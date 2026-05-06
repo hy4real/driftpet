@@ -114,13 +114,18 @@ type PendingItemResult = {
 
 const ensurePendingItem = (payload: IngestInput, normalized: string): PendingItemResult => {
   const db = getDatabase();
-  const contentHash = buildContentHash(buildItemIdentity(payload, normalized));
-  const existing = db.prepare(`
-    SELECT id
-    FROM items
-    WHERE content_hash = ?
-    LIMIT 1
-  `).get(contentHash) as ExistingItemRow | undefined;
+  const contentHash = payload.source === "manual_chaos"
+    ? null
+    : buildContentHash(buildItemIdentity(payload, normalized));
+
+  const existing = contentHash === null
+    ? undefined
+    : db.prepare(`
+      SELECT id
+      FROM items
+      WHERE content_hash = ?
+      LIMIT 1
+    `).get(contentHash) as ExistingItemRow | undefined;
 
   if (existing !== undefined) {
     const existingCard = findCardByItemId(existing.id);
@@ -271,6 +276,13 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
 };
 
 export const ingestManualText = async (
+  rawText: string,
+  origin: ItemOrigin = "real"
+): Promise<CardRecord> => {
+  return ingestChaosReset(rawText, origin);
+};
+
+export const ingestChaosReset = async (
   rawText: string,
   origin: ItemOrigin = "real"
 ): Promise<CardRecord> => {

@@ -27,6 +27,14 @@ type DigestJson = {
   summaryForRetrieval?: unknown;
 };
 
+type ChaosResetJson = {
+  mainLine?: unknown;
+  sideQuests?: unknown;
+  nextStep?: unknown;
+  summaryForRetrieval?: unknown;
+  knowledgeTag?: unknown;
+};
+
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DIGEST_MODEL = process.env.DRIFTPET_DIGEST_MODEL ?? DEFAULT_MODEL;
 const REMARK_MODEL = process.env.DRIFTPET_REMARK_MODEL ?? DIGEST_MODEL;
@@ -117,6 +125,27 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
   };
 };
 
+const createChaosResetFallback = (input: DigestInput): DigestDraft => {
+  const contentBasis = normalizeText(input.rawText);
+  const firstLine = contentBasis.split(/\n+/).map((line) => normalizeText(line)).find((line) => line.length > 0) ?? "";
+  const mainLine = truncate(
+    firstLine.length > 0 ? firstLine : "Return to one thread and name the actual deliverable.",
+    120
+  );
+  const sideQuests = /https?:\/\//i.test(contentBasis)
+    ? "Set aside the extra links and tabs that do not unblock the main deliverable."
+    : "Set aside anything that does not move the current deliverable forward.";
+  const nextStep = "Write the next concrete output, close two unrelated tabs, and do the first five-minute step now.";
+
+  return {
+    title: mainLine,
+    useFor: `Set aside: ${sideQuests}\nNext: ${nextStep}`,
+    knowledgeTag: "chaos reset",
+    summaryForRetrieval: truncate(`${mainLine} ${sideQuests} ${nextStep}`, 500),
+    petRemark: "You drifted. Pull one thread and keep it."
+  };
+};
+
 const formatRecentCards = (cards: CardRecord[]): string => {
   if (cards.length === 0) {
     return "No recent cards yet.";
@@ -156,6 +185,15 @@ const parseDigestJson = (value: string): DigestJson => {
   return parsed;
 };
 
+const parseChaosResetJson = (value: string): ChaosResetJson => {
+  const jsonText = extractJsonObject(value);
+  if (jsonText === null) {
+    throw new Error("Model output did not contain a JSON object.");
+  }
+
+  return JSON.parse(jsonText) as ChaosResetJson;
+};
+
 const coerceString = (value: unknown, fallback: string, limit: number): string => {
   if (typeof value !== "string") {
     return truncate(fallback, limit);
@@ -186,6 +224,20 @@ const buildDigestPrompt = (input: DigestInput, recentCards: CardRecord[]): strin
   ].join("\n");
 };
 
+const buildChaosResetPrompt = (input: DigestInput, recentCards: CardRecord[]): string => {
+  const basePrompt = loadPrompt("chaos-reset.v1.md");
+
+  return [
+    basePrompt,
+    "",
+    "Recent cards:",
+    formatRecentCards(recentCards),
+    "",
+    "Current chaos dump:",
+    input.rawText
+  ].join("\n");
+};
+
 const buildRemarkPrompt = (digest: DigestDraft): string => {
   const basePrompt = loadPrompt("pet-remark.v1.md");
   return [
@@ -201,10 +253,102 @@ const buildRemarkPrompt = (digest: DigestDraft): string => {
   ].join("\n");
 };
 
+const applyPetRemark = async (
+  digest: DigestDraft,
+  fallbackRemark: string
+): Promise<Pick<GenerateDigestResult, "digest" | "digestError">> => {
+  try {
+    const remarkResponse = await sendTextPrompt({
+      prompt: buildRemarkPrompt(digest),
+      model: REMARK_MODEL,
+      maxTokens: 80
+    });
+
+    digest.petRemark = coerceString(remarkResponse, fallbackRemark, 80);
+    return {
+      digest,
+      digestError: null
+    };
+  } catch (error) {
+    return {
+      digest,
+      digestError: error instanceof Error
+        ? `Pet remark fallback: ${error.message}`
+        : "Pet remark fallback: unknown error."
+    };
+  }
+};
+
+const generateChaosResetDraft = async (
+  input: DigestInput,
+  recentCards: CardRecord[]
+): Promise<GenerateDigestResult> => {
+  const fallback = createChaosResetFallback(input);
+
+  if (!canUseLlm()) {
+    return {
+      digest: fallback,
+      digestError: `${getLlmMissingReason()}; using fallback digest.`,
+      mode: "full"
+    };
+  }
+
+  try {
+    const response = await sendTextPrompt({
+      prompt: buildChaosResetPrompt(input, recentCards),
+      model: DIGEST_MODEL,
+      maxTokens: 350
+    });
+    const parsed = parseChaosResetJson(response);
+    const mainLine = coerceString(parsed.mainLine, fallback.title, 120);
+    const sideQuests = coerceString(
+      parsed.sideQuests,
+      "Set aside anything that does not move the current deliverable forward.",
+      180
+    );
+    const nextStep = coerceString(
+      parsed.nextStep,
+      "Write the next concrete output and do the first five-minute step now.",
+      180
+    );
+
+    const digest: DigestDraft = {
+      title: mainLine,
+      useFor: `Set aside: ${sideQuests}\nNext: ${nextStep}`,
+      knowledgeTag: coerceString(parsed.knowledgeTag, "chaos reset", 80),
+      summaryForRetrieval: coerceString(
+        parsed.summaryForRetrieval,
+        fallback.summaryForRetrieval,
+        500
+      ),
+      petRemark: fallback.petRemark
+    };
+
+    const withRemark = await applyPetRemark(digest, fallback.petRemark);
+    return {
+      digest: withRemark.digest,
+      digestError: withRemark.digestError,
+      mode: "full"
+    };
+  } catch (error) {
+    return {
+      digest: fallback,
+      digestError: error instanceof Error
+        ? `Chaos reset fallback: ${error.message}`
+        : "Chaos reset fallback: unknown error.",
+      mode: "full"
+    };
+  }
+};
+
 export const generateDigestDraft = async (
   input: DigestInput,
   recentCards: CardRecord[]
 ): Promise<GenerateDigestResult> => {
+  if (input.source === "manual_chaos") {
+    return generateChaosResetDraft(input, recentCards);
+  }
+
   if (isLowSignalTelegramText(input)) {
     return {
       digest: createLowSignalDigest(input),
@@ -243,27 +387,12 @@ export const generateDigestDraft = async (
       petRemark: fallback.petRemark
     };
 
-    try {
-      const remarkResponse = await sendTextPrompt({
-        prompt: buildRemarkPrompt(digest),
-        model: REMARK_MODEL,
-        maxTokens: 80
-      });
-      digest.petRemark = coerceString(remarkResponse, fallback.petRemark, 80);
-      return {
-        digest,
-        digestError: null,
-        mode: "full"
-      };
-    } catch (error) {
-      return {
-        digest,
-        digestError: error instanceof Error
-          ? `Pet remark fallback: ${error.message}`
-          : "Pet remark fallback: unknown error.",
-        mode: "full"
-      };
-    }
+    const withRemark = await applyPetRemark(digest, fallback.petRemark);
+    return {
+      digest: withRemark.digest,
+      digestError: withRemark.digestError,
+      mode: "full"
+    };
   } catch (error) {
     return {
       digest: fallback,

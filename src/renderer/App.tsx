@@ -11,7 +11,7 @@ export default function App() {
   const [history, setHistory] = useState<CardRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [manualText, setManualText] = useState("");
+  const [chaosText, setChaosText] = useState("");
   const [status, setStatus] = useState<AppStatus | null>(null);
 
   useEffect(() => {
@@ -35,15 +35,15 @@ export default function App() {
     setStatus(nextStatus);
   };
 
-  const submitManualText = async () => {
-    const nextValue = manualText.trim();
+  const submitChaosReset = async () => {
+    const nextValue = chaosText.trim();
     if (nextValue.length === 0) {
       return;
     }
 
-    const card = await window.driftpet.ingestManualText(nextValue);
+    const card = await window.driftpet.ingestChaosReset(nextValue);
     setActiveCard(card);
-    setManualText("");
+    setChaosText("");
     const nextStatus = await window.driftpet.getStatus();
     setStatus(nextStatus);
   };
@@ -79,9 +79,9 @@ export default function App() {
             setStatusOpen((open) => !open);
           }}
           onShowDemo={showDemoCard}
-          onManualTextChange={setManualText}
-          onSubmitManualText={submitManualText}
-          manualText={manualText}
+          onChaosTextChange={setChaosText}
+          onSubmitChaosReset={submitChaosReset}
+          chaosText={chaosText}
           historyOpen={historyOpen}
           statusOpen={statusOpen}
         />

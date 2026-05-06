@@ -10,6 +10,7 @@ declare global {
       listRecentCards: () => Promise<CardRecord[]>;
       getStatus: () => Promise<AppStatus>;
       ingestManualText: (rawText: string) => Promise<CardRecord>;
+      ingestChaosReset: (rawText: string) => Promise<CardRecord>;
       onCardCreated: (listener: (card: CardRecord) => void) => () => void;
     };
   }

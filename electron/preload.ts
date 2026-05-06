@@ -9,6 +9,7 @@ const api = {
   listRecentCards: (): Promise<CardRecord[]> => ipcRenderer.invoke("cards:list-recent"),
   getStatus: (): Promise<AppStatus> => ipcRenderer.invoke("app:get-status"),
   ingestManualText: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:manual-text", rawText),
+  ingestChaosReset: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:chaos-reset", rawText),
   onCardCreated: (listener: CardCreatedListener): (() => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, card: CardRecord) => {
       listener(card);

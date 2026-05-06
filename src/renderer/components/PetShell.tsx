@@ -1,9 +1,9 @@
 type PetShellProps = {
   historyOpen: boolean;
   statusOpen: boolean;
-  manualText: string;
-  onManualTextChange: (value: string) => void;
-  onSubmitManualText: () => void;
+  chaosText: string;
+  onChaosTextChange: (value: string) => void;
+  onSubmitChaosReset: () => void;
   onToggleHistory: () => void;
   onToggleStatus: () => void;
   onShowDemo: () => void;
@@ -12,9 +12,9 @@ type PetShellProps = {
 export function PetShell({
   historyOpen,
   statusOpen,
-  manualText,
-  onManualTextChange,
-  onSubmitManualText,
+  chaosText,
+  onChaosTextChange,
+  onSubmitChaosReset,
   onToggleHistory,
   onToggleStatus,
   onShowDemo
@@ -30,12 +30,12 @@ export function PetShell({
 
       <div className="pet-controls">
         <label className="manual-input-shell">
-          <span className="manual-input-label">Manual drift note</span>
+          <span className="manual-input-label">I&apos;m drifting</span>
           <textarea
             className="manual-input"
-            onChange={(event) => onManualTextChange(event.target.value)}
-            placeholder="Paste what you are doing or where you drifted."
-            value={manualText}
+            onChange={(event) => onChaosTextChange(event.target.value)}
+            placeholder="Paste the current task, open tabs, links, and where the thread got messy."
+            value={chaosText}
           />
         </label>
         <button
@@ -61,10 +61,10 @@ export function PetShell({
         </button>
         <button
           className="pet-button pet-button-strong"
-          onClick={onSubmitManualText}
+          onClick={onSubmitChaosReset}
           type="button"
         >
-          ingest note
+          reset thread
         </button>
       </div>
     </section>

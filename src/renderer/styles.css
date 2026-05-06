@@ -305,6 +305,7 @@ button {
   color: var(--text-0);
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .ghost-button,
