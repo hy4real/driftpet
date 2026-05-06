@@ -231,7 +231,12 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
     .slice(0, 5);
   const digestResult = await generateDigestDraft(input, recentCards);
   const combinedError = joinErrors(input.lastError, digestResult.digestError);
-  const relatedResult = await findRelatedCards(digestResult.digest.summaryForRetrieval, pending.itemId);
+  const relatedResult = digestResult.mode === "low_signal"
+    ? {
+      related: [],
+      queryEmbedding: null
+    }
+    : await findRelatedCards(digestResult.digest.summaryForRetrieval, pending.itemId);
 
   return finalizeCard(
     pending.itemId,

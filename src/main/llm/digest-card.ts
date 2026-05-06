@@ -17,6 +17,7 @@ type DigestDraft = Omit<CardRecord, "id" | "itemId" | "createdAt" | "related">;
 type GenerateDigestResult = {
   digest: DigestDraft;
   digestError: string | null;
+  mode: "full" | "low_signal";
 };
 
 type DigestJson = {
@@ -29,6 +30,31 @@ type DigestJson = {
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DIGEST_MODEL = process.env.DRIFTPET_DIGEST_MODEL ?? DEFAULT_MODEL;
 const REMARK_MODEL = process.env.DRIFTPET_REMARK_MODEL ?? DIGEST_MODEL;
+const LOW_SIGNAL_TG_TEXT = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "yo",
+  "sup",
+  "ping",
+  "test",
+  "ok",
+  "okay",
+  "kk",
+  "gm",
+  "gn",
+  "你好",
+  "您好",
+  "哈喽",
+  "嗨",
+  "喂",
+  "在吗",
+  "在嘛",
+  "收到",
+  "哈哈",
+  "哈哈哈",
+  "lol"
+]);
 
 const normalizeText = (value: string): string => {
   return value.trim().replace(/\s+/g, " ");
@@ -36,6 +62,42 @@ const normalizeText = (value: string): string => {
 
 const truncate = (value: string, limit: number): string => {
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
+};
+
+const normalizeForSignal = (value: string): string => {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, "");
+};
+
+const isLowSignalTelegramText = (input: DigestInput): boolean => {
+  if (input.source !== "tg_text" || input.rawUrl !== undefined && input.rawUrl !== null) {
+    return false;
+  }
+
+  const compact = normalizeForSignal(input.rawText);
+  if (compact.length === 0) {
+    return false;
+  }
+
+  if (LOW_SIGNAL_TG_TEXT.has(compact)) {
+    return true;
+  }
+
+  return /^(hello+|hi+|hey+|yo+|ping+|test+|ok+|lol+|哈哈+|呵呵+)$/.test(compact);
+};
+
+const createLowSignalDigest = (input: DigestInput): DigestDraft => {
+  const label = truncate(normalizeText(input.rawText), 36) || "ping";
+
+  return {
+    title: `Telegram ping captured: ${label}`,
+    useFor: "Treat this as a ping or smoke input. Confirm the Telegram lane works, then move back to a higher-signal thread.",
+    knowledgeTag: "Telegram ping",
+    summaryForRetrieval: `Low-signal Telegram ping: ${label}`,
+    petRemark: "Tiny ping landed. File it and keep moving."
+  };
 };
 
 const createFallbackDigest = (input: DigestInput): DigestDraft => {
@@ -143,12 +205,21 @@ export const generateDigestDraft = async (
   input: DigestInput,
   recentCards: CardRecord[]
 ): Promise<GenerateDigestResult> => {
+  if (isLowSignalTelegramText(input)) {
+    return {
+      digest: createLowSignalDigest(input),
+      digestError: null,
+      mode: "low_signal"
+    };
+  }
+
   const fallback = createFallbackDigest(input);
 
   if (!canUseLlm()) {
     return {
       digest: fallback,
-      digestError: `${getLlmMissingReason()}; using fallback digest.`
+      digestError: `${getLlmMissingReason()}; using fallback digest.`,
+      mode: "full"
     };
   }
 
@@ -181,14 +252,16 @@ export const generateDigestDraft = async (
       digest.petRemark = coerceString(remarkResponse, fallback.petRemark, 80);
       return {
         digest,
-        digestError: null
+        digestError: null,
+        mode: "full"
       };
     } catch (error) {
       return {
         digest,
         digestError: error instanceof Error
           ? `Pet remark fallback: ${error.message}`
-          : "Pet remark fallback: unknown error."
+          : "Pet remark fallback: unknown error.",
+        mode: "full"
       };
     }
   } catch (error) {
@@ -196,7 +269,8 @@ export const generateDigestDraft = async (
       digest: fallback,
       digestError: error instanceof Error
         ? `Digest fallback: ${error.message}`
-        : "Digest fallback: unknown error."
+        : "Digest fallback: unknown error.",
+      mode: "full"
     };
   }
 };
