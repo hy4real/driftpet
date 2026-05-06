@@ -128,9 +128,15 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
 const createChaosResetFallback = (input: DigestInput): DigestDraft => {
   const contentBasis = normalizeText(input.rawText);
   const firstLine = contentBasis.split(/\n+/).map((line) => normalizeText(line)).find((line) => line.length > 0) ?? "";
+  const cleanedMainLine = firstLine
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/当前\s*tab[:：].*$/i, "")
+    .replace(/tabs?[:：].*$/i, "")
+    .replace(/[，,;；]\s*$/, "")
+    .trim();
   const mainLine = truncate(
-    firstLine.length > 0 ? firstLine : "Return to one thread and name the actual deliverable.",
-    120
+    cleanedMainLine.length > 0 ? cleanedMainLine : "Return to one thread and name the actual deliverable.",
+    72
   );
   const sideQuests = /https?:\/\//i.test(contentBasis)
     ? "Set aside the extra links and tabs that do not unblock the main deliverable."
@@ -192,6 +198,26 @@ const parseChaosResetJson = (value: string): ChaosResetJson => {
   }
 
   return JSON.parse(jsonText) as ChaosResetJson;
+};
+
+const scrubBrokenPetRemark = (value: string, fallback: string): string => {
+  const normalized = normalizeText(value);
+  if (!normalized.startsWith("{")) {
+    return normalized;
+  }
+
+  try {
+    const parsed = JSON.parse(normalized) as {
+      petRemark?: unknown;
+    };
+    if (typeof parsed.petRemark === "string") {
+      return normalizeText(parsed.petRemark);
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
 };
 
 const coerceString = (value: unknown, fallback: string, limit: number): string => {
@@ -264,7 +290,11 @@ const applyPetRemark = async (
       maxTokens: 80
     });
 
-    digest.petRemark = coerceString(remarkResponse, fallbackRemark, 80);
+    digest.petRemark = coerceString(
+      scrubBrokenPetRemark(remarkResponse, fallbackRemark),
+      fallbackRemark,
+      80
+    );
     return {
       digest,
       digestError: null

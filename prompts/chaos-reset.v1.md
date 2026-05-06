@@ -16,6 +16,7 @@ Required schema:
 Rules:
 - Do not summarize everything.
 - `mainLine` must name the real deliverable or thread, not a mood.
+- `mainLine` must stay short and must not include raw URLs, full tab lists, or long context dumps.
 - `sideQuests` must identify what to ignore, close, postpone, or stop checking.
 - `nextStep` must be specific and immediately actionable.
 - Use the recent cards context only to sharpen the decision, not to add extra tasks.
