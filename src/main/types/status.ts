@@ -1,4 +1,4 @@
-import type { ItemOrigin } from "./item";
+import type { ItemOrigin, UrlExtractionStage } from "./item";
 import type { RelatedCardRef } from "./card";
 
 export type StatusLevel = "ok" | "warn" | "idle";
@@ -23,7 +23,9 @@ export type LatestCaptureExtractionStatus = {
   rawUrl: string | null;
   extractedTitle: string | null;
   extractedTextPreview: string | null;
-  extractionState: "not_applicable" | "fallback" | "extracted";
+  extractionState: "not_applicable" | "fallback" | "extracted" | "failed";
+  stage: UrlExtractionStage;
+  detail: string | null;
 };
 
 export type LatestItemStatus = {

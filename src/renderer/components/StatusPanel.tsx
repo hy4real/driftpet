@@ -34,13 +34,17 @@ const summarize = (value: string, limit: number): string => {
   return `${normalized.slice(0, limit - 3)}...`;
 };
 
-const extractionLabel = (state: "not_applicable" | "fallback" | "extracted"): string => {
+const extractionLabel = (state: "not_applicable" | "fallback" | "extracted" | "failed"): string => {
   if (state === "extracted") {
     return "extracted";
   }
 
   if (state === "fallback") {
     return "fallback";
+  }
+
+  if (state === "failed") {
+    return "failed";
   }
 
   return "n/a";
@@ -127,17 +131,23 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
               </div>
 
               {status.storage.latestItem.extraction.hasUrl ? (
-                <div className={`capture-block ${status.storage.latestItem.extraction.extractionState === "fallback" ? "capture-block-warn" : ""}`}>
+                <div className={`capture-block ${status.storage.latestItem.extraction.extractionState === "fallback" || status.storage.latestItem.extraction.extractionState === "failed" ? "capture-block-warn" : ""}`}>
                   <span className="bubble-label">Extraction</span>
                   <p>{status.storage.latestItem.extraction.rawUrl}</p>
-                  <small>{extractionLabel(status.storage.latestItem.extraction.extractionState)}</small>
+                  <small>
+                    {extractionLabel(status.storage.latestItem.extraction.extractionState)}
+                    {` · ${status.storage.latestItem.extraction.stage}`}
+                  </small>
+                  {status.storage.latestItem.extraction.detail !== null ? (
+                    <small>{summarize(status.storage.latestItem.extraction.detail, 180)}</small>
+                  ) : null}
                   {status.storage.latestItem.extraction.extractedTextPreview !== null ? (
                     <small>{status.storage.latestItem.extraction.extractedTextPreview}</small>
                   ) : null}
                 </div>
               ) : null}
 
-              {status.storage.latestItem.lastError !== null ? (
+              {status.storage.latestItem.lastError !== null && status.storage.latestItem.lastError !== status.storage.latestItem.extraction.detail ? (
                 <div className="capture-block capture-block-warn">
                   <span className="bubble-label">Error</span>
                   <p>{summarize(status.storage.latestItem.lastError, 180)}</p>

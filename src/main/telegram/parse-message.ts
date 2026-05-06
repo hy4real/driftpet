@@ -1,4 +1,4 @@
-import type { ItemSource } from "../types/item";
+import type { ItemSource, UrlExtractionStage } from "../types/item";
 
 type TelegramEntity = {
   type: string;
@@ -27,6 +27,8 @@ export type ParsedTelegramInput = {
   tgMessageId: string;
   extractedTitle?: string | null;
   extractedText?: string | null;
+  extractionStage?: UrlExtractionStage;
+  extractionError?: string | null;
   lastError?: string | null;
 };
 

@@ -5,7 +5,7 @@ import { getRecentCards } from "../db/cards";
 import { upsertCardEmbedding } from "../db/embeddings";
 import { generateDigestDraft } from "../llm/digest-card";
 import { findRelatedCards } from "../recall/related";
-import type { ItemOrigin, ItemSource } from "../types/item";
+import type { ItemOrigin, ItemSource, UrlExtractionStage } from "../types/item";
 
 type ExistingItemRow = {
   id: number;
@@ -74,6 +74,8 @@ export type IngestInput = {
   tgMessageId?: string | null;
   extractedTitle?: string | null;
   extractedText?: string | null;
+  extractionStage?: UrlExtractionStage;
+  extractionError?: string | null;
   lastError?: string | null;
 };
 
@@ -89,6 +91,20 @@ const joinErrors = (...errors: Array<string | null | undefined>): string | null 
     .filter((value) => value.length > 0);
 
   return values.length > 0 ? values.join(" | ") : null;
+};
+
+const resolveExtractionStage = (payload: IngestInput): UrlExtractionStage => {
+  if (payload.rawUrl === undefined || payload.rawUrl === null || payload.rawUrl.length === 0) {
+    return "not_applicable";
+  }
+
+  if (payload.extractionStage !== undefined) {
+    return payload.extractionStage;
+  }
+
+  return payload.extractedText !== undefined && payload.extractedText !== null && payload.extractedText.trim().length > 0
+    ? "readability"
+    : "no_content";
 };
 
 type PendingItemResult = {
@@ -131,7 +147,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
       tg_message_id,
       received_at,
       status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.source,
     payload.origin ?? "real",
@@ -158,6 +174,7 @@ const finalizeCard = (
   queryEmbedding: number[] | null
 ): CardRecord => {
   const db = getDatabase();
+  const extractionStage = resolveExtractionStage(payload);
   const createCard = db.transaction(() => {
     const createdAt = Date.now();
     const cardResult = db.prepare(`
@@ -184,13 +201,15 @@ const finalizeCard = (
 
     db.prepare(`
       UPDATE items
-      SET status = ?, extracted_title = ?, extracted_text = ?, last_error = ?
+      SET status = ?, extracted_title = ?, extracted_text = ?, last_error = ?, extraction_stage = ?, extraction_error = ?
       WHERE id = ?
     `).run(
       "digested",
-      payload.extractedTitle ?? digest.title,
-      payload.extractedText ?? digest.summaryForRetrieval,
+      payload.extractedTitle ?? null,
+      payload.extractedText ?? null,
       combinedError,
+      extractionStage,
+      payload.extractionError ?? null,
       itemId
     );
 

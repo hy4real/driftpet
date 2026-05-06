@@ -5,7 +5,7 @@ import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
 import type { RelatedCardRef } from "../types/card";
-import type { ItemOrigin } from "../types/item";
+import type { ItemOrigin, UrlExtractionStage } from "../types/item";
 
 type CountsRow = {
   item_count: number;
@@ -27,6 +27,8 @@ type LatestItemRow = {
   raw_text: string | null;
   received_at: number;
   last_error: string | null;
+  extraction_stage: UrlExtractionStage | null;
+  extraction_error: string | null;
   card_id: number | null;
   card_title: string | null;
   use_for: string | null;
@@ -58,6 +60,62 @@ const parseRelated = (value: string | null): RelatedCardRef[] => {
   }
 };
 
+const inferExtractionStage = (row: LatestItemRow): UrlExtractionStage => {
+  if (row.raw_url === null) {
+    return "not_applicable";
+  }
+
+  if (row.extraction_stage !== null) {
+    return row.extraction_stage;
+  }
+
+  const error = row.last_error?.toLowerCase() ?? "";
+  if (error.includes("fetch failed")) {
+    return "fetch_failed";
+  }
+
+  if (error.includes("no readable article content found")) {
+    return "no_content";
+  }
+
+  return row.extracted_text !== null && row.extracted_text.trim().length > 0
+    ? "readability"
+    : "no_content";
+};
+
+const buildExtractionStatus = (row: LatestItemRow): LatestItemStatus["extraction"] => {
+  const stage = inferExtractionStage(row);
+  let extractionState: LatestItemStatus["extraction"]["extractionState"] = "not_applicable";
+  let detail: string | null = null;
+  let extractedTextPreview: string | null = null;
+
+  if (stage === "readability") {
+    extractionState = "extracted";
+    detail = "Readability extracted article text.";
+    extractedTextPreview = row.extracted_text === null ? null : summarize(row.extracted_text, 180);
+  } else if (stage === "body_fallback") {
+    extractionState = "fallback";
+    detail = row.extraction_error ?? "Readability returned empty content; using page body text fallback.";
+    extractedTextPreview = row.extracted_text === null ? null : summarize(row.extracted_text, 180);
+  } else if (stage === "fetch_failed") {
+    extractionState = "failed";
+    detail = row.extraction_error ?? "URL fetch failed before article parsing.";
+  } else if (stage === "no_content") {
+    extractionState = "failed";
+    detail = row.extraction_error ?? "Fetched the page, but found no readable article content.";
+  }
+
+  return {
+    hasUrl: row.raw_url !== null,
+    rawUrl: row.raw_url,
+    extractedTitle: row.extracted_title,
+    extractedTextPreview,
+    extractionState,
+    stage,
+    detail
+  };
+};
+
 const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | null => {
   if (row === undefined) {
     return null;
@@ -66,11 +124,6 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
   const fallbackTitle = row.raw_text === null || row.raw_text.length === 0
     ? "Untitled input"
     : summarize(row.raw_text, 54);
-  const extractionState = row.raw_url === null
-    ? "not_applicable"
-    : row.extracted_text !== null && row.extracted_text.trim().length > 0
-      ? "extracted"
-      : "fallback";
 
   return {
     id: row.id,
@@ -83,13 +136,7 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
     rawText: row.raw_text,
     tgMessageId: row.tg_message_id,
     lastError: row.last_error,
-    extraction: {
-      hasUrl: row.raw_url !== null,
-      rawUrl: row.raw_url,
-      extractedTitle: row.extracted_title,
-      extractedTextPreview: row.extracted_text === null ? null : summarize(row.extracted_text, 180),
-      extractionState
-    },
+    extraction: buildExtractionStatus(row),
     card: row.card_id === null || row.card_title === null || row.use_for === null || row.knowledge_tag === null || row.pet_remark === null
       ? null
       : {
@@ -130,6 +177,8 @@ const getLatestItem = (): LatestItemStatus | null => {
       items.raw_text AS raw_text,
       items.received_at AS received_at,
       items.last_error AS last_error,
+      items.extraction_stage AS extraction_stage,
+      items.extraction_error AS extraction_error,
       cards.id AS card_id,
       cards.title AS card_title,
       cards.use_for AS use_for,
@@ -275,9 +324,11 @@ const getStorageSection = (
     };
   }
 
-  const detail = latestItem.lastError !== null && latestItem.lastError.length > 0
-    ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.lastError, 72)}`
-    : `${latestItem.source} · ${latestItem.status} · ${latestItem.title}`;
+  const detail = latestItem.extraction.extractionState === "failed" && latestItem.extraction.detail !== null
+    ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.extraction.detail, 72)}`
+    : latestItem.lastError !== null && latestItem.lastError.length > 0
+      ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.lastError, 72)}`
+      : `${latestItem.source} · ${latestItem.status} · ${latestItem.title}`;
 
   return {
     level: counts.failed_count > 0 ? "warn" : "ok",

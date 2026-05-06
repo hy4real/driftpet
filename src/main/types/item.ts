@@ -2,6 +2,12 @@ export type ItemSource = "manual_chaos" | "tg_text" | "tg_url";
 
 export type ItemStatus = "pending" | "digested" | "failed";
 export type ItemOrigin = "real" | "synthetic";
+export type UrlExtractionStage =
+  | "not_applicable"
+  | "readability"
+  | "body_fallback"
+  | "fetch_failed"
+  | "no_content";
 
 export type ItemRecord = {
   id: number;
@@ -16,4 +22,6 @@ export type ItemRecord = {
   status: ItemStatus;
   origin: ItemOrigin;
   lastError: string | null;
+  extractionStage: UrlExtractionStage;
+  extractionError: string | null;
 };

@@ -13,6 +13,8 @@ export const enrichTelegramInput = async (
     ...input,
     extractedTitle: article.title,
     extractedText: article.text,
+    extractionStage: article.stage,
+    extractionError: article.error,
     lastError: article.error
   };
 };

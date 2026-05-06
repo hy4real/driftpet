@@ -1,11 +1,13 @@
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+import type { UrlExtractionStage } from "../types/item";
 
 export type ExtractedArticle = {
   title: string | null;
   text: string | null;
   error: string | null;
   url: string;
+  stage: UrlExtractionStage;
 };
 
 const normalizeText = (value: string): string => {
@@ -31,7 +33,8 @@ export const extractArticleFromHtml = (html: string, url: string): ExtractedArti
         title: title.length > 0 ? title : null,
         text,
         error: null,
-        url
+        url,
+        stage: "readability"
       };
     }
 
@@ -40,8 +43,9 @@ export const extractArticleFromHtml = (html: string, url: string): ExtractedArti
       return {
         title: title.length > 0 ? title : null,
         text: fallbackText,
-        error: null,
-        url
+        error: "Readability returned empty content; using page body text fallback.",
+        url,
+        stage: "body_fallback"
       };
     }
 
@@ -49,7 +53,8 @@ export const extractArticleFromHtml = (html: string, url: string): ExtractedArti
       title: title.length > 0 ? title : null,
       text: null,
       error: "No readable article content found.",
-      url
+      url,
+      stage: "no_content"
     };
   } finally {
     dom.window.close();
@@ -70,7 +75,8 @@ export const extractArticleFromUrl = async (url: string): Promise<ExtractedArtic
         title: null,
         text: null,
         error: `Fetch failed with HTTP ${response.status}.`,
-        url
+        url,
+        stage: "fetch_failed"
       };
     }
 
@@ -80,8 +86,9 @@ export const extractArticleFromUrl = async (url: string): Promise<ExtractedArtic
     return {
       title: null,
       text: null,
-      error: error instanceof Error ? error.message : "Unknown fetch error.",
-      url
+      error: error instanceof Error ? `Fetch failed: ${error.message}` : "Fetch failed: unknown error.",
+      url,
+      stage: "fetch_failed"
     };
   }
 };
