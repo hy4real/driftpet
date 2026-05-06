@@ -1,6 +1,7 @@
 import type { RelatedCardRef } from "../types/card";
 import { listRecallCandidates } from "../db/embeddings";
 import { canUseEmbeddings, generateEmbedding } from "../llm/embeddings";
+import { detectOutputLanguage } from "../llm/language";
 
 type FindRelatedResult = {
   related: RelatedCardRef[];
@@ -73,8 +74,14 @@ const lexicalSimilarity = (left: string, right: string): number => {
   return overlap / Math.sqrt(leftTokens.size * rightTokens.size);
 };
 
-const buildReason = (summary: string): string => {
+const buildReason = (summary: string, languageHint: string): string => {
   const snippet = summary.trim().replace(/\s+/g, " ").slice(0, 96);
+  const language = detectOutputLanguage(languageHint, summary);
+
+  if (language === "zh") {
+    return snippet.length > 0 ? `相关线索：${snippet}${summary.length > 96 ? "..." : ""}` : "相关线索来自更早的一张卡片。";
+  }
+
   return snippet.length > 0 ? `Similar thread: ${snippet}${summary.length > 96 ? "..." : ""}` : "Similar thread from an earlier card.";
 };
 
@@ -87,7 +94,10 @@ const isRecallEligible = (candidate: Awaited<ReturnType<typeof listRecallCandida
     return false;
   }
 
-  return candidate.source !== "tg_text" || candidate.title.toLowerCase().includes("ping") === false;
+  const title = candidate.title.toLowerCase();
+  const summary = candidate.summaryForRetrieval.toLowerCase();
+  const looksLikePing = title.includes("ping") || summary.includes("telegram ping");
+  return candidate.source !== "tg_text" || looksLikePing === false;
 };
 
 export const findRelatedCards = async (
@@ -129,7 +139,7 @@ export const findRelatedCards = async (
     .map((entry) => ({
       cardId: entry.candidate.cardId,
       title: entry.candidate.title,
-      reason: buildReason(entry.candidate.summaryForRetrieval)
+      reason: buildReason(entry.candidate.summaryForRetrieval, summaryForRetrieval)
     }));
 
   return {

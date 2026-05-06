@@ -8,7 +8,7 @@ This is the remaining part of the original two-week V1 plan, in execution order.
    Feed a batch of real Telegram / local chaos inputs and inspect card quality, recall quality, and interruption behavior.
 
 2. Prompt and threshold retuning
-   Adjust the digest prompt, chaos-reset prompt, and recall thresholds based on real captures.
+   Adjust the digest prompt, chaos-reset prompt, recall thresholds, and multilingual wording based on real captures.
 
 3. Report refresh
    Update the generated morning brief so it describes the current V1 surface accurately.

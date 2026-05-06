@@ -14,6 +14,7 @@ Required schema:
 
 Rules:
 - Do not write a generic summary.
+- Match the requested output language.
 - `useFor` must produce a next move, not a content recap.
 - Use the recent cards context to avoid vague suggestions.
 - `knowledgeTag` should be short and reusable.

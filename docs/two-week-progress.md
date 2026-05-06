@@ -96,6 +96,15 @@ Status: done
 
 Commit: `572fc2a`
 
+### Day 16
+
+Status: done
+
+- Chinese fallback copy now stays in Chinese for digest cards and chaos reset cards
+- Related recall reasons now follow the input language instead of hardcoding English
+- Prompt files now explicitly ask the model to match the requested output language
+- Recall ping filtering no longer depends on the English title wording alone
+
 ## Remaining Work From The Original Two-Week Plan
 
 Status: not done yet
