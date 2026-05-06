@@ -121,7 +121,7 @@ const recentResult = sqlite(`
 const prefsResult = sqlite(`
   select key, value
   from prefs
-  where key in ('telegram_last_update_id')
+  where key in ('telegram_last_update_id', 'pet_mode', 'pet_hourly_budget')
   order by key;
 `);
 
@@ -200,7 +200,7 @@ const markdown = `# driftpet Morning Brief - ${reportDate}
 
 ## One-Line Read
 
-driftpet now has a working V1 spine plus a visible health surface: Telegram capture on the phone, local Mac polling, cloud digest generation, local Qwen embeddings through Ollama, related-memory recall in SQLite, and an in-app status panel for failure visibility.
+driftpet now has a working V1 spine plus control surfaces: Telegram capture on the phone, local chaos-reset input, cloud digest generation, local Qwen embeddings through Ollama, filtered related-memory recall, and an in-app pet mode / budget / health surface.
 
 ## Verification
 
@@ -220,6 +220,9 @@ Current counts:
 - Telegram items: ${counts.telegram_items ?? "unknown"}
 - Ollama embeddings: ${counts.ollama_embeddings ?? "unknown"}
 - Latest Telegram item: ${latestTelegram?.extractedTitle ?? "none observed"}
+- Pet mode: ${appStatus?.pet?.mode ?? "unknown"}
+- Pet hourly budget: ${appStatus?.pet?.hourlyBudget ?? "unknown"}
+- Auto cards shown this hour: ${appStatus?.pet?.shownThisHour ?? "unknown"}
 
 ## What Is Working
 
@@ -230,12 +233,16 @@ Current counts:
 - Related recall is no longer just lexical; recent cards have real local vectors.
 - SQLite persists items, cards, events, prefs, and card embeddings locally.
 - The renderer can now show Telegram / LLM / embeddings / storage health without opening SQLite.
+- The pet has \`focus\` / \`sleep\` modes plus an hourly auto-surface budget.
+- Manual chaos dumps now go through a dedicated thread-reset lane instead of the generic note path.
+- Related recall excludes synthetic verification data and Telegram ping cards.
 
 ## Product Shape
 
 The product is strongest when it stays narrow:
 
 > Send drift into Telegram. driftpet turns it into one useful card and connects it to memory.
+> Or hit "I'm drifting" locally and let the pet pull you back to one thread.
 
 Do not make it a general chatbot yet. The valuable behavior is not conversation volume; it is capture, compression, and resurfacing.
 
@@ -243,6 +250,7 @@ Do not make it a general chatbot yet. The valuable behavior is not conversation 
 
 - UI shell: Electron renderer with React components.
 - Main process: SQLite, Telegram polling, extraction, LLM calls, recall.
+- Pet runtime: local mode state plus hourly interruption budget.
 - Storage: local SQLite under \`data/app.db\`.
 - Text model path: \`DRIFTPET_LLM_PROVIDER=openai\` with a relay endpoint.
 - Embedding path: \`DRIFTPET_EMBED_PROVIDER=ollama\`.
@@ -250,14 +258,14 @@ Do not make it a general chatbot yet. The valuable behavior is not conversation 
 
 ## Tomorrow's Priority
 
-1. Add a small "recent capture" inspection view.
-   The user should see the latest Telegram item, card, related hits, and any error without opening SQLite.
+1. Run a real usage pass.
+   Feed more real captures instead of synthetic-only probes and note where cards still become vague or annoying.
 
-2. Improve low-information input handling.
-   A message like "哈喽" should be stored as a ping, but it should not be over-treated as knowledge. Add a low-information tag or reduced-card mode.
+2. Retune prompts and thresholds.
+   Tighten the chaos-reset phrasing and recall thresholds against real cards, not only smoke tests.
 
-3. Tune related recall thresholds.
-   The current related hits work, but the threshold is still MVP-level. Collect 20 real items before changing much.
+3. Refresh README and handoff docs.
+   The product shape has moved beyond the Day 1-3 skeleton and the docs should match it.
 
 ## Do Not Build Tomorrow
 
@@ -309,7 +317,7 @@ sqlite3 -header -column data/app.db "select id, source, status, extracted_title 
 
 ## Morning Decision
 
-The next clean product move is a status and inspection panel, not more intelligence. Make failures visible before adding more behaviors.
+The next clean product move is a real-usage tuning pass. The product surface is wide enough for V1; now tighten outputs against real captures instead of adding more feature branches.
 `;
 
 fs.writeFileSync(reportPath, markdown);
