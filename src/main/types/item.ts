@@ -1,6 +1,7 @@
 export type ItemSource = "manual_chaos" | "tg_text" | "tg_url";
 
 export type ItemStatus = "pending" | "digested" | "failed";
+export type ItemOrigin = "real" | "synthetic";
 
 export type ItemRecord = {
   id: number;
@@ -13,5 +14,6 @@ export type ItemRecord = {
   tgMessageId: string | null;
   receivedAt: number;
   status: ItemStatus;
+  origin: ItemOrigin;
   lastError: string | null;
 };

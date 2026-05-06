@@ -5,6 +5,7 @@ import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
 import type { RelatedCardRef } from "../types/card";
+import type { ItemOrigin } from "../types/item";
 
 type CountsRow = {
   item_count: number;
@@ -18,6 +19,7 @@ type LatestItemRow = {
   id: number;
   source: string;
   status: string;
+  origin: ItemOrigin;
   raw_url: string | null;
   tg_message_id: string | null;
   extracted_title: string | null;
@@ -76,6 +78,7 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
     source: row.source,
     status: row.status,
     receivedAt: row.received_at,
+    origin: row.origin,
     rawUrl: row.raw_url,
     rawText: row.raw_text,
     tgMessageId: row.tg_message_id,
@@ -119,6 +122,7 @@ const getLatestItem = (): LatestItemStatus | null => {
       items.id AS id,
       items.source AS source,
       items.status AS status,
+      items.origin AS origin,
       items.raw_url AS raw_url,
       items.tg_message_id AS tg_message_id,
       items.extracted_title AS extracted_title,

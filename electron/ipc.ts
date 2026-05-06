@@ -9,7 +9,10 @@ export const registerIpcHandlers = (
   emitCardCreated: (card: CardRecord) => void
 ): void => {
   ipcMain.handle("pet:show-demo", async (): Promise<CardRecord> => {
-    const card = await ingestManualText("You drifted into inputs again. Close two tabs, keep one thread, and turn this note into the next concrete action.");
+    const card = await ingestManualText(
+      "You drifted into inputs again. Close two tabs, keep one thread, and turn this note into the next concrete action.",
+      "synthetic"
+    );
     emitCardCreated(card);
     return card;
   });

@@ -5,7 +5,7 @@ import { getRecentCards } from "../db/cards";
 import { upsertCardEmbedding } from "../db/embeddings";
 import { generateDigestDraft } from "../llm/digest-card";
 import { findRelatedCards } from "../recall/related";
-import type { ItemSource } from "../types/item";
+import type { ItemOrigin, ItemSource } from "../types/item";
 
 type ExistingItemRow = {
   id: number;
@@ -68,6 +68,7 @@ const findCardByItemId = (itemId: number): CardRecord | null => {
 
 export type IngestInput = {
   source: ItemSource;
+  origin?: ItemOrigin;
   rawText: string;
   rawUrl?: string | null;
   tgMessageId?: string | null;
@@ -123,6 +124,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
   const itemResult = db.prepare(`
     INSERT INTO items (
       source,
+      origin,
       raw_url,
       raw_text,
       content_hash,
@@ -132,6 +134,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.source,
+    payload.origin ?? "real",
     payload.rawUrl ?? null,
     normalized,
     contentHash,
@@ -248,9 +251,13 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
   );
 };
 
-export const ingestManualText = async (rawText: string): Promise<CardRecord> => {
+export const ingestManualText = async (
+  rawText: string,
+  origin: ItemOrigin = "real"
+): Promise<CardRecord> => {
   return ingestInput({
     source: "manual_chaos",
+    origin,
     rawText
   });
 };

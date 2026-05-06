@@ -1,3 +1,4 @@
+import type { ItemOrigin } from "./item";
 import type { RelatedCardRef } from "./card";
 
 export type StatusLevel = "ok" | "warn" | "idle";
@@ -34,6 +35,7 @@ export type LatestItemStatus = {
   rawUrl: string | null;
   rawText: string | null;
   tgMessageId: string | null;
+  origin: ItemOrigin;
   lastError: string | null;
   extraction: LatestCaptureExtractionStatus;
   card: LatestCaptureCardStatus | null;

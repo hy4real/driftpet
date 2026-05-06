@@ -94,6 +94,8 @@ const ollamaEmbed = runOllamaEmbed();
 const countsResult = sqlite(`
   select
     (select count(*) from items) as items,
+    (select count(*) from items where origin = 'real') as real_items,
+    (select count(*) from items where origin = 'synthetic') as synthetic_items,
     (select count(*) from cards) as cards,
     (select count(*) from card_embeddings) as embeddings,
     (select count(*) from items where source like 'tg_%') as telegram_items,
@@ -104,6 +106,7 @@ const recentResult = sqlite(`
   select
     items.id,
     items.source,
+    items.origin,
     items.status,
     items.tg_message_id as tgMessageId,
     items.extracted_title as extractedTitle,
@@ -210,6 +213,8 @@ ${checkLine("SQLite readback", countsResult.ok && recentResult.ok ? "pass" : "fa
 Current counts:
 
 - Items: ${counts.items ?? "unknown"}
+- Real items: ${counts.real_items ?? "unknown"}
+- Synthetic items: ${counts.synthetic_items ?? "unknown"}
 - Cards: ${counts.cards ?? "unknown"}
 - Embeddings: ${counts.embeddings ?? "unknown"}
 - Telegram items: ${counts.telegram_items ?? "unknown"}

@@ -111,7 +111,9 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
             <section className="capture-panel">
               <header className="capture-panel-header">
                 <strong>Latest capture</strong>
-                <span>#{status.storage.latestItem.id}</span>
+                <span>
+                  #{status.storage.latestItem.id} · {status.storage.latestItem.origin}
+                </span>
               </header>
 
               <div className="capture-block">
@@ -119,6 +121,7 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
                 <p>{status.storage.latestItem.title}</p>
                 <small>
                   {status.storage.latestItem.source} · {status.storage.latestItem.status}
+                  {` · ${status.storage.latestItem.origin}`}
                   {status.storage.latestItem.tgMessageId !== null ? ` · ${status.storage.latestItem.tgMessageId}` : ""}
                 </small>
               </div>
