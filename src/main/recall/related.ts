@@ -9,13 +9,28 @@ type FindRelatedResult = {
 
 const MAX_RELATED = 2;
 const MAX_CANDIDATES = 50;
+const EMBEDDING_THRESHOLD = 0.44;
+const LEXICAL_ONLY_THRESHOLD = 0.24;
 
 const tokenize = (value: string): string[] => {
   return value
     .toLowerCase()
-    .split(/[^a-z0-9]+/i)
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[._/-]+/g, " ")
+    .split(/[^a-z0-9\u4e00-\u9fff]+/i)
     .map((token) => token.trim())
-    .filter((token) => token.length >= 3);
+    .filter((token) => token.length >= 2)
+    .filter((token) => ![
+      "https",
+      "http",
+      "www",
+      "com",
+      "net",
+      "org",
+      "html",
+      "index",
+      "example"
+    ].includes(token));
 };
 
 const cosineSimilarity = (a: number[], b: number[]): number => {
@@ -63,11 +78,24 @@ const buildReason = (summary: string): string => {
   return snippet.length > 0 ? `Similar thread: ${snippet}${summary.length > 96 ? "..." : ""}` : "Similar thread from an earlier card.";
 };
 
+const isRecallEligible = (candidate: Awaited<ReturnType<typeof listRecallCandidates>>[number]): boolean => {
+  if (candidate.origin !== "real") {
+    return false;
+  }
+
+  if (candidate.knowledgeTag !== null && candidate.knowledgeTag.toLowerCase() === "telegram ping") {
+    return false;
+  }
+
+  return candidate.source !== "tg_text" || candidate.title.toLowerCase().includes("ping") === false;
+};
+
 export const findRelatedCards = async (
   summaryForRetrieval: string,
   excludeItemId: number
 ): Promise<FindRelatedResult> => {
-  const candidates = listRecallCandidates(excludeItemId, MAX_CANDIDATES);
+  const candidates = listRecallCandidates(excludeItemId, MAX_CANDIDATES)
+    .filter(isRecallEligible);
   const queryEmbedding = canUseEmbeddings()
     ? await generateEmbedding(summaryForRetrieval).catch(() => null)
     : null;
@@ -78,17 +106,24 @@ export const findRelatedCards = async (
       ? cosineSimilarity(queryEmbedding, candidate.embedding)
       : null;
     const recencyBoost = Math.max(0, 1 - (Date.now() - candidate.createdAt) / (1000 * 60 * 60 * 24 * 30)) * 0.05;
-    const finalScore = (embedding !== null ? (embedding * 0.75) + (lexical * 0.25) : lexical) + recencyBoost;
+    const finalScore = (embedding !== null ? (embedding * 0.82) + (lexical * 0.18) : lexical) + recencyBoost;
 
     return {
       candidate,
+      lexical,
+      embedding,
       finalScore
     };
   });
 
-  const threshold = queryEmbedding !== null ? 0.35 : 0.18;
   const related = scored
-    .filter((entry) => entry.finalScore >= threshold)
+    .filter((entry) => {
+      if (entry.embedding !== null) {
+        return entry.finalScore >= EMBEDDING_THRESHOLD && entry.embedding >= 0.38;
+      }
+
+      return entry.finalScore >= LEXICAL_ONLY_THRESHOLD && entry.lexical >= 0.2;
+    })
     .sort((left, right) => right.finalScore - left.finalScore)
     .slice(0, MAX_RELATED)
     .map((entry) => ({

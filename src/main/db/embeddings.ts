@@ -8,6 +8,9 @@ type RecallCandidateRow = {
   summary_for_retrieval: string;
   created_at: number;
   vector_json: string | null;
+  source: string;
+  origin: string;
+  knowledge_tag: string | null;
 };
 
 export type RecallCandidate = {
@@ -17,6 +20,9 @@ export type RecallCandidate = {
   summaryForRetrieval: string;
   createdAt: number;
   embedding: number[] | null;
+  source: string;
+  origin: string;
+  knowledgeTag: string | null;
 };
 
 const parseVector = (value: string | null): number[] | null => {
@@ -65,8 +71,12 @@ export const listRecallCandidates = (excludeItemId: number, limit: number): Reca
       cards.title AS title,
       cards.summary_for_retrieval AS summary_for_retrieval,
       cards.created_at AS created_at,
-      card_embeddings.vector_json AS vector_json
+      card_embeddings.vector_json AS vector_json,
+      items.source AS source,
+      items.origin AS origin,
+      cards.knowledge_tag AS knowledge_tag
     FROM cards
+    JOIN items ON items.id = cards.item_id
     LEFT JOIN card_embeddings ON card_embeddings.card_id = cards.id
     WHERE cards.item_id <> ?
     ORDER BY cards.created_at DESC
@@ -79,6 +89,9 @@ export const listRecallCandidates = (excludeItemId: number, limit: number): Reca
     title: row.title,
     summaryForRetrieval: row.summary_for_retrieval,
     createdAt: row.created_at,
-    embedding: parseVector(row.vector_json)
+    embedding: parseVector(row.vector_json),
+    source: row.source,
+    origin: row.origin,
+    knowledgeTag: row.knowledge_tag
   }));
 };
