@@ -34,6 +34,18 @@ const summarize = (value: string, limit: number): string => {
   return `${normalized.slice(0, limit - 3)}...`;
 };
 
+const extractionLabel = (state: "not_applicable" | "fallback" | "extracted"): string => {
+  if (state === "extracted") {
+    return "extracted";
+  }
+
+  if (state === "fallback") {
+    return "fallback";
+  }
+
+  return "n/a";
+};
+
 export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
   return (
     <aside className={`status-panel ${isOpen ? "open" : ""}`}>
@@ -110,6 +122,17 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
                   {status.storage.latestItem.tgMessageId !== null ? ` · ${status.storage.latestItem.tgMessageId}` : ""}
                 </small>
               </div>
+
+              {status.storage.latestItem.extraction.hasUrl ? (
+                <div className={`capture-block ${status.storage.latestItem.extraction.extractionState === "fallback" ? "capture-block-warn" : ""}`}>
+                  <span className="bubble-label">Extraction</span>
+                  <p>{status.storage.latestItem.extraction.rawUrl}</p>
+                  <small>{extractionLabel(status.storage.latestItem.extraction.extractionState)}</small>
+                  {status.storage.latestItem.extraction.extractedTextPreview !== null ? (
+                    <small>{status.storage.latestItem.extraction.extractedTextPreview}</small>
+                  ) : null}
+                </div>
+              ) : null}
 
               {status.storage.latestItem.lastError !== null ? (
                 <div className="capture-block capture-block-warn">

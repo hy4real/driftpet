@@ -21,6 +21,7 @@ type LatestItemRow = {
   raw_url: string | null;
   tg_message_id: string | null;
   extracted_title: string | null;
+  extracted_text: string | null;
   raw_text: string | null;
   received_at: number;
   last_error: string | null;
@@ -63,6 +64,11 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
   const fallbackTitle = row.raw_text === null || row.raw_text.length === 0
     ? "Untitled input"
     : summarize(row.raw_text, 54);
+  const extractionState = row.raw_url === null
+    ? "not_applicable"
+    : row.extracted_text !== null && row.extracted_text.trim().length > 0
+      ? "extracted"
+      : "fallback";
 
   return {
     id: row.id,
@@ -74,6 +80,13 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
     rawText: row.raw_text,
     tgMessageId: row.tg_message_id,
     lastError: row.last_error,
+    extraction: {
+      hasUrl: row.raw_url !== null,
+      rawUrl: row.raw_url,
+      extractedTitle: row.extracted_title,
+      extractedTextPreview: row.extracted_text === null ? null : summarize(row.extracted_text, 180),
+      extractionState
+    },
     card: row.card_id === null || row.card_title === null || row.use_for === null || row.knowledge_tag === null || row.pet_remark === null
       ? null
       : {
@@ -109,6 +122,7 @@ const getLatestItem = (): LatestItemStatus | null => {
       items.raw_url AS raw_url,
       items.tg_message_id AS tg_message_id,
       items.extracted_title AS extracted_title,
+      items.extracted_text AS extracted_text,
       items.raw_text AS raw_text,
       items.received_at AS received_at,
       items.last_error AS last_error,

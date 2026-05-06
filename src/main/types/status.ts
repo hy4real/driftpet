@@ -17,6 +17,14 @@ export type LatestCaptureCardStatus = {
   related: RelatedCardRef[];
 };
 
+export type LatestCaptureExtractionStatus = {
+  hasUrl: boolean;
+  rawUrl: string | null;
+  extractedTitle: string | null;
+  extractedTextPreview: string | null;
+  extractionState: "not_applicable" | "fallback" | "extracted";
+};
+
 export type LatestItemStatus = {
   id: number;
   title: string;
@@ -27,6 +35,7 @@ export type LatestItemStatus = {
   rawText: string | null;
   tgMessageId: string | null;
   lastError: string | null;
+  extraction: LatestCaptureExtractionStatus;
   card: LatestCaptureCardStatus | null;
 };
 
