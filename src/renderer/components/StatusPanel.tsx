@@ -25,6 +25,15 @@ const formatCheckedAt = (value: number): string => {
   });
 };
 
+const summarize = (value: string, limit: number): string => {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, limit - 3)}...`;
+};
+
 export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
   return (
     <aside className={`status-panel ${isOpen ? "open" : ""}`}>
@@ -85,6 +94,70 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
               <small>{status.storage.detail}</small>
             </article>
           </div>
+
+          {status.storage.latestItem !== null ? (
+            <section className="capture-panel">
+              <header className="capture-panel-header">
+                <strong>Latest capture</strong>
+                <span>#{status.storage.latestItem.id}</span>
+              </header>
+
+              <div className="capture-block">
+                <span className="bubble-label">Input</span>
+                <p>{status.storage.latestItem.title}</p>
+                <small>
+                  {status.storage.latestItem.source} · {status.storage.latestItem.status}
+                  {status.storage.latestItem.tgMessageId !== null ? ` · ${status.storage.latestItem.tgMessageId}` : ""}
+                </small>
+              </div>
+
+              {status.storage.latestItem.lastError !== null ? (
+                <div className="capture-block capture-block-warn">
+                  <span className="bubble-label">Error</span>
+                  <p>{summarize(status.storage.latestItem.lastError, 180)}</p>
+                </div>
+              ) : null}
+
+              {status.storage.latestItem.card !== null ? (
+                <>
+                  <div className="capture-block">
+                    <span className="bubble-label">Card</span>
+                    <p>{status.storage.latestItem.card.title}</p>
+                    <small>{status.storage.latestItem.card.knowledgeTag}</small>
+                  </div>
+
+                  <div className="capture-block">
+                    <span className="bubble-label">Next move</span>
+                    <p>{summarize(status.storage.latestItem.card.useFor, 180)}</p>
+                  </div>
+
+                  <div className="capture-block">
+                    <span className="bubble-label">Remark</span>
+                    <p>{status.storage.latestItem.card.petRemark}</p>
+                  </div>
+
+                  {status.storage.latestItem.card.related.length > 0 ? (
+                    <div className="capture-block">
+                      <span className="bubble-label">Related</span>
+                      <ul className="capture-related-list">
+                        {status.storage.latestItem.card.related.map((related) => (
+                          <li key={related.cardId}>
+                            <strong>{related.title}</strong>
+                            <span>{related.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="capture-block">
+                  <span className="bubble-label">Card</span>
+                  <p>No card generated yet.</p>
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <footer className="status-footer">
             <span>checked {formatCheckedAt(status.checkedAt)}</span>

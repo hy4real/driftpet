@@ -4,6 +4,7 @@ import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
 import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
+import type { RelatedCardRef } from "../types/card";
 
 type CountsRow = {
   item_count: number;
@@ -17,10 +18,18 @@ type LatestItemRow = {
   id: number;
   source: string;
   status: string;
+  raw_url: string | null;
+  tg_message_id: string | null;
   extracted_title: string | null;
   raw_text: string | null;
   received_at: number;
   last_error: string | null;
+  card_id: number | null;
+  card_title: string | null;
+  use_for: string | null;
+  knowledge_tag: string | null;
+  pet_remark: string | null;
+  related_card_ids: string | null;
 };
 
 const DEFAULT_DIGEST_MODEL = "claude-sonnet-4-20250514";
@@ -32,6 +41,18 @@ const summarize = (value: string, limit: number): string => {
   }
 
   return `${normalized.slice(0, limit - 3)}...`;
+};
+
+const parseRelated = (value: string | null): RelatedCardRef[] => {
+  if (value === null || value.length === 0) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(value) as RelatedCardRef[];
+  } catch {
+    return [];
+  }
 };
 
 const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | null => {
@@ -49,7 +70,20 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
     source: row.source,
     status: row.status,
     receivedAt: row.received_at,
-    lastError: row.last_error
+    rawUrl: row.raw_url,
+    rawText: row.raw_text,
+    tgMessageId: row.tg_message_id,
+    lastError: row.last_error,
+    card: row.card_id === null || row.card_title === null || row.use_for === null || row.knowledge_tag === null || row.pet_remark === null
+      ? null
+      : {
+        id: row.card_id,
+        title: row.card_title,
+        useFor: row.use_for,
+        knowledgeTag: row.knowledge_tag,
+        petRemark: row.pet_remark,
+        related: parseRelated(row.related_card_ids)
+      }
   };
 };
 
@@ -69,15 +103,24 @@ const getLatestItem = (): LatestItemStatus | null => {
   const db = getDatabase();
   const row = db.prepare(`
     SELECT
-      id,
-      source,
-      status,
-      extracted_title,
-      raw_text,
-      received_at,
-      last_error
+      items.id AS id,
+      items.source AS source,
+      items.status AS status,
+      items.raw_url AS raw_url,
+      items.tg_message_id AS tg_message_id,
+      items.extracted_title AS extracted_title,
+      items.raw_text AS raw_text,
+      items.received_at AS received_at,
+      items.last_error AS last_error,
+      cards.id AS card_id,
+      cards.title AS card_title,
+      cards.use_for AS use_for,
+      cards.knowledge_tag AS knowledge_tag,
+      cards.pet_remark AS pet_remark,
+      cards.related_card_ids AS related_card_ids
     FROM items
-    ORDER BY received_at DESC
+    LEFT JOIN cards ON cards.item_id = items.id
+    ORDER BY items.received_at DESC
     LIMIT 1
   `).get() as LatestItemRow | undefined;
 

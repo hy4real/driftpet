@@ -1,3 +1,5 @@
+import type { RelatedCardRef } from "./card";
+
 export type StatusLevel = "ok" | "warn" | "idle";
 
 export type StatusSection = {
@@ -6,13 +8,26 @@ export type StatusSection = {
   detail: string;
 };
 
+export type LatestCaptureCardStatus = {
+  id: number;
+  title: string;
+  useFor: string;
+  knowledgeTag: string;
+  petRemark: string;
+  related: RelatedCardRef[];
+};
+
 export type LatestItemStatus = {
   id: number;
   title: string;
   source: string;
   status: string;
   receivedAt: number;
+  rawUrl: string | null;
+  rawText: string | null;
+  tgMessageId: string | null;
   lastError: string | null;
+  card: LatestCaptureCardStatus | null;
 };
 
 export type AppStatus = {
