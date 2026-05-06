@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-electron
+.env
+.omx
+reports
+data/app.db
+data/*.db-*
+*.log
+.DS_Store
