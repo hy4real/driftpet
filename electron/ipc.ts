@@ -2,7 +2,8 @@ import { ipcMain } from "electron";
 import { getRecentCards } from "../src/main/db/cards";
 import { ingestChaosReset, ingestManualText } from "../src/main/ingest/ingest";
 import type { CardRecord } from "../src/main/types/card";
-import type { AppStatus } from "../src/main/types/status";
+import { setPetHourlyBudget, setPetMode } from "../src/main/pet/runtime";
+import type { AppStatus, PetMode } from "../src/main/types/status";
 import { getAppStatus } from "../src/main/status/app-status";
 
 export const registerIpcHandlers = (
@@ -35,5 +36,13 @@ export const registerIpcHandlers = (
     const card = await ingestChaosReset(rawText);
     emitCardCreated(card);
     return card;
+  });
+
+  ipcMain.handle("pet:set-mode", async (_event, mode: PetMode): Promise<void> => {
+    setPetMode(mode);
+  });
+
+  ipcMain.handle("pet:set-hourly-budget", async (_event, value: number): Promise<number> => {
+    return setPetHourlyBudget(value);
   });
 };

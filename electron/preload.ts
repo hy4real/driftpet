@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { CardRecord } from "../src/main/types/card";
-import type { AppStatus } from "../src/main/types/status";
+import type { AppStatus, PetMode } from "../src/main/types/status";
 
 type CardCreatedListener = (card: CardRecord) => void;
 
@@ -10,6 +10,8 @@ const api = {
   getStatus: (): Promise<AppStatus> => ipcRenderer.invoke("app:get-status"),
   ingestManualText: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:manual-text", rawText),
   ingestChaosReset: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:chaos-reset", rawText),
+  setPetMode: (mode: PetMode): Promise<void> => ipcRenderer.invoke("pet:set-mode", mode),
+  setPetHourlyBudget: (value: number): Promise<number> => ipcRenderer.invoke("pet:set-hourly-budget", value),
   onCardCreated: (listener: CardCreatedListener): (() => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, card: CardRecord) => {
       listener(card);

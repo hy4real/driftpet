@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CardRecord } from "../main/types/card";
-import type { AppStatus } from "../main/types/status";
+import type { AppStatus, PetMode } from "../main/types/status";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { PetBubble } from "./components/PetBubble";
 import { PetShell } from "./components/PetShell";
@@ -52,6 +52,20 @@ export default function App() {
     void window.driftpet.getStatus().then(setStatus);
   };
 
+  const setPetMode = async (mode: PetMode) => {
+    await window.driftpet.setPetMode(mode);
+    refreshStatus();
+  };
+
+  const changePetBudget = async (delta: number) => {
+    if (status === null) {
+      return;
+    }
+
+    await window.driftpet.setPetHourlyBudget(status.pet.hourlyBudget + delta);
+    refreshStatus();
+  };
+
   return (
     <main className="app-shell">
       <HistoryDrawer
@@ -82,6 +96,11 @@ export default function App() {
           onChaosTextChange={setChaosText}
           onSubmitChaosReset={submitChaosReset}
           chaosText={chaosText}
+          petMode={status?.pet.mode ?? "focus"}
+          petHourlyBudget={status?.pet.hourlyBudget ?? 3}
+          petShownThisHour={status?.pet.shownThisHour ?? 0}
+          onSetPetMode={setPetMode}
+          onChangePetBudget={changePetBudget}
           historyOpen={historyOpen}
           statusOpen={statusOpen}
         />

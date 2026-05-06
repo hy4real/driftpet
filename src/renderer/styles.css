@@ -480,6 +480,62 @@ button {
   gap: 8px;
 }
 
+.mode-shell,
+.budget-shell {
+  display: grid;
+  gap: 6px;
+}
+
+.mode-segmented,
+.budget-stepper {
+  display: grid;
+  gap: 8px;
+}
+
+.mode-segmented {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.budget-stepper {
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: stretch;
+}
+
+.mode-button,
+.budget-button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-0);
+  cursor: pointer;
+}
+
+.mode-button-active {
+  background: rgba(92, 195, 191, 0.18);
+  border-color: rgba(92, 195, 191, 0.3);
+}
+
+.budget-value {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.budget-value strong,
+.budget-value span {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.budget-value span {
+  color: var(--text-1);
+}
+
 .manual-input-shell {
   display: grid;
   gap: 6px;

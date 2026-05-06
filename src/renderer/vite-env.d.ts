@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { CardRecord } from "../main/types/card";
-import type { AppStatus } from "../main/types/status";
+import type { AppStatus, PetMode } from "../main/types/status";
 
 declare global {
   interface Window {
@@ -11,6 +11,8 @@ declare global {
       getStatus: () => Promise<AppStatus>;
       ingestManualText: (rawText: string) => Promise<CardRecord>;
       ingestChaosReset: (rawText: string) => Promise<CardRecord>;
+      setPetMode: (mode: PetMode) => Promise<void>;
+      setPetHourlyBudget: (value: number) => Promise<number>;
       onCardCreated: (listener: (card: CardRecord) => void) => () => void;
     };
   }

@@ -2,6 +2,7 @@ import type { ItemOrigin, UrlExtractionStage } from "./item";
 import type { RelatedCardRef } from "./card";
 
 export type StatusLevel = "ok" | "warn" | "idle";
+export type PetMode = "focus" | "sleep";
 
 export type StatusSection = {
   level: StatusLevel;
@@ -45,6 +46,13 @@ export type LatestItemStatus = {
 
 export type AppStatus = {
   checkedAt: number;
+  pet: StatusSection & {
+    enabled: boolean;
+    mode: PetMode;
+    hourlyBudget: number;
+    shownThisHour: number;
+    canSurfaceAuto: boolean;
+  };
   telegram: StatusSection & {
     enabled: boolean;
     lastUpdateId: number | null;

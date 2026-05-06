@@ -3,6 +3,7 @@ import { getPref } from "../db/prefs";
 import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
 import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
+import { decideAutoSurface } from "../pet/runtime";
 import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
 import type { RelatedCardRef } from "../types/card";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
@@ -227,6 +228,36 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
   };
 };
 
+const getPetSection = (): AppStatus["pet"] => {
+  const decision = decideAutoSurface();
+
+  if (decision.mode === "sleep") {
+    return {
+      enabled: true,
+      level: "idle",
+      summary: `Sleep mode · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`,
+      detail: "Auto popups are paused until you switch back to focus mode.",
+      mode: decision.mode,
+      hourlyBudget: decision.hourlyBudget,
+      shownThisHour: decision.shownThisHour,
+      canSurfaceAuto: false
+    };
+  }
+
+  return {
+    enabled: true,
+    level: decision.allowed ? "ok" : "warn",
+    summary: `Focus mode · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`,
+    detail: decision.allowed
+      ? "Auto popups can still surface new cards."
+      : "Hourly surface budget reached; new cards still land in history.",
+    mode: decision.mode,
+    hourlyBudget: decision.hourlyBudget,
+    shownThisHour: decision.shownThisHour,
+    canSurfaceAuto: decision.allowed
+  };
+};
+
 const getLlmSection = (): AppStatus["llm"] => {
   const digestModel = process.env.DRIFTPET_DIGEST_MODEL ?? DEFAULT_DIGEST_MODEL;
   const remarkModel = process.env.DRIFTPET_REMARK_MODEL ?? digestModel;
@@ -347,6 +378,7 @@ export const getAppStatus = async (): Promise<AppStatus> => {
 
   return {
     checkedAt: Date.now(),
+    pet: getPetSection(),
     telegram: getTelegramSection(counts.telegram_count),
     llm: getLlmSection(),
     embeddings: getEmbeddingSection(counts.embedding_count),

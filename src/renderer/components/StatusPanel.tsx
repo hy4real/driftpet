@@ -74,6 +74,15 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
       ) : (
         <>
           <div className="status-grid">
+            <article className={`status-card status-${status.pet.level}`}>
+              <div className="status-card-head">
+                <strong>Pet</strong>
+                <span>{statusLabel(status.pet)}</span>
+              </div>
+              <p>{status.pet.summary}</p>
+              <small>{status.pet.detail}</small>
+            </article>
+
             <article className={`status-card status-${status.telegram.level}`}>
               <div className="status-card-head">
                 <strong>Telegram</strong>
