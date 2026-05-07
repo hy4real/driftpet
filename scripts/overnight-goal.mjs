@@ -325,8 +325,8 @@ Do not make it a general chatbot yet. The valuable behavior is not conversation 
 2. Retune prompts and thresholds against the real cards now in SQLite.
    The next tuning pass should focus on chaos-reset wording and when recall should stay empty.
 
-3. Refresh README and handoff docs.
-   The product shape has moved well beyond the Day 1-3 skeleton and the docs should match it.
+3. Run a broader Telegram URL batch pass.
+   Core URL extraction now has fresh live evidence outside the Codex sandbox; the remaining question is how real forwarded links behave through the poller path.
 
 ## Do Not Build Tomorrow
 
@@ -345,7 +345,8 @@ These are tempting, but the core loop still needs observation.
 - Telegram \`409\` can happen if two pollers run with the same bot token.
 - Secrets currently live in \`.env\`; rotate exposed keys later.
 - Live Ollama probing can be unavailable from a constrained runner context even when stored vectors prove the path worked earlier.
-- URL extraction and Telegram URL cases still need another live test pass.
+- Public URL extraction can look broken inside the Codex sandbox even when the same Electron-as-Node probe succeeds outside it; do not treat sandbox-only \`fetch_failed\` results as product regressions.
+- Telegram URL handling still needs a broader pass through the actual poller path.
 - Historical \`last_error\` values can still exist on successful rows, even though the status surface now avoids surfacing them as the current top-line state.
 
 ## Useful Commands

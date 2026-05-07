@@ -1,12 +1,12 @@
 import { BrowserWindow, screen } from "electron";
-import path from "node:path";
+import { getPreloadEntryPath, getRendererEntryPath } from "../paths";
 
 const WINDOW_WIDTH = 460;
 const WINDOW_HEIGHT = 360;
 const EDGE_GAP = 24;
 
 const getRendererEntry = (): string => {
-  return path.join(process.cwd(), "dist/renderer/index.html");
+  return getRendererEntryPath();
 };
 
 export const createMainWindow = (): BrowserWindow => {
@@ -30,7 +30,7 @@ export const createMainWindow = (): BrowserWindow => {
     alwaysOnTop: true,
     skipTaskbar: true,
     webPreferences: {
-      preload: path.join(process.cwd(), "dist-electron/electron/preload.js")
+      preload: getPreloadEntryPath()
     }
   });
 

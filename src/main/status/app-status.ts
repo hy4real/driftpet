@@ -195,6 +195,39 @@ const getLatestItem = (): LatestItemStatus | null => {
   return buildLatestItem(row);
 };
 
+const getLatestRealItem = (): LatestItemStatus | null => {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT
+      items.id AS id,
+      items.source AS source,
+      items.status AS status,
+      items.origin AS origin,
+      items.raw_url AS raw_url,
+      items.tg_message_id AS tg_message_id,
+      items.extracted_title AS extracted_title,
+      items.extracted_text AS extracted_text,
+      items.raw_text AS raw_text,
+      items.received_at AS received_at,
+      items.last_error AS last_error,
+      items.extraction_stage AS extraction_stage,
+      items.extraction_error AS extraction_error,
+      cards.id AS card_id,
+      cards.title AS card_title,
+      cards.use_for AS use_for,
+      cards.knowledge_tag AS knowledge_tag,
+      cards.pet_remark AS pet_remark,
+      cards.related_card_ids AS related_card_ids
+    FROM items
+    LEFT JOIN cards ON cards.item_id = items.id
+    WHERE items.origin = 'real'
+    ORDER BY items.received_at DESC
+    LIMIT 1
+  `).get() as LatestItemRow | undefined;
+
+  return buildLatestItem(row);
+};
+
 const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] => {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim() ?? "";
   const enabled = token.length > 0;
@@ -339,11 +372,13 @@ const getEmbeddingSection = (storedEmbeddings: number): AppStatus["embeddings"] 
 
 const getStorageSection = (
   counts: CountsRow,
-  latestItem: LatestItemStatus | null
+  latestItem: LatestItemStatus | null,
+  latestRealItem: LatestItemStatus | null
 ): AppStatus["storage"] => {
   const summary = `${counts.item_count} items · ${counts.card_count} cards`;
+  const summaryItem = latestRealItem ?? latestItem;
 
-  if (latestItem === null) {
+  if (summaryItem === null) {
     return {
       level: "idle",
       summary,
@@ -355,11 +390,11 @@ const getStorageSection = (
     };
   }
 
-  const detail = latestItem.extraction.extractionState === "failed" && latestItem.extraction.detail !== null
-    ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.extraction.detail, 72)}`
-    : latestItem.card === null && latestItem.lastError !== null && latestItem.lastError.length > 0
-      ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.lastError, 72)}`
-      : `${latestItem.source} · ${latestItem.status} · ${latestItem.title}`;
+  const detail = summaryItem.extraction.extractionState === "failed" && summaryItem.extraction.detail !== null
+    ? `${summaryItem.source} · ${summaryItem.status} · ${summarize(summaryItem.extraction.detail, 72)}`
+    : summaryItem.card === null && summaryItem.lastError !== null && summaryItem.lastError.length > 0
+      ? `${summaryItem.source} · ${summaryItem.status} · ${summarize(summaryItem.lastError, 72)}`
+      : `${summaryItem.source} · ${summaryItem.status} · ${summaryItem.title}`;
 
   return {
     level: counts.failed_count > 0 ? "warn" : "ok",
@@ -375,6 +410,7 @@ const getStorageSection = (
 export const getAppStatus = async (): Promise<AppStatus> => {
   const counts = getCounts();
   const latestItem = getLatestItem();
+  const latestRealItem = getLatestRealItem();
 
   return {
     checkedAt: Date.now(),
@@ -382,6 +418,6 @@ export const getAppStatus = async (): Promise<AppStatus> => {
     telegram: getTelegramSection(counts.telegram_count),
     llm: getLlmSection(),
     embeddings: getEmbeddingSection(counts.embedding_count),
-    storage: getStorageSection(counts, latestItem)
+    storage: getStorageSection(counts, latestItem, latestRealItem)
   };
 };

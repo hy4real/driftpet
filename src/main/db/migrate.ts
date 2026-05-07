@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDatabase } from "./client";
+import { getMigrationsDir } from "../paths";
 
 type MigrationNameRow = {
   name: string;
@@ -22,7 +23,7 @@ export const runMigrations = (): void => {
       .map((row) => row.name)
   );
 
-  const migrationsDir = path.join(process.cwd(), "src/main/db/migrations");
+  const migrationsDir = getMigrationsDir();
   const migrationFiles = fs.readdirSync(migrationsDir)
     .filter((file) => file.endsWith(".sql"))
     .sort();

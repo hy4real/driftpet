@@ -122,6 +122,16 @@ Status: done
 - The generated overnight brief now reflects the current V1 surface instead of an older system shape
 - README and supporting docs now describe language-aware fallback copy, chaos-reset recall dedupe, the current health surface, and the generated morning brief path
 
+### Day 19
+
+Status: done
+
+- Real usage pass surfaced that a single item could still end up with multiple cards if old data or retries slipped through; `cards.item_id` is now enforced as unique and ingest now behaves idempotently around card creation
+- Chaos-reset fields now reject off-language model output and fall back to same-language copy instead of storing mixed Chinese/English cards
+- Chaos-reset main-line titles are post-processed to keep only the actual thread instead of dragging the distraction clause into the title
+- Near-duplicate chaos resets are now allowed to return no related memory instead of echoing the immediately previous reset back to the user
+- Live URL extraction was re-verified with the current code: Codex sandbox probes still report `fetch_failed`, but the same Electron-as-Node probe outside the sandbox reached `readability` on public MDN and `example.com`, which confirms the current extraction logic works in a normal network context
+
 ## Remaining Work From The Original Two-Week Plan
 
 Status: still in progress
