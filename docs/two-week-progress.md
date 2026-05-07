@@ -105,6 +105,14 @@ Status: done
 - Prompt files now explicitly ask the model to match the requested output language
 - Recall ping filtering no longer depends on the English title wording alone
 
+### Day 17
+
+Status: in progress
+
+- Real usage pass surfaced a concrete recall annoyance: repeated `manual_chaos` dumps were resurfacing the immediately previous chaos-reset card as a "related" memory
+- Related recall now suppresses near-duplicate chaos-reset cards instead of treating the last identical reset as useful memory
+- Verified with an isolated Electron-as-Node probe using two repeated Chinese chaos-reset inputs
+
 ## Remaining Work From The Original Two-Week Plan
 
 Status: not done yet

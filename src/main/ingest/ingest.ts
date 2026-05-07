@@ -263,7 +263,11 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
       related: [],
       queryEmbedding: null
     }
-    : await findRelatedCards(digestResult.digest.summaryForRetrieval, pending.itemId);
+    : await findRelatedCards({
+      source: input.source,
+      title: digestResult.digest.title,
+      summaryForRetrieval: digestResult.digest.summaryForRetrieval
+    }, pending.itemId);
 
   return finalizeCard(
     pending.itemId,

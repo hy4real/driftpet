@@ -2,16 +2,31 @@ import type { RelatedCardRef } from "../types/card";
 import { listRecallCandidates } from "../db/embeddings";
 import { canUseEmbeddings, generateEmbedding } from "../llm/embeddings";
 import { detectOutputLanguage } from "../llm/language";
+import type { ItemSource } from "../types/item";
 
 type FindRelatedResult = {
   related: RelatedCardRef[];
   queryEmbedding: number[] | null;
 };
 
+type RelatedQuery = {
+  source: ItemSource;
+  title: string;
+  summaryForRetrieval: string;
+};
+
 const MAX_RELATED = 2;
 const MAX_CANDIDATES = 50;
 const EMBEDDING_THRESHOLD = 0.44;
 const LEXICAL_ONLY_THRESHOLD = 0.24;
+const CHAOS_DUPLICATE_THRESHOLD = 0.92;
+
+const normalizeComparableText = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+};
 
 const tokenize = (value: string): string[] => {
   return value
@@ -100,18 +115,36 @@ const isRecallEligible = (candidate: Awaited<ReturnType<typeof listRecallCandida
   return candidate.source !== "tg_text" || looksLikePing === false;
 };
 
+const isNearDuplicateChaosReset = (
+  query: RelatedQuery,
+  candidate: Awaited<ReturnType<typeof listRecallCandidates>>[number],
+  lexical: number
+): boolean => {
+  if (query.source !== "manual_chaos" || candidate.source !== "manual_chaos") {
+    return false;
+  }
+
+  const normalizedTitle = normalizeComparableText(query.title);
+  const normalizedCandidateTitle = normalizeComparableText(candidate.title);
+  if (normalizedTitle.length > 0 && normalizedTitle === normalizedCandidateTitle) {
+    return true;
+  }
+
+  return lexical >= CHAOS_DUPLICATE_THRESHOLD;
+};
+
 export const findRelatedCards = async (
-  summaryForRetrieval: string,
+  query: RelatedQuery,
   excludeItemId: number
 ): Promise<FindRelatedResult> => {
   const candidates = listRecallCandidates(excludeItemId, MAX_CANDIDATES)
     .filter(isRecallEligible);
   const queryEmbedding = canUseEmbeddings()
-    ? await generateEmbedding(summaryForRetrieval).catch(() => null)
+    ? await generateEmbedding(query.summaryForRetrieval).catch(() => null)
     : null;
 
   const scored = candidates.map((candidate) => {
-    const lexical = lexicalSimilarity(summaryForRetrieval, candidate.summaryForRetrieval);
+    const lexical = lexicalSimilarity(query.summaryForRetrieval, candidate.summaryForRetrieval);
     const embedding = queryEmbedding !== null && candidate.embedding !== null
       ? cosineSimilarity(queryEmbedding, candidate.embedding)
       : null;
@@ -128,6 +161,10 @@ export const findRelatedCards = async (
 
   const related = scored
     .filter((entry) => {
+      if (isNearDuplicateChaosReset(query, entry.candidate, entry.lexical)) {
+        return false;
+      }
+
       if (entry.embedding !== null) {
         return entry.finalScore >= EMBEDDING_THRESHOLD && entry.embedding >= 0.38;
       }
@@ -139,7 +176,7 @@ export const findRelatedCards = async (
     .map((entry) => ({
       cardId: entry.candidate.cardId,
       title: entry.candidate.title,
-      reason: buildReason(entry.candidate.summaryForRetrieval, summaryForRetrieval)
+      reason: buildReason(entry.candidate.summaryForRetrieval, query.summaryForRetrieval)
     }));
 
   return {
