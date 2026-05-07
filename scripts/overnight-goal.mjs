@@ -110,8 +110,10 @@ const recentResult = sqlite(`
     items.status,
     items.tg_message_id as tgMessageId,
     items.extracted_title as extractedTitle,
+    items.last_error as lastError,
     cards.title,
-    cards.knowledge_tag as knowledgeTag
+    cards.knowledge_tag as knowledgeTag,
+    cards.related_card_ids as relatedCardIds
   from items
   left join cards on cards.item_id = items.id
   order by items.id desc
@@ -134,6 +136,23 @@ const vectorLength = Array.isArray(embeddingPayload.embeddings?.[0])
 const counts = parseJson(countsResult.stdout, [{}])[0] ?? {};
 const recent = parseJson(recentResult.stdout, []);
 const prefs = parseJson(prefsResult.stdout, []);
+const parseRelatedCount = (value) => {
+  if (typeof value !== "string" || value.length === 0) {
+    return 0;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const latestRealChaos = recent.find((entry) => entry.origin === "real" && entry.source === "manual_chaos");
+const latestRealTelegram = recent.find((entry) => entry.origin === "real" && typeof entry.source === "string" && entry.source.startsWith("tg_"));
+const latestChaosRelatedCount = parseRelatedCount(latestRealChaos?.relatedCardIds);
+const latestChaosHasStaleError = typeof latestRealChaos?.lastError === "string" && latestRealChaos.lastError.length > 0;
 const configuredForOllama = appStatus?.embeddings?.provider === "ollama";
 const storedVectors = Number(appStatus?.embeddings?.storedEmbeddings ?? counts.ollama_embeddings ?? 0);
 const liveEmbeddingOk = ollamaEmbed.ok && vectorLength > 0;
@@ -194,13 +213,13 @@ const verification = {
 fs.writeFileSync(jsonPath, `${JSON.stringify(verification, null, 2)}\n`);
 
 const checkLine = (label, state) => `- ${state.toUpperCase()} ${label}`;
-const latestTelegram = recent.find((entry) => entry.source?.startsWith("tg_"));
+const latestStorageDetail = appStatus?.storage?.detail ?? "unknown";
 
 const markdown = `# driftpet Morning Brief - ${reportDate}
 
 ## One-Line Read
 
-driftpet now has a working V1 spine plus control surfaces: Telegram capture on the phone, local chaos-reset input, cloud digest generation, local Qwen embeddings through Ollama, filtered related-memory recall, and an in-app pet mode / budget / health surface.
+driftpet now has a working V1 spine plus control surfaces: Telegram capture on the phone, local chaos-reset input, cloud digest generation, local Qwen embeddings through Ollama, language-aware cards, filtered related-memory recall, and an in-app pet mode / budget / health surface.
 
 ## Verification
 
@@ -219,7 +238,9 @@ Current counts:
 - Embeddings: ${counts.embeddings ?? "unknown"}
 - Telegram items: ${counts.telegram_items ?? "unknown"}
 - Ollama embeddings: ${counts.ollama_embeddings ?? "unknown"}
-- Latest Telegram item: ${latestTelegram?.extractedTitle ?? "none observed"}
+- Latest real Telegram item: ${latestRealTelegram?.extractedTitle ?? latestRealTelegram?.title ?? "none observed"}
+- Latest real chaos reset related count: ${latestChaosRelatedCount}
+- Latest storage summary: ${latestStorageDetail}
 - Pet mode: ${appStatus?.pet?.mode ?? "unknown"}
 - Pet hourly budget: ${appStatus?.pet?.hourlyBudget ?? "unknown"}
 - Auto cards shown this hour: ${appStatus?.pet?.shownThisHour ?? "unknown"}
@@ -236,6 +257,9 @@ Current counts:
 - The pet has \`focus\` / \`sleep\` modes plus an hourly auto-surface budget.
 - Manual chaos dumps now go through a dedicated thread-reset lane instead of the generic note path.
 - Related recall excludes synthetic verification data and Telegram ping cards.
+- Fallback digest copy and related-memory reasons now follow the user's input language.
+- Repeated chaos resets no longer surface the immediately previous identical reset as a fake memory.
+- Storage health now prefers the latest successful card over stale fallback text when summarizing current state.
 
 ## Product Shape
 
@@ -258,14 +282,14 @@ Do not make it a general chatbot yet. The valuable behavior is not conversation 
 
 ## Tomorrow's Priority
 
-1. Run a real usage pass.
-   Feed more real captures instead of synthetic-only probes and note where cards still become vague or annoying.
+1. Continue the real usage pass.
+   Feed more real captures and note where cards still become vague, repetitive, or annoying.
 
-2. Retune prompts and thresholds.
-   Tighten the chaos-reset phrasing and recall thresholds against real cards, not only smoke tests.
+2. Retune prompts and thresholds against the real cards now in SQLite.
+   The next tuning pass should focus on chaos-reset wording and when recall should stay empty.
 
 3. Refresh README and handoff docs.
-   The product shape has moved beyond the Day 1-3 skeleton and the docs should match it.
+   The product shape has moved well beyond the Day 1-3 skeleton and the docs should match it.
 
 ## Do Not Build Tomorrow
 
@@ -284,7 +308,8 @@ These are tempting, but the core loop still needs observation.
 - Telegram \`409\` can happen if two pollers run with the same bot token.
 - Secrets currently live in \`.env\`; rotate exposed keys later.
 - Live Ollama probing can be unavailable from a constrained runner context even when stored vectors prove the path worked earlier.
-- URL extraction and Telegram URL cases need another live test pass.
+- URL extraction and Telegram URL cases still need another live test pass.
+- Historical \`last_error\` values can still exist on successful rows, even though the status surface now avoids surfacing them as the current top-line state.
 
 ## Useful Commands
 
@@ -317,7 +342,7 @@ sqlite3 -header -column data/app.db "select id, source, status, extracted_title 
 
 ## Morning Decision
 
-The next clean product move is a real-usage tuning pass. The product surface is wide enough for V1; now tighten outputs against real captures instead of adding more feature branches.
+The next clean product move is still a real-usage tuning pass. The surface is now broad enough for V1, and the highest-value work is to make the cards calmer and sharper against real captures instead of adding more product branches.
 `;
 
 fs.writeFileSync(reportPath, markdown);

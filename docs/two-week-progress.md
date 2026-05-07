@@ -126,7 +126,7 @@ Status: not done yet
    The chaos-reset prompt, digest prompt, and recall thresholds should be tuned against real captures instead of only synthetic probes.
 
 3. Morning brief refresh
-   The overnight report still describes an earlier system shape and should be updated to mention chaos reset, modes, budget, and recall filtering.
+   In progress. The overnight report is being updated to mention language-aware cards, chaos-reset recall dedupe, and the current health/status behavior.
 
 4. Docs cleanup
    README and supporting docs should reflect the current product shape rather than the Day 1-3 skeleton only.

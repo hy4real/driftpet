@@ -11,7 +11,7 @@ This is the remaining part of the original two-week V1 plan, in execution order.
    Adjust the digest prompt, chaos-reset prompt, recall thresholds, and multilingual wording based on real captures.
 
 3. Report refresh
-   Update the generated morning brief so it describes the current V1 surface accurately.
+   Done for the current product shape. Keep rerunning it after major behavior changes so the generated morning brief stays honest.
 
 4. README cleanup
    Align setup and feature docs with the actual current app behavior.
