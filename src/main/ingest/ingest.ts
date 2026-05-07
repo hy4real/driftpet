@@ -60,6 +60,29 @@ const findCardByItemId = (itemId: number): CardRecord | null => {
       created_at
     FROM cards
     WHERE item_id = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(itemId) as CardRow | undefined;
+
+  return row === undefined ? null : mapCardRow(row);
+};
+
+const findNewestCardByItemId = (itemId: number): CardRecord | null => {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT
+      id,
+      item_id,
+      title,
+      use_for,
+      knowledge_tag,
+      summary_for_retrieval,
+      related_card_ids,
+      pet_remark,
+      created_at
+    FROM cards
+    WHERE item_id = ?
+    ORDER BY id DESC
     LIMIT 1
   `).get(itemId) as CardRow | undefined;
 
@@ -180,6 +203,11 @@ const finalizeCard = (
 ): CardRecord => {
   const db = getDatabase();
   const extractionStage = resolveExtractionStage(payload);
+  const existingCard = findNewestCardByItemId(itemId);
+  if (existingCard !== null) {
+    return existingCard;
+  }
+
   const createCard = db.transaction(() => {
     const createdAt = Date.now();
     const cardResult = db.prepare(`
@@ -239,7 +267,18 @@ const finalizeCard = (
     };
   });
 
-  return createCard();
+  try {
+    return createCard();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("UNIQUE constraint failed: cards.item_id")) {
+      const card = findNewestCardByItemId(itemId);
+      if (card !== null) {
+        return card;
+      }
+    }
+
+    throw error;
+  }
 };
 
 export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {

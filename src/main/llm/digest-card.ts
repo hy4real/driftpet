@@ -1,7 +1,7 @@
 import type { CardRecord } from "../types/card";
 import type { ItemSource } from "../types/item";
 import { canUseLlm, getLlmMissingReason, sendTextPrompt } from "./client";
-import { detectOutputLanguage, type OutputLanguage } from "./language";
+import { detectOutputLanguage, matchesOutputLanguage, type OutputLanguage } from "./language";
 import { loadPrompt } from "./prompt-loader";
 
 type DigestInput = {
@@ -84,6 +84,39 @@ const normalizeForSignal = (value: string): string => {
     .replace(/\s+/g, "");
 };
 
+const trimChaosClause = (value: string): string => {
+  const chineseMarker = /[，,]\s*(但|不过|可是|只是|然后|同时|结果).*/u;
+  const chineseMatch = chineseMarker.exec(value);
+  if (chineseMatch !== null && chineseMatch.index >= 8) {
+    return value.slice(0, chineseMatch.index).trim();
+  }
+
+  const englishMarker = /\b(?:but|while|except)\b.*/i;
+  const englishMatch = englishMarker.exec(value);
+  if (englishMatch !== null && englishMatch.index >= 8) {
+    return value.slice(0, englishMatch.index).trim().replace(/[,\s]+$/, "");
+  }
+
+  return value.trim();
+};
+
+const cleanChaosMainLine = (value: string, fallback: string): string => {
+  const firstLine = normalizeText(value)
+    .split(/\n+/)
+    .map((line) => normalizeText(line))
+    .find((line) => line.length > 0) ?? "";
+  const cleaned = trimChaosClause(
+    firstLine
+      .replace(/https?:\/\/\S+/g, "")
+      .replace(/当前\s*tab[:：].*$/i, "")
+      .replace(/tabs?[:：].*$/i, "")
+      .replace(/[，,;；]\s*$/, "")
+      .trim()
+  );
+
+  return truncate(cleaned.length > 0 ? cleaned : fallback, 72);
+};
+
 const isLowSignalTelegramText = (input: DigestInput): boolean => {
   if (input.source !== "tg_text" || input.rawUrl !== undefined && input.rawUrl !== null) {
     return false;
@@ -154,22 +187,14 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
 
 const createChaosResetFallback = (input: DigestInput): DigestDraft => {
   const contentBasis = normalizeText(input.rawText);
-  const firstLine = contentBasis.split(/\n+/).map((line) => normalizeText(line)).find((line) => line.length > 0) ?? "";
-  const cleanedMainLine = firstLine
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/当前\s*tab[:：].*$/i, "")
-    .replace(/tabs?[:：].*$/i, "")
-    .replace(/[，,;；]\s*$/, "")
-    .trim();
-  const mainLine = truncate(
-    cleanedMainLine.length > 0 ? cleanedMainLine : "Return to one thread and name the actual deliverable.",
-    72
-  );
+  const mainLine = cleanChaosMainLine(contentBasis, "Return to one thread and name the actual deliverable.");
   const language = detectOutputLanguage(input.rawText);
 
   if (language === "zh") {
     const fallbackMainLine = "回到一条主线，并把真正要交付的东西说清楚。";
-    const resolvedMainLine = cleanedMainLine.length > 0 ? mainLine : truncate(fallbackMainLine, 72);
+    const resolvedMainLine = mainLine === "Return to one thread and name the actual deliverable."
+      ? truncate(fallbackMainLine, 72)
+      : mainLine;
     const sideQuests = /https?:\/\//i.test(contentBasis)
       ? "先放下那些不能直接推进主交付的链接和标签页。"
       : "先放下所有不能直接推进当前交付的岔线。";
@@ -273,6 +298,16 @@ const coerceString = (value: unknown, fallback: string, limit: number): string =
 
   const normalized = normalizeText(value);
   return truncate(normalized.length > 0 ? normalized : fallback, limit);
+};
+
+const coerceStringInLanguage = (
+  value: unknown,
+  fallback: string,
+  limit: number,
+  language: OutputLanguage
+): string => {
+  const candidate = coerceString(value, fallback, limit);
+  return matchesOutputLanguage(language, candidate) ? candidate : truncate(fallback, limit);
 };
 
 const buildDigestPrompt = (input: DigestInput, recentCards: CardRecord[]): string => {
@@ -392,20 +427,25 @@ const generateChaosResetDraft = async (
       maxTokens: 350
     });
     const parsed = parseChaosResetJson(response);
-    const mainLine = coerceString(parsed.mainLine, fallback.title, 120);
-    const sideQuests = coerceString(
+    const mainLine = cleanChaosMainLine(
+      coerceStringInLanguage(parsed.mainLine, fallback.title, 120, language),
+      fallback.title
+    );
+    const sideQuests = coerceStringInLanguage(
       parsed.sideQuests,
       language === "zh"
         ? "先放下所有不能直接推进当前交付的岔线。"
         : "Set aside anything that does not move the current deliverable forward.",
-      180
+      180,
+      language
     );
-    const nextStep = coerceString(
+    const nextStep = coerceStringInLanguage(
       parsed.nextStep,
       language === "zh"
         ? "写下下一条具体产出，然后立刻做第一个五分钟动作。"
         : "Write the next concrete output and do the first five-minute step now.",
-      180
+      180,
+      language
     );
 
     const digest: DigestDraft = {
@@ -413,11 +453,17 @@ const generateChaosResetDraft = async (
       useFor: language === "zh"
         ? `先放下：${sideQuests}\n下一步：${nextStep}`
         : `Set aside: ${sideQuests}\nNext: ${nextStep}`,
-      knowledgeTag: coerceString(parsed.knowledgeTag, language === "zh" ? "线程复位" : "chaos reset", 80),
-      summaryForRetrieval: coerceString(
+      knowledgeTag: coerceStringInLanguage(
+        parsed.knowledgeTag,
+        language === "zh" ? "线程复位" : "chaos reset",
+        80,
+        language
+      ),
+      summaryForRetrieval: coerceStringInLanguage(
         parsed.summaryForRetrieval,
         fallback.summaryForRetrieval,
-        500
+        500,
+        language
       ),
       petRemark: fallback.petRemark
     };
@@ -472,15 +518,17 @@ export const generateDigestDraft = async (
       maxTokens: 500
     });
     const digestJson = parseDigestJson(digestResponse);
+    const language = detectOutputLanguage(input.rawText, input.extractedText, input.extractedTitle);
 
     const digest: DigestDraft = {
-      title: coerceString(digestJson.title, fallback.title, 120),
-      useFor: coerceString(digestJson.useFor, fallback.useFor, 260),
-      knowledgeTag: coerceString(digestJson.knowledgeTag, fallback.knowledgeTag, 80),
-      summaryForRetrieval: coerceString(
+      title: coerceStringInLanguage(digestJson.title, fallback.title, 120, language),
+      useFor: coerceStringInLanguage(digestJson.useFor, fallback.useFor, 260, language),
+      knowledgeTag: coerceStringInLanguage(digestJson.knowledgeTag, fallback.knowledgeTag, 80, language),
+      summaryForRetrieval: coerceStringInLanguage(
         digestJson.summaryForRetrieval,
         fallback.summaryForRetrieval,
-        500
+        500,
+        language
       ),
       petRemark: fallback.petRemark
     };

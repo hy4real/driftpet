@@ -15,6 +15,7 @@ Required schema:
 Rules:
 - Do not write a generic summary.
 - Match the requested output language.
+- Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `useFor` must produce a next move, not a content recap.
 - Use the recent cards context to avoid vague suggestions.
 - `knowledgeTag` should be short and reusable.

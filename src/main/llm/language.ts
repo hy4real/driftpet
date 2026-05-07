@@ -27,3 +27,15 @@ export const detectOutputLanguage = (...values: Array<string | null | undefined>
 
   return cjkCount >= Math.max(4, latinCount * 0.35) ? "zh" : "en";
 };
+
+export const matchesOutputLanguage = (
+  expected: OutputLanguage,
+  ...values: Array<string | null | undefined>
+): boolean => {
+  const content = normalizeWhitespace(values.filter((value): value is string => typeof value === "string").join(" "));
+  if (content.length === 0) {
+    return true;
+  }
+
+  return detectOutputLanguage(content) === expected;
+};

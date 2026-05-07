@@ -16,6 +16,7 @@ Required schema:
 Rules:
 - Do not summarize everything.
 - Match the requested output language.
+- Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `mainLine` must name the real deliverable or thread, not a mood.
 - `mainLine` must stay short and must not include raw URLs, full tab lists, or long context dumps.
 - `sideQuests` must identify what to ignore, close, postpone, or stop checking.

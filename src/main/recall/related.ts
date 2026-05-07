@@ -20,6 +20,7 @@ const MAX_CANDIDATES = 50;
 const EMBEDDING_THRESHOLD = 0.44;
 const LEXICAL_ONLY_THRESHOLD = 0.24;
 const CHAOS_DUPLICATE_THRESHOLD = 0.92;
+const CHAOS_SIMILAR_THRESHOLD = 0.68;
 
 const normalizeComparableText = (value: string): string => {
   return value
@@ -130,7 +131,25 @@ const isNearDuplicateChaosReset = (
     return true;
   }
 
-  return lexical >= CHAOS_DUPLICATE_THRESHOLD;
+  if (
+    normalizedTitle.length > 0 &&
+    normalizedCandidateTitle.length > 0 &&
+    (normalizedTitle.includes(normalizedCandidateTitle) || normalizedCandidateTitle.includes(normalizedTitle))
+  ) {
+    return true;
+  }
+
+  const normalizedSummary = normalizeComparableText(query.summaryForRetrieval);
+  const normalizedCandidateSummary = normalizeComparableText(candidate.summaryForRetrieval);
+  if (
+    normalizedSummary.length > 0 &&
+    normalizedCandidateSummary.length > 0 &&
+    (normalizedSummary.includes(normalizedCandidateSummary) || normalizedCandidateSummary.includes(normalizedSummary))
+  ) {
+    return true;
+  }
+
+  return lexical >= CHAOS_DUPLICATE_THRESHOLD || lexical >= CHAOS_SIMILAR_THRESHOLD;
 };
 
 export const findRelatedCards = async (
