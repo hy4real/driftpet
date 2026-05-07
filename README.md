@@ -7,7 +7,9 @@ Current V1 shape:
 - Forward text or URLs from your phone into Telegram.
 - Or paste a local "I'm drifting" dump into the pet.
 - driftpet turns that into one next move, keeps local memory in SQLite, and only resurfaces related cards that still look relevant.
+- Fallback card copy and related-memory reasons follow the input language.
 - Automatic popup surfacing can be capped with `focus / sleep` mode plus an hourly budget.
+- The health drawer shows Telegram / LLM / embeddings / storage status plus the latest capture path.
 
 ## Local setup
 
@@ -35,6 +37,12 @@ npm run dev
 
 ```bash
 node scripts/overnight-goal.mjs
+```
+
+6. App-equivalent status probe:
+
+```bash
+ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron -e "const { getAppStatus } = require('./dist-electron/src/main/status/app-status.js'); getAppStatus().then((status)=>console.log(JSON.stringify(status, null, 2)));"
 ```
 
 ## Provider options
@@ -82,20 +90,23 @@ DRIFTPET_EMBED_MODEL=qwen3-embedding:0.6b
 - Embedding-based related recall can use a different provider than the main digest model.
 - For split setups, keep your relay key on `DRIFTPET_LLM_API_KEY` and put your separate OpenAI embeddings key on `DRIFTPET_EMBED_API_KEY`.
 - Synthetic verification items are kept separate from real items and are filtered out of normal related-memory recall.
+- `better-sqlite3` is ABI-sensitive between system Node and Electron. For app-equivalent smoke tests, prefer Electron runtime probes.
 
 ## What the app currently does
 
 - `Telegram capture`: polls your bot with long polling and stores text / URL inputs locally.
-- `Digest cards`: turns a capture into a compact next-move card.
+- `Digest cards`: turns a capture into a compact next-move card. When the model falls back, the local copy still tracks the input language.
 - `Chaos reset`: local manual input goes through a dedicated "I'm drifting" prompt instead of the generic digest path.
-- `Related memory`: recalls a small number of prior real cards and excludes ping/synthetic noise.
-- `Health + inspection`: status drawer shows Telegram / LLM / embeddings / storage plus the latest capture and extraction path.
+- `Related memory`: recalls a small number of prior real cards, excludes ping/synthetic noise, and suppresses immediately repeated chaos-reset cards.
+- `Health + inspection`: status drawer shows Telegram / LLM / embeddings / storage plus the latest capture and extraction path. The top-line storage summary reflects the latest successful card instead of replaying stale fallback text.
 - `Pet runtime`: `focus` and `sleep` modes plus an hourly auto-surface budget.
+- `Generated brief`: `node scripts/overnight-goal.mjs` regenerates a morning brief and JSON verification snapshot under `reports/`.
 
 ## Current limitations
 
-- Real-world prompt tuning is still lightweight; the best next improvement is more real captures, not more feature branches.
+- Real-world prompt tuning is still lightweight; the best next improvement is more real captures and calmer output, not more feature branches.
 - URL extraction still needs another live pass on a wider variety of real pages.
+- Real usage tuning is still in progress for when recall should stay empty instead of forcing a weak memory link.
 - The generated morning brief in `reports/` is useful for local review, but `reports/` is intentionally gitignored.
 
 ## Recommended split setup

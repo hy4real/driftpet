@@ -107,7 +107,7 @@ Status: done
 
 ### Day 17
 
-Status: in progress
+Status: done
 
 - Real usage pass surfaced a concrete recall annoyance: repeated `manual_chaos` dumps were resurfacing the immediately previous chaos-reset card as a "related" memory
 - Related recall now suppresses near-duplicate chaos-reset cards instead of treating the last identical reset as useful memory
@@ -115,9 +115,16 @@ Status: in progress
 - Real usage pass also surfaced a status-panel issue: successful chaos-reset cards could still make storage health look broken because stale fallback text stayed in `last_error`
 - Storage health now prefers the latest successful card title over stale `last_error` text when a card already exists
 
+### Day 18
+
+Status: done
+
+- The generated overnight brief now reflects the current V1 surface instead of an older system shape
+- README and supporting docs now describe language-aware fallback copy, chaos-reset recall dedupe, the current health surface, and the generated morning brief path
+
 ## Remaining Work From The Original Two-Week Plan
 
-Status: not done yet
+Status: still in progress
 
 1. Real usage pass
    Use the app with a larger batch of real captures and inspect where the cards still become vague or annoying.
@@ -126,10 +133,10 @@ Status: not done yet
    The chaos-reset prompt, digest prompt, and recall thresholds should be tuned against real captures instead of only synthetic probes.
 
 3. Morning brief refresh
-   In progress. The overnight report is being updated to mention language-aware cards, chaos-reset recall dedupe, and the current health/status behavior.
+   Done. The overnight report now mentions language-aware cards, chaos-reset recall dedupe, and the current health/status behavior.
 
 4. Docs cleanup
-   README and supporting docs should reflect the current product shape rather than the Day 1-3 skeleton only.
+   Done. README and supporting docs now reflect the current product shape rather than the Day 1-3 skeleton only.
 
 ## Current Product Shape
 
