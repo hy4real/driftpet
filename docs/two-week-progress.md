@@ -112,6 +112,8 @@ Status: in progress
 - Real usage pass surfaced a concrete recall annoyance: repeated `manual_chaos` dumps were resurfacing the immediately previous chaos-reset card as a "related" memory
 - Related recall now suppresses near-duplicate chaos-reset cards instead of treating the last identical reset as useful memory
 - Verified with an isolated Electron-as-Node probe using two repeated Chinese chaos-reset inputs
+- Real usage pass also surfaced a status-panel issue: successful chaos-reset cards could still make storage health look broken because stale fallback text stayed in `last_error`
+- Storage health now prefers the latest successful card title over stale `last_error` text when a card already exists
 
 ## Remaining Work From The Original Two-Week Plan
 

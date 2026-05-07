@@ -357,7 +357,7 @@ const getStorageSection = (
 
   const detail = latestItem.extraction.extractionState === "failed" && latestItem.extraction.detail !== null
     ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.extraction.detail, 72)}`
-    : latestItem.lastError !== null && latestItem.lastError.length > 0
+    : latestItem.card === null && latestItem.lastError !== null && latestItem.lastError.length > 0
       ? `${latestItem.source} · ${latestItem.status} · ${summarize(latestItem.lastError, 72)}`
       : `${latestItem.source} · ${latestItem.status} · ${latestItem.title}`;
 
