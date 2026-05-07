@@ -120,6 +120,40 @@ const recentResult = sqlite(`
   limit 8;
 `);
 
+const latestRealTelegramResult = sqlite(`
+  select
+    items.id,
+    items.source,
+    items.origin,
+    items.status,
+    items.tg_message_id as tgMessageId,
+    items.extracted_title as extractedTitle,
+    cards.title
+  from items
+  left join cards on cards.item_id = items.id
+  where items.origin = 'real'
+    and items.source like 'tg_%'
+  order by items.received_at desc
+  limit 1;
+`);
+
+const latestRealChaosResult = sqlite(`
+  select
+    items.id,
+    items.source,
+    items.origin,
+    items.status,
+    items.last_error as lastError,
+    cards.title,
+    cards.related_card_ids as relatedCardIds
+  from items
+  left join cards on cards.item_id = items.id
+  where items.origin = 'real'
+    and items.source = 'manual_chaos'
+  order by items.received_at desc
+  limit 1;
+`);
+
 const prefsResult = sqlite(`
   select key, value
   from prefs
@@ -136,6 +170,8 @@ const vectorLength = Array.isArray(embeddingPayload.embeddings?.[0])
 const counts = parseJson(countsResult.stdout, [{}])[0] ?? {};
 const recent = parseJson(recentResult.stdout, []);
 const prefs = parseJson(prefsResult.stdout, []);
+const latestRealTelegram = parseJson(latestRealTelegramResult.stdout, [])[0] ?? null;
+const latestRealChaos = parseJson(latestRealChaosResult.stdout, [])[0] ?? null;
 const parseRelatedCount = (value) => {
   if (typeof value !== "string" || value.length === 0) {
     return 0;
@@ -149,10 +185,7 @@ const parseRelatedCount = (value) => {
   }
 };
 
-const latestRealChaos = recent.find((entry) => entry.origin === "real" && entry.source === "manual_chaos");
-const latestRealTelegram = recent.find((entry) => entry.origin === "real" && typeof entry.source === "string" && entry.source.startsWith("tg_"));
 const latestChaosRelatedCount = parseRelatedCount(latestRealChaos?.relatedCardIds);
-const latestChaosHasStaleError = typeof latestRealChaos?.lastError === "string" && latestRealChaos.lastError.length > 0;
 const configuredForOllama = appStatus?.embeddings?.provider === "ollama";
 const storedVectors = Number(appStatus?.embeddings?.storedEmbeddings ?? counts.ollama_embeddings ?? 0);
 const liveEmbeddingOk = ollamaEmbed.ok && vectorLength > 0;
@@ -190,7 +223,9 @@ const verification = {
       ok: countsResult.ok && recentResult.ok,
       counts,
       prefs,
-      recent
+      recent,
+      latestRealTelegram,
+      latestRealChaos
     }
   },
   failures: [
@@ -200,6 +235,8 @@ const verification = {
     ...(ollamaState === "fail" ? [ollamaEmbed] : []),
     countsResult,
     recentResult,
+    latestRealTelegramResult,
+    latestRealChaosResult,
     prefsResult
   ]
     .filter((entry) => !entry.ok)
