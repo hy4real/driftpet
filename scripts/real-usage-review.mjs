@@ -156,7 +156,7 @@ const sql = `
   LIMIT ${limit}
 `;
 
-const rows = JSON.parse(execFileSync("sqlite3", [
+const sqliteOutput = execFileSync("sqlite3", [
   "-json",
   dbPath,
   sql,
@@ -164,7 +164,8 @@ const rows = JSON.parse(execFileSync("sqlite3", [
   cwd: root,
   encoding: "utf8",
   stdio: ["ignore", "pipe", "pipe"],
-}));
+}).trim();
+const rows = sqliteOutput.length === 0 ? [] : JSON.parse(sqliteOutput);
 
 fs.mkdirSync(reportsDir, { recursive: true });
 
