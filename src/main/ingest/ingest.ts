@@ -100,6 +100,35 @@ export type IngestResult = {
   created: boolean;
 };
 
+// A real chaos reset is meant to be a fresh moment, so manual_chaos opts out
+// of permanent content-hash dedup. But a stream of identical pastes within a
+// few seconds is paste-spam, not five distinct moments — collapse those onto
+// the most recent same-text item so we don't burn five LLM calls.
+const CHAOS_PASTE_DEDUP_WINDOW_MS = 90_000;
+
+const findRecentChaosItem = (
+  payload: IngestInput,
+  normalized: string,
+  now: number
+): ExistingItemRow | undefined => {
+  if (payload.source !== "manual_chaos") {
+    return undefined;
+  }
+
+  const origin = payload.origin ?? "real";
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT id
+    FROM items
+    WHERE source = 'manual_chaos'
+      AND origin = ?
+      AND raw_text = ?
+      AND received_at >= ?
+    ORDER BY received_at DESC
+    LIMIT 1
+  `).get(origin, normalized, now - CHAOS_PASTE_DEDUP_WINDOW_MS) as ExistingItemRow | undefined;
+};
+
 const ensurePendingItem = (payload: IngestInput, normalized: string): PendingItemResult => {
   const db = getDatabase();
   const contentHash = payload.source === "manual_chaos"
@@ -107,7 +136,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
     : buildContentHash(buildItemIdentity(payload, normalized));
 
   const existing = contentHash === null
-    ? undefined
+    ? findRecentChaosItem(payload, normalized, Date.now())
     : db.prepare(`
       SELECT id
       FROM items

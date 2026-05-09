@@ -27,6 +27,7 @@
     "test:url-note-runner": "node --test --experimental-strip-types src/main/telegram/url-classifier.test.mjs src/main/telegram/url-note-runner-parse.test.mjs",
     "test:recall": "node --test --experimental-strip-types src/main/recall/scoring.test.mjs",
     "test:related": "npm run build:electron && node --test scripts/related-language-recall.test.mjs",
+    "test:ingest-dedup": "npm run build:electron && node --test scripts/ingest-chaos-dedup.test.mjs",
     "test:ui-smoke": "node --test scripts/app-ui-smoke.test.mjs",
     "test:window-state": "node --test --experimental-strip-types src/main/app/window-state.test.mjs",
     "probe:url-fallback": "node scripts/probe-url-fallback-digest.mjs",
