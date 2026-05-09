@@ -30,6 +30,7 @@
     "test:ingest-dedup": "npm run build:electron && node --test scripts/ingest-chaos-dedup.test.mjs",
     "test:ui-smoke": "node --test scripts/app-ui-smoke.test.mjs",
     "test:window-state": "node --test --experimental-strip-types src/main/app/window-state.test.mjs",
+    "test:clipboard-watcher": "node --test --experimental-strip-types src/main/clipboard/watcher.test.mjs",
     "probe:url-fallback": "node scripts/probe-url-fallback-digest.mjs",
     "test:lore": "node --test scripts/validate-lore-commit.test.mjs",
     "test:workflow": "node --test scripts/workflow-fusion-bridge.test.mjs",

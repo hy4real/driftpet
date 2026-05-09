@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CardRecord } from "../main/types/card";
+import type { ClipboardOffer } from "../main/clipboard/watcher";
 import type { AppStatus } from "../main/types/status";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { PetShell } from "./components/PetShell";
@@ -29,13 +30,17 @@ export default function App() {
   const [isAsync, setIsAsync] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [eventVersion, setEventVersion] = useState(0);
+  const [clipboardOffer, setClipboardOffer] = useState<ClipboardOffer | null>(null);
   const petNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clipboardOfferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const miniBubbleResizeActiveRef = useRef(false);
   const windowModeRef = useRef<WindowMode>("mini");
   const rememberedThread = status?.pet.rememberedThread ?? null;
   const isMini = windowMode === "mini";
   const showBubble = windowMode === "compact";
-  const showMiniClickBubble = isMini && petNote !== null;
+  const showMiniOffer = isMini && pendingCard === null && clipboardOffer !== null;
+  const showMiniClickBubble = isMini && !showMiniOffer && petNote !== null;
+  const needsMiniBubbleWidth = showMiniClickBubble || showMiniOffer;
 
   useEffect(() => {
     windowModeRef.current = windowMode;
@@ -52,13 +57,13 @@ export default function App() {
       return;
     }
 
-    if (showMiniClickBubble === miniBubbleResizeActiveRef.current) {
+    if (needsMiniBubbleWidth === miniBubbleResizeActiveRef.current) {
       return;
     }
 
-    miniBubbleResizeActiveRef.current = showMiniClickBubble;
-    void window.driftpet.setMiniBubbleVisible(showMiniClickBubble);
-  }, [isMini, showMiniClickBubble]);
+    miniBubbleResizeActiveRef.current = needsMiniBubbleWidth;
+    void window.driftpet.setMiniBubbleVisible(needsMiniBubbleWidth);
+  }, [isMini, needsMiniBubbleWidth]);
 
   useEffect(() => {
     return () => {
@@ -101,14 +106,42 @@ export default function App() {
       void window.driftpet.getStatus().then(setStatus);
     });
 
+    const unsubscribeClipboard = window.driftpet.onClipboardOffer((offer) => {
+      setClipboardOffer(offer);
+    });
+
     return () => {
       unsubscribe();
       unsubscribePet();
+      unsubscribeClipboard();
       if (petNoteTimerRef.current !== null) {
         clearTimeout(petNoteTimerRef.current);
       }
+      if (clipboardOfferTimerRef.current !== null) {
+        clearTimeout(clipboardOfferTimerRef.current);
+      }
     };
   }, []);
+
+  // Auto-dismiss a clipboard offer after 12s so the bubble doesn't camp the pet.
+  useEffect(() => {
+    if (clipboardOffer === null) {
+      return;
+    }
+    if (clipboardOfferTimerRef.current !== null) {
+      clearTimeout(clipboardOfferTimerRef.current);
+    }
+    clipboardOfferTimerRef.current = setTimeout(() => {
+      setClipboardOffer(null);
+      clipboardOfferTimerRef.current = null;
+    }, 12_000);
+    return () => {
+      if (clipboardOfferTimerRef.current !== null) {
+        clearTimeout(clipboardOfferTimerRef.current);
+        clipboardOfferTimerRef.current = null;
+      }
+    };
+  }, [clipboardOffer]);
 
   const showPetNote = useCallback((note: string, duration = 4200) => {
     setPetNote(note);
@@ -141,6 +174,24 @@ export default function App() {
       clearTimeout(petNoteTimerRef.current);
       petNoteTimerRef.current = null;
     }
+  };
+
+  const dismissClipboardOffer = () => {
+    setClipboardOffer(null);
+    if (clipboardOfferTimerRef.current !== null) {
+      clearTimeout(clipboardOfferTimerRef.current);
+      clipboardOfferTimerRef.current = null;
+    }
+  };
+
+  const acceptClipboardOffer = async () => {
+    if (clipboardOffer === null) {
+      return;
+    }
+    const text = clipboardOffer.text;
+    dismissClipboardOffer();
+    setChaosText(text);
+    await setWindowSize("expanded");
   };
 
   const resurfaceRememberedThread = async () => {
@@ -262,7 +313,7 @@ export default function App() {
   }, [historyOpen]);
 
   return (
-    <main className={`app-shell app-shell-${windowMode} ${showMiniClickBubble ? "app-shell-mini-bubble" : ""}`}>
+    <main className={`app-shell app-shell-${windowMode} ${needsMiniBubbleWidth ? "app-shell-mini-bubble" : ""}`}>
       {!isMini ? (
         <HistoryDrawer
           cards={history}
@@ -303,6 +354,9 @@ export default function App() {
           hasPendingCard={pendingCard !== null}
           rememberedThread={rememberedThread}
           onResurfaceRememberedThread={resurfaceRememberedThread}
+          clipboardOffer={showMiniOffer ? clipboardOffer : null}
+          onAcceptClipboardOffer={acceptClipboardOffer}
+          onDismissClipboardOffer={dismissClipboardOffer}
         />
       </section>
     </main>

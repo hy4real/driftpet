@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CardRecord } from "../../main/types/card";
+import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import type { RememberedThread } from "../../main/types/status";
 import { PetAvatar } from "./PetAvatar";
 import { PetBubble } from "./PetBubble";
@@ -44,6 +45,17 @@ type PetShellProps = {
   hasPendingCard: boolean;
   rememberedThread: RememberedThread | null;
   onResurfaceRememberedThread: () => void;
+  clipboardOffer: ClipboardOffer | null;
+  onAcceptClipboardOffer: () => void;
+  onDismissClipboardOffer: () => void;
+};
+
+const previewClipboardText = (raw: string, maxLength = 60): string => {
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= maxLength) {
+    return collapsed;
+  }
+  return `${collapsed.slice(0, maxLength - 1)}…`;
 };
 
 const clampPresenceTitle = (value: string, maxLength = 28): string => {
@@ -119,7 +131,10 @@ export function PetShell({
   activeCardTitle,
   hasPendingCard,
   rememberedThread,
-  onResurfaceRememberedThread
+  onResurfaceRememberedThread,
+  clipboardOffer,
+  onAcceptClipboardOffer,
+  onDismissClipboardOffer
 }: PetShellProps) {
   const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -399,7 +414,24 @@ export function PetShell({
         </div>
       ) : null}
 
-      {isMini && petNote !== null ? (
+      {isMini && clipboardOffer !== null ? (
+        <div className="pet-clipboard-offer" role="dialog" aria-label="复制了一段，要收吗？">
+          <div className="pet-clipboard-offer-text">
+            <span className="pet-clipboard-offer-prompt">复制了一段，要收吗？</span>
+            <span className="pet-clipboard-offer-preview">{previewClipboardText(clipboardOffer.text)}</span>
+          </div>
+          <div className="pet-clipboard-offer-actions">
+            <button type="button" className="pet-clipboard-offer-accept" onClick={onAcceptClipboardOffer}>
+              收一下
+            </button>
+            <button type="button" className="pet-clipboard-offer-dismiss" onClick={onDismissClipboardOffer}>
+              不用
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {isMini && clipboardOffer === null && petNote !== null ? (
         <div className="pet-click-bubble" role="status">
           {petNote}
         </div>

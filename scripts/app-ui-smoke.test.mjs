@@ -187,6 +187,7 @@ const setupDom = () => {
   Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", { configurable: true, value: true });
 
   let cleanupListener = () => {};
+  let clipboardOfferEmitter = null;
   const setWindowSizeCalls = [];
   const setMiniBubbleVisibleCalls = [];
   const moveWindowByCalls = [];
@@ -236,6 +237,12 @@ const setupDom = () => {
       };
       return cleanupListener;
     },
+    onClipboardOffer: (listener) => {
+      clipboardOfferEmitter = listener;
+      return () => {
+        clipboardOfferEmitter = null;
+      };
+    },
     onPetActiveChanged: () => () => {},
   };
 
@@ -244,6 +251,11 @@ const setupDom = () => {
     setWindowSizeCalls,
     setMiniBubbleVisibleCalls,
     moveWindowByCalls,
+    emitClipboardOffer: (offer) => {
+      if (clipboardOfferEmitter !== null) {
+        clipboardOfferEmitter(offer);
+      }
+    },
     cleanup: () => {
       cleanupListener();
       dom.window.close();
@@ -363,6 +375,61 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   assert.ok(container.querySelector(".pet-shell-expanded"), "expected double click to open the nest");
   assert.ok(container.querySelector(".pet-workbench"), "expected expanded mode to show the workbench");
   assert.equal(container.querySelector(".pet-avatar-button"), null, "expected nest panel to hide the animated pet");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("clipboard offer in mini mode lets the user accept into the nest pre-filled or dismiss it", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls, emitClipboardOffer } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  // Dismiss path: an offer arrives, the user clicks 不用, no window resize happens.
+  await act(async () => {
+    emitClipboardOffer({ text: "An interesting paragraph the user just copied from a doc.", capturedAt: Date.now() });
+  });
+
+  const offer = container.querySelector(".pet-clipboard-offer");
+  assert.ok(offer, "expected the clipboard offer bubble to appear in mini mode");
+  assert.match(offer.textContent ?? "", /复制了一段，要收吗？/);
+  assert.match(offer.textContent ?? "", /An interesting paragraph/);
+  assert.ok(container.querySelector(".app-shell-mini-bubble"), "offer should widen the mini window like the click bubble does");
+
+  const dismiss = offer.querySelector(".pet-clipboard-offer-dismiss");
+  assert.ok(dismiss);
+  await act(async () => {
+    dismiss.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  assert.equal(container.querySelector(".pet-clipboard-offer"), null, "dismiss should remove the offer");
+  assert.deepEqual(setWindowSizeCalls, [], "dismiss must not change the window mode");
+
+  // Accept path: a fresh offer arrives, the user clicks 收一下, the workbench opens with text pre-filled.
+  await act(async () => {
+    emitClipboardOffer({ text: "Second copy: tighten the next driftpet card.", capturedAt: Date.now() });
+  });
+  const acceptOffer = container.querySelector(".pet-clipboard-offer-accept");
+  assert.ok(acceptOffer);
+  await act(async () => {
+    acceptOffer.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  assert.deepEqual(setWindowSizeCalls, ["expanded"], "accepting should expand the window once");
+  assert.equal(container.querySelector(".pet-clipboard-offer"), null, "offer must be cleared once accepted");
+  const textarea = container.querySelector("textarea");
+  assert.ok(textarea, "workbench textarea should be visible after expanding");
+  assert.equal(textarea.value, "Second copy: tighten the next driftpet card.", "textarea should be pre-filled with the copied text");
 
   await act(async () => {
     root.unmount();

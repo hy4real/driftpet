@@ -1,8 +1,9 @@
 import type { App } from "electron";
-import { app, BrowserWindow, net, protocol } from "electron";
+import { app, BrowserWindow, clipboard, net, protocol } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { registerIpcHandlers } from "../../../electron/ipc";
+import { startClipboardWatcher, type ClipboardOffer } from "../clipboard/watcher";
 import { closeDatabase, checkpointDatabase } from "../db/client";
 import { runMigrations } from "../db/migrate";
 import { decideAutoSurface, recordAutoCardShown, recordAutoCardSuppressed } from "../pet/runtime";
@@ -86,6 +87,19 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
   registerIpcHandlers(emitCardCreated);
   const stopTelegramPoller = startTelegramPoller({ onCardCreated: emitAutoCardCreated });
 
+  const clipboardOfferEnabled = (process.env.DRIFTPET_CLIPBOARD_OFFER ?? "on").toLowerCase() !== "off";
+  const clipboardWatcher = clipboardOfferEnabled
+    ? startClipboardWatcher({
+      reader: clipboard,
+      onOffer: (offer: ClipboardOffer) => {
+        if (mainWindow.isDestroyed()) {
+          return;
+        }
+        mainWindow.webContents.send("events:clipboard-offer", offer);
+      }
+    })
+    : null;
+
   // System tray.
   createTray({
     onToggleWindow: () => {
@@ -102,6 +116,7 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
     },
     onQuit: () => {
       stopTelegramPoller();
+      clipboardWatcher?.stop();
       clearInterval(checkpointInterval);
       closeDatabase();
       electronApp.quit();
@@ -122,6 +137,7 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
   electronApp.on("before-quit", () => {
     isQuitting = true;
     stopTelegramPoller();
+    clipboardWatcher?.stop();
     clearInterval(checkpointInterval);
     closeDatabase();
   });

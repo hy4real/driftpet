@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { CardRecord } from "../src/main/types/card";
+import type { ClipboardOffer } from "../src/main/clipboard/watcher";
 import type { AppStatus } from "../src/main/types/status";
 
 type CardCreatedListener = (card: CardRecord) => void;
+type ClipboardOfferListener = (offer: ClipboardOffer) => void;
 type PetActiveChangedListener = (assets: { slug: string; spritesheetPath: string }) => void;
 
 type PetInfo = {
@@ -35,6 +37,17 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("events:card-created", wrapped);
+    };
+  },
+  onClipboardOffer: (listener: ClipboardOfferListener): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, offer: ClipboardOffer) => {
+      listener(offer);
+    };
+
+    ipcRenderer.on("events:clipboard-offer", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("events:clipboard-offer", wrapped);
     };
   },
   onPetActiveChanged: (listener: PetActiveChangedListener): (() => void) => {
