@@ -37,6 +37,7 @@ const sampleStatus = {
     hourlyBudget: 3,
     shownThisHour: 1,
     canSurfaceAuto: true,
+    rememberedThread: null,
   },
   telegram: {
     level: "ok",

@@ -19,7 +19,6 @@ export default function App() {
   const [activeCard, setActiveCard] = useState<CardRecord | null>(null);
   const [pendingCard, setPendingCard] = useState<CardRecord | null>(null);
   const [history, setHistory] = useState<CardRecord[]>([]);
-  const [rememberedThreadTitle, setRememberedThreadTitle] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [windowMode, setWindowMode] = useState<WindowMode>("mini");
   const [chaosText, setChaosText] = useState("");
@@ -33,7 +32,7 @@ export default function App() {
   const petNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const miniBubbleResizeActiveRef = useRef(false);
   const windowModeRef = useRef<WindowMode>("mini");
-  const skipRememberedForNextCardRef = useRef(false);
+  const rememberedThread = status?.pet.rememberedThread ?? null;
   const isMini = windowMode === "mini";
   const showBubble = windowMode === "compact";
   const showMiniClickBubble = isMini && petNote !== null;
@@ -74,7 +73,6 @@ export default function App() {
     void window.driftpet.listRecentCards().then((cards) => {
       setHistory(cards);
       setActiveCard(null);
-      setRememberedThreadTitle(cards[0]?.title ?? null);
     });
     void window.driftpet.getStatus().then(setStatus);
     void window.driftpet.petActive().then((active) => {
@@ -98,11 +96,6 @@ export default function App() {
         setActiveCard(card);
       }
       setHistory((current) => [card, ...current.filter((entry) => entry.id !== card.id)].slice(0, 20));
-      if (skipRememberedForNextCardRef.current) {
-        skipRememberedForNextCardRef.current = false;
-      } else {
-        setRememberedThreadTitle(card.title);
-      }
       setEventVersion((v) => v + 1);
       setHasError(false);
       void window.driftpet.getStatus().then(setStatus);
@@ -150,6 +143,25 @@ export default function App() {
     }
   };
 
+  const resurfaceRememberedThread = async () => {
+    if (rememberedThread === null) {
+      return;
+    }
+    const fromHistory = history.find((card) => card.id === rememberedThread.cardId) ?? null;
+    if (fromHistory !== null) {
+      setActiveCard(fromHistory);
+      return;
+    }
+    const cards = await window.driftpet.listRecentCards();
+    setHistory(cards);
+    const refetched = cards.find((card) => card.id === rememberedThread.cardId) ?? null;
+    if (refetched !== null) {
+      setActiveCard(refetched);
+      return;
+    }
+    showPetNote("这张线我还守着，但卡片要去历史里翻一翻。", 4200);
+  };
+
   const pokePet = () => {
     const notes = [
       "我在。",
@@ -175,7 +187,6 @@ export default function App() {
       const card = await window.driftpet.ingestChaosReset(nextValue);
       setPendingCard(null);
       setActiveCard(card);
-      setRememberedThreadTitle(card.title);
       setChaosText("");
       setEventVersion((v) => v + 1);
       showPetNote("整理好了，我叼着小卡片回来了。", 3600);
@@ -290,7 +301,8 @@ export default function App() {
           historyOpen={historyOpen}
           activeCardTitle={pendingCard?.title ?? activeCard?.title ?? null}
           hasPendingCard={pendingCard !== null}
-          rememberedThreadTitle={rememberedThreadTitle}
+          rememberedThread={rememberedThread}
+          onResurfaceRememberedThread={resurfaceRememberedThread}
         />
       </section>
     </main>

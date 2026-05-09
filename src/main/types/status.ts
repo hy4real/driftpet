@@ -4,6 +4,12 @@ import type { TelegramPollerLifecycle } from "../telegram/poller-runtime";
 
 export type StatusLevel = "ok" | "warn" | "idle";
 
+export type RememberedThread = {
+  cardId: number;
+  title: string;
+  createdAt: number;
+};
+
 export type StatusSection = {
   level: StatusLevel;
   summary: string;
@@ -53,6 +59,7 @@ export type AppStatus = {
     hourlyBudget: number;
     shownThisHour: number;
     canSurfaceAuto: boolean;
+    rememberedThread: RememberedThread | null;
   };
   telegram: StatusSection & {
     enabled: boolean;

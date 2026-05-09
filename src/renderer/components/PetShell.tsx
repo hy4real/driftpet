@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CardRecord } from "../../main/types/card";
+import type { RememberedThread } from "../../main/types/status";
 import { PetAvatar } from "./PetAvatar";
 import { PetBubble } from "./PetBubble";
 import { PetControls } from "./PetControls";
@@ -41,7 +42,8 @@ type PetShellProps = {
   onSetWindowSize: (windowSize: "mini" | "compact" | "expanded") => void;
   activeCardTitle: string | null;
   hasPendingCard: boolean;
-  rememberedThreadTitle: string | null;
+  rememberedThread: RememberedThread | null;
+  onResurfaceRememberedThread: () => void;
 };
 
 const clampPresenceTitle = (value: string, maxLength = 28): string => {
@@ -116,7 +118,8 @@ export function PetShell({
   onSetWindowSize,
   activeCardTitle,
   hasPendingCard,
-  rememberedThreadTitle
+  rememberedThread,
+  onResurfaceRememberedThread
 }: PetShellProps) {
   const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,11 +212,11 @@ export function PetShell({
   const petExpression = transientExpression ?? resolveExpression(baseExpression, triggers, Date.now());
   const moodLabel = moodLabelByState[petUiState];
   const statusLabel = statusLabelByState[petUiState];
-  const canShowRememberedThread = activeCardTitle === null && rememberedThreadTitle !== null;
+  const canShowRememberedThread = activeCardTitle === null && rememberedThread !== null;
   const memoryActive = canShowRememberedThread && showRememberedThread;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
-  const presenceTitle = memoryActive
-    ? `上次帮你守的线：${clampPresenceTitle(rememberedThreadTitle)}`
+  const presenceTitle = memoryActive && rememberedThread !== null
+    ? `上次帮你守的线：${clampPresenceTitle(rememberedThread.title)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
   const presenceLabel = memoryActive ? "线程记忆" : moodLabel;
   const liveStatusLabel = dragging
@@ -442,6 +445,7 @@ export function PetShell({
               label={presenceLabel}
               memoryActive={memoryActive}
               title={presenceTitle}
+              onMemoryClick={memoryActive ? onResurfaceRememberedThread : undefined}
             />
           ) : null}
         </div>

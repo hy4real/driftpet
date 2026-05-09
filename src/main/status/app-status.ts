@@ -5,7 +5,7 @@ import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import { decideAutoSurface } from "../pet/runtime";
 import { getTelegramPollerRuntimeState } from "../telegram/poller-runtime";
-import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
+import type { AppStatus, LatestItemStatus, RememberedThread, StatusLevel } from "../types/status";
 import type { RelatedCardRef } from "../types/card";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
 import { normalizeText, truncate } from "../utils/text";
@@ -215,6 +215,41 @@ const getLatestItem = (): LatestItemStatus | null => {
   return buildLatestItem(row);
 };
 
+type RememberedThreadRow = {
+  card_id: number;
+  card_title: string;
+  card_created_at: number;
+};
+
+const REMEMBERED_THREAD_EXCLUDED_TAGS = ["Telegram ping", "链接待重试", "link retry"];
+
+const getRememberedThread = (): RememberedThread | null => {
+  const db = getDatabase();
+  const placeholders = REMEMBERED_THREAD_EXCLUDED_TAGS.map(() => "?").join(", ");
+  const row = db.prepare(`
+    SELECT
+      cards.id AS card_id,
+      cards.title AS card_title,
+      cards.created_at AS card_created_at
+    FROM items
+    INNER JOIN cards ON cards.item_id = items.id
+    WHERE items.origin = 'real'
+      AND cards.knowledge_tag NOT IN (${placeholders})
+    ORDER BY cards.created_at DESC
+    LIMIT 1
+  `).get(...REMEMBERED_THREAD_EXCLUDED_TAGS) as RememberedThreadRow | undefined;
+
+  if (row === undefined) {
+    return null;
+  }
+
+  return {
+    cardId: row.card_id,
+    title: row.card_title,
+    createdAt: row.card_created_at
+  };
+};
+
 const getLatestRealItem = (): LatestItemStatus | null => {
   const db = getDatabase();
   const row = db.prepare(`
@@ -325,7 +360,8 @@ const getPetSection = (): AppStatus["pet"] => {
       : "Hourly surface budget reached; new cards still land in history.",
     hourlyBudget: decision.hourlyBudget,
     shownThisHour: decision.shownThisHour,
-    canSurfaceAuto: decision.allowed
+    canSurfaceAuto: decision.allowed,
+    rememberedThread: getRememberedThread()
   };
 };
 
