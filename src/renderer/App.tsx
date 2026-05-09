@@ -44,8 +44,11 @@ export default function App() {
   const miniBubbleResizeActiveRef = useRef(false);
   const windowModeRef = useRef<WindowMode>("mini");
   const rememberedThread = status?.pet.rememberedThread ?? null;
+  const rememberedThreadCard = rememberedThread !== null
+    ? history.find((card) => card.id === rememberedThread.cardId) ?? null
+    : null;
   const isMini = windowMode === "mini";
-  const showBubble = windowMode === "compact";
+  const showBubble = windowMode === "compact" && activeCard !== null;
   const showMiniClickBubble = isMini && petNote !== null;
   const showMiniResumeThread = isMini && petNote === null && rememberedThread !== null;
   const needsMiniBubbleWidth = showMiniClickBubble || showMiniResumeThread;
@@ -435,6 +438,7 @@ export default function App() {
           activeCardTitle={pendingCard?.title ?? activeCard?.title ?? null}
           hasPendingCard={pendingCard !== null}
           rememberedThread={rememberedThread}
+          rememberedThreadCard={rememberedThreadCard}
           onResurfaceRememberedThread={resurfaceRememberedThread}
           clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}

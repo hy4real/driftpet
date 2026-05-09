@@ -1115,6 +1115,66 @@ test("workbench panel keeps a visible border and shadow on light backgrounds", a
   assert.match(workbenchBlock, /box-shadow:\s*var\(--shadow-panel\)/, "expected workbench to keep the panel shadow token for depth");
 });
 
+test("compact mode renders a full resume thread card with next-step body", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const miniResumeButton = container.querySelector(".pet-mini-resume-thread");
+  assert.ok(miniResumeButton, "expected the mini-mode resume entry once a remembered thread is seeded");
+
+  await act(async () => {
+    miniResumeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  // After resume, App sets activeCard, so the bubble takes over and ResumeThreadCard hides.
+  // Close the bubble to prove the resume card returns when no active bubble is on screen.
+  const bubbleHide = container.querySelector(".bubble-panel .ghost-button");
+  assert.ok(bubbleHide, "expected the active bubble to render after the resume click");
+
+  await act(async () => {
+    bubbleHide.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const resumeCard = container.querySelector(".pet-resume-card");
+  assert.ok(resumeCard, "expected the full resume thread card once the active bubble is dismissed");
+  const resumeTitle = resumeCard.querySelector(".pet-resume-card-title");
+  assert.ok(resumeTitle, "expected the resume card to render the thread title");
+  assert.equal(resumeTitle.textContent, sampleCard.title);
+  assert.ok(resumeCard.querySelector(".pet-resume-card-row"), "expected the resume card to render at least the next-step row");
+  assert.ok(resumeCard.querySelector(".pet-resume-card-primary"), "expected a primary resume action");
+  assert.ok(resumeCard.querySelector(".pet-resume-card-secondary"), "expected a secondary collapse action");
+
+  // Memory hint inside PetPresence should yield to the full card so the same thread is not echoed twice.
+  const presenceMemoryButton = container.querySelector(".pet-presence-card[data-memory-active=\"true\"], .pet-presence-card .pet-presence-memory");
+  assert.equal(presenceMemoryButton, null, "expected the presence memory hint to step aside while the resume card is on screen");
+
+  // Collapsing the resume card should remove it for this thread id.
+  const collapseButton = resumeCard.querySelector(".pet-resume-card-secondary");
+
+  await act(async () => {
+    collapseButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  assert.equal(container.querySelector(".pet-resume-card"), null, "expected the resume card to disappear after collapse");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
 test("workbench collapse button takes the user straight back to mini", async () => {
   const { App, cleanupBundle } = await buildAppModule();
   const { cleanup, setWindowSizeCalls } = setupDom();

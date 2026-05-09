@@ -1322,6 +1322,105 @@ textarea:disabled {
   }
 }
 
+.pet-resume-card {
+  width: 100%;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(92, 195, 191, 0.10), transparent 32%),
+    linear-gradient(180deg, rgba(18, 27, 33, 0.96), rgba(11, 16, 21, 0.92));
+  box-shadow: var(--shadow);
+  color: var(--text-0);
+  text-align: left;
+  justify-self: stretch;
+}
+
+.pet-resume-card-header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pet-resume-card-eyebrow {
+  color: var(--teal);
+  font-size: var(--font-caption);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+.pet-resume-card-title {
+  margin: 0;
+  font-size: var(--font-header);
+  line-height: 1.25;
+}
+
+.pet-resume-card-row {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.pet-resume-card-row-label {
+  color: var(--teal);
+  font-size: var(--font-text);
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.pet-resume-card-row-body {
+  display: grid;
+  gap: 2px;
+}
+
+.pet-resume-card-row-eyebrow {
+  color: var(--text-1);
+  font-size: var(--font-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pet-resume-card-row p {
+  margin: 0;
+  color: var(--text-0);
+  font-size: var(--font-text);
+  line-height: 1.45;
+}
+
+.pet-resume-card-row-muted .pet-resume-card-row-label,
+.pet-resume-card-row-muted p {
+  color: var(--text-1);
+}
+
+.pet-resume-card-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.pet-resume-card-primary,
+.pet-resume-card-secondary {
+  padding: var(--space-2) 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-body);
+  cursor: pointer;
+}
+
+.pet-resume-card-primary {
+  border: 1px solid var(--teal);
+  background: var(--teal-soft);
+  color: var(--text-0);
+}
+
+.pet-resume-card-secondary {
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
 @media (max-height: 420px) {
   .bubble-panel-compact {
     max-height: 180px;
@@ -1329,5 +1428,10 @@ textarea:disabled {
 
   .manual-input {
     min-height: 80px;
+  }
+
+  .pet-resume-card {
+    padding: var(--space-4) var(--space-5);
+    gap: var(--space-3);
   }
 }

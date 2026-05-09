@@ -8,6 +8,7 @@ import { PetBubble } from "./PetBubble";
 import { PetControls } from "./PetControls";
 import { PetPresence } from "./PetPresence";
 import { PetWorkbench } from "./PetWorkbench";
+import { ResumeThreadCard } from "./ResumeThreadCard";
 import {
   getPetUiState,
   moodLabelByState,
@@ -44,6 +45,7 @@ type PetShellProps = {
   activeCardTitle: string | null;
   hasPendingCard: boolean;
   rememberedThread: RememberedThread | null;
+  rememberedThreadCard: CardRecord | null;
   onResurfaceRememberedThread: () => void;
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
@@ -123,6 +125,7 @@ export function PetShell({
   activeCardTitle,
   hasPendingCard,
   rememberedThread,
+  rememberedThreadCard,
   onResurfaceRememberedThread,
   clipboardOffer,
   onAcceptClipboardOffer,
@@ -142,6 +145,9 @@ export function PetShell({
   const triggerIdRef = useRef(0);
   const prevEventVersionRef = useRef(eventVersion);
   const isMini = windowMode === "mini";
+  const [collapsedResumeCardId, setCollapsedResumeCardId] = useState<number | null>(null);
+  const resumeCardId = rememberedThreadCard !== null ? rememberedThreadCard.id : null;
+  const isResumeCollapsed = resumeCardId !== null && collapsedResumeCardId === resumeCardId;
 
   const triggerExpression = (expression: PetExpression, durationMs: number) => {
     const id = ++triggerIdRef.current;
@@ -226,7 +232,10 @@ export function PetShell({
   const moodLabel = moodLabelByState[petUiState];
   const statusLabel = statusLabelByState[petUiState];
   const canShowRememberedThread = activeCardTitle === null && rememberedThread !== null;
-  const memoryActive = canShowRememberedThread;
+  const showResumeCard = !isMini && !isExpanded && !showBubble && rememberedThreadCard !== null && !isResumeCollapsed;
+  // When the full resume card is on screen, suppress the presence-line memory hint
+  // so the same thread does not echo in two places at once.
+  const memoryActive = canShowRememberedThread && !showResumeCard;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
   const presenceTitle = memoryActive && rememberedThread !== null
     ? `上次帮你守的线：${clampPresenceTitle(rememberedThread.title)}`
@@ -486,6 +495,14 @@ export function PetShell({
             />
           ) : null}
         </div>
+      ) : null}
+
+      {showResumeCard && rememberedThreadCard !== null ? (
+        <ResumeThreadCard
+          card={rememberedThreadCard}
+          onResume={onResurfaceRememberedThread}
+          onCollapse={() => setCollapsedResumeCardId(rememberedThreadCard.id)}
+        />
       ) : null}
 
       {!isMini ? (
