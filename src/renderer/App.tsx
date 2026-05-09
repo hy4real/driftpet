@@ -283,6 +283,13 @@ export default function App() {
     }
     if (windowSize !== "mini") {
       revealPendingCard();
+      // If a re-render happens during the awaited resize (e.g. clipboard offer
+      // gets dismissed by acceptClipboardOffer), the mini-bubble effect would
+      // otherwise see needsMiniBubbleWidth flip false vs ref still true and
+      // fire setMiniBubbleVisible(false) — that IPC arrives at main behind
+      // pet:set-window-size("expanded") and shrinks the just-expanded nest
+      // back to mini dimensions. Drop the ref proactively so the effect bails.
+      miniBubbleResizeActiveRef.current = false;
     }
     await window.driftpet.setWindowSize(windowSize);
     setWindowMode(windowSize);

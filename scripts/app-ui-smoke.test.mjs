@@ -386,7 +386,7 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
 
 test("clipboard offer in mini mode lets the user accept into the nest pre-filled or dismiss it", async () => {
   const { App, cleanupBundle } = await buildAppModule();
-  const { cleanup, setWindowSizeCalls, emitClipboardOffer } = setupDom();
+  const { cleanup, setWindowSizeCalls, setMiniBubbleVisibleCalls, emitClipboardOffer } = setupDom();
   const container = document.getElementById("root");
   assert.ok(container);
 
@@ -421,11 +421,17 @@ test("clipboard offer in mini mode lets the user accept into the nest pre-filled
   });
   const acceptOffer = container.querySelector(".pet-clipboard-offer-accept");
   assert.ok(acceptOffer);
+  const miniBubbleCallsBeforeAccept = setMiniBubbleVisibleCalls.slice();
   await act(async () => {
     acceptOffer.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 
   assert.deepEqual(setWindowSizeCalls, ["expanded"], "accepting should expand the window once");
+  const newMiniBubbleCalls = setMiniBubbleVisibleCalls.slice(miniBubbleCallsBeforeAccept.length);
+  assert.ok(
+    !newMiniBubbleCalls.includes(false),
+    `accepting must not fire setMiniBubbleVisible(false); that IPC arrives behind the expand and shrinks the just-opened nest back to mini. New calls: ${JSON.stringify(newMiniBubbleCalls)}`
+  );
   assert.equal(container.querySelector(".pet-clipboard-offer"), null, "offer must be cleared once accepted");
   const textarea = container.querySelector("textarea");
   assert.ok(textarea, "workbench textarea should be visible after expanding");
