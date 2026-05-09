@@ -1,0 +1,47 @@
+{
+  "task_id": "0507T001",
+  "title": "Replace this title",
+  "task_type": "CODE_CHANGE",
+  "intent": "Describe the user's intent in one sentence",
+  "goal": "Describe the concrete, verifiable outcome",
+  "scope": [
+    "src/example.ts"
+  ],
+  "out_of_scope": [
+    "package.json",
+    "infra/",
+    "unrelated modules"
+  ],
+  "required_agent": "executor",
+  "mode": "solo | build | review | research",
+  "acceptance": [
+    "List the checks that prove success"
+  ],
+  "risk_boundary": [
+    "State what must not be changed",
+    "State the blast-radius limit",
+    "State when execution must stop and return BLOCKED"
+  ],
+  "evidence_refs": [
+    "Optional paths, logs, or source links"
+  ],
+  "current_state": "ROUTE_OR_EXECUTE",
+  "external_status": "待执行",
+  "report_format": [
+    "执行线程",
+    "任务ID",
+    "状态",
+    "是否进行QA验收",
+    "QA说明",
+    "files",
+    "action",
+    "verify",
+    "done",
+    "blockers",
+    "最小下一步",
+    "commit",
+    "提交信息"
+  ],
+  "rollback_hint": "Describe the clean rollback point or say not needed",
+  "caused_by": "user_request"
+}

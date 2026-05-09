@@ -11,6 +11,7 @@ type RecallCandidateRow = {
   source: string;
   origin: string;
   knowledge_tag: string | null;
+  raw_url: string | null;
 };
 
 export type RecallCandidate = {
@@ -23,6 +24,7 @@ export type RecallCandidate = {
   source: string;
   origin: string;
   knowledgeTag: string | null;
+  rawUrl: string | null;
 };
 
 const parseVector = (value: string | null): number[] | null => {
@@ -74,7 +76,8 @@ export const listRecallCandidates = (excludeItemId: number, limit: number): Reca
       card_embeddings.vector_json AS vector_json,
       items.source AS source,
       items.origin AS origin,
-      cards.knowledge_tag AS knowledge_tag
+      cards.knowledge_tag AS knowledge_tag,
+      items.raw_url AS raw_url
     FROM cards
     JOIN items ON items.id = cards.item_id
     LEFT JOIN card_embeddings ON card_embeddings.card_id = cards.id
@@ -92,6 +95,7 @@ export const listRecallCandidates = (excludeItemId: number, limit: number): Reca
     embedding: parseVector(row.vector_json),
     source: row.source,
     origin: row.origin,
-    knowledgeTag: row.knowledge_tag
+    knowledgeTag: row.knowledge_tag,
+    rawUrl: row.raw_url
   }));
 };

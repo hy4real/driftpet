@@ -6,6 +6,8 @@ export type UrlExtractionStage =
   | "not_applicable"
   | "readability"
   | "body_fallback"
+  | "note_ingested"
+  | "note_failed"
   | "fetch_failed"
   | "no_content";
 
@@ -24,4 +26,6 @@ export type ItemRecord = {
   lastError: string | null;
   extractionStage: UrlExtractionStage;
   extractionError: string | null;
+  artifactPath: string | null;
+  processor: string | null;
 };

@@ -1,0 +1,30 @@
+appId: com.driftpet.app
+productName: driftpet
+copyright: "Copyright © 2025"
+
+directories:
+  output: release
+
+mac:
+  icon: assets/icon.png
+  category: public.app-category.productivity
+  target:
+    - dmg
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  title: driftpet
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - node_modules/**/*
+  - prompts/**/*
+  - src/main/db/migrations/**/*
+  - package.json
+
+extraResources:
+  - from: assets
+    to: assets

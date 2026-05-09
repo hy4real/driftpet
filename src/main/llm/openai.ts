@@ -95,7 +95,8 @@ export const sendOpenAiResponsesPrompt = async ({
       model,
       max_output_tokens: maxTokens,
       input: prompt
-    })
+    }),
+    signal: AbortSignal.timeout(30_000)
   });
 
   const payload = await response.json() as OpenAiResponsesPayload;
@@ -132,7 +133,8 @@ export const sendOpenAiCompatiblePrompt = async ({
           content: prompt
         }
       ]
-    })
+    }),
+    signal: AbortSignal.timeout(30_000)
   });
 
   const payload = await response.json() as OpenAiCompatiblePayload;

@@ -1,16 +1,65 @@
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import { getRecentCards } from "../src/main/db/cards";
-import { ingestChaosReset, ingestManualText } from "../src/main/ingest/ingest";
+import { ingestChaosReset } from "../src/main/ingest/ingest";
 import type { CardRecord } from "../src/main/types/card";
-import { setPetHourlyBudget, setPetMode } from "../src/main/pet/runtime";
-import type { AppStatus, PetMode } from "../src/main/types/status";
+import { setPetHourlyBudget } from "../src/main/pet/runtime";
+import type { AppStatus } from "../src/main/types/status";
 import { getAppStatus } from "../src/main/status/app-status";
+import { moveMainWindowBy, resizeMainWindow } from "../src/main/app/windows";
+import {
+  COMPACT_WINDOW_HEIGHT,
+  COMPACT_WINDOW_WIDTH,
+  EXPANDED_WINDOW_HEIGHT,
+  EXPANDED_WINDOW_WIDTH,
+  MINI_BUBBLE_WINDOW_WIDTH,
+  MINI_WINDOW_HEIGHT,
+  MINI_WINDOW_WIDTH,
+} from "../src/main/app/window-state";
+import { parsePetdexSlug, downloadPet } from "../src/main/pet/petdex-client";
+import {
+  listInstalledPets,
+  getActivePetSlug,
+  setActivePetSlug,
+  getActivePetAssets,
+  type PetInfo
+} from "../src/main/pet/registry";
 
 export const registerIpcHandlers = (
   emitCardCreated: (card: CardRecord) => void
 ): void => {
+  const getTargetWindow = (
+    event: IpcMainEvent | IpcMainInvokeEvent
+  ): BrowserWindow | null => {
+    return BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getAllWindows()[0] ?? null;
+  };
+
+  const resizeWindow = (
+    event: IpcMainInvokeEvent,
+    windowKey: "mini" | "compact" | "expanded"
+  ): void => {
+    const window = getTargetWindow(event);
+    if (window === null || window.isDestroyed()) {
+      return;
+    }
+
+    let width = MINI_WINDOW_WIDTH;
+    let height = MINI_WINDOW_HEIGHT;
+    if (windowKey === "mini") {
+      width = MINI_WINDOW_WIDTH;
+      height = MINI_WINDOW_HEIGHT;
+    } else if (windowKey === "compact") {
+      width = COMPACT_WINDOW_WIDTH;
+      height = COMPACT_WINDOW_HEIGHT;
+    } else {
+      width = EXPANDED_WINDOW_WIDTH;
+      height = EXPANDED_WINDOW_HEIGHT;
+    }
+
+    resizeMainWindow(window, width, height, windowKey);
+  };
+
   ipcMain.handle("pet:show-demo", async (): Promise<CardRecord> => {
-    const card = await ingestManualText(
+    const card = await ingestChaosReset(
       "You drifted into inputs again. Close two tabs, keep one thread, and turn this note into the next concrete action.",
       "synthetic"
     );
@@ -26,23 +75,77 @@ export const registerIpcHandlers = (
     return getAppStatus();
   });
 
-  ipcMain.handle("ingest:manual-text", async (_event, rawText: string): Promise<CardRecord> => {
-    const card = await ingestManualText(rawText);
-    emitCardCreated(card);
-    return card;
-  });
-
   ipcMain.handle("ingest:chaos-reset", async (_event, rawText: string): Promise<CardRecord> => {
     const card = await ingestChaosReset(rawText);
     emitCardCreated(card);
     return card;
   });
 
-  ipcMain.handle("pet:set-mode", async (_event, mode: PetMode): Promise<void> => {
-    setPetMode(mode);
-  });
-
   ipcMain.handle("pet:set-hourly-budget", async (_event, value: number): Promise<number> => {
     return setPetHourlyBudget(value);
+  });
+
+  ipcMain.handle("pet:set-window-size", async (_event, windowSize: "mini" | "compact" | "expanded"): Promise<void> => {
+    resizeWindow(_event, windowSize);
+  });
+
+  ipcMain.handle("pet:set-mini-bubble-visible", async (event, visible: boolean): Promise<void> => {
+    const window = getTargetWindow(event);
+    if (window === null || window.isDestroyed()) {
+      return;
+    }
+
+    resizeMainWindow(
+      window,
+      visible ? MINI_BUBBLE_WINDOW_WIDTH : MINI_WINDOW_WIDTH,
+      MINI_WINDOW_HEIGHT,
+      "mini",
+      !visible
+    );
+  });
+
+  ipcMain.on("pet:move-window-by", (event, deltaX: number, deltaY: number) => {
+    const window = getTargetWindow(event);
+    if (window === null || window.isDestroyed()) {
+      return;
+    }
+
+    moveMainWindowBy(window, Number(deltaX) || 0, Number(deltaY) || 0);
+  });
+
+  ipcMain.handle("pet:list", async (): Promise<PetInfo[]> => {
+    return listInstalledPets();
+  });
+
+  ipcMain.handle("pet:active", async (): Promise<{ slug: string; spritesheetPath: string }> => {
+    const assets = getActivePetAssets();
+    return { slug: assets.slug, spritesheetPath: assets.spritesheetPath };
+  });
+
+  ipcMain.handle("pet:set-active", async (event, slug: string): Promise<void> => {
+    setActivePetSlug(slug);
+    const window = getTargetWindow(event);
+    if (window !== null && !window.isDestroyed()) {
+      window.webContents.send("pet:active-changed", getActivePetAssets());
+    }
+  });
+
+  ipcMain.handle("pet:install", async (event, input: string): Promise<{ slug: string; displayName: string }> => {
+    const slug = parsePetdexSlug(input);
+    if (slug === null) {
+      throw new Error(`invalid pet identifier: ${input}`);
+    }
+
+    await downloadPet(slug);
+    setActivePetSlug(slug);
+
+    const window = getTargetWindow(event);
+    if (window !== null && !window.isDestroyed()) {
+      window.webContents.send("pet:active-changed", getActivePetAssets());
+    }
+
+    const pets = listInstalledPets();
+    const pet = pets.find((p) => p.slug === slug);
+    return { slug, displayName: pet?.displayName ?? slug };
   });
 };

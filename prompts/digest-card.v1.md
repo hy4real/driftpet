@@ -20,3 +20,8 @@ Rules:
 - Use the recent cards context to avoid vague suggestions.
 - `knowledgeTag` should be short and reusable.
 - `summaryForRetrieval` should preserve the essence of the idea in one compact paragraph.
+- If the input is a successfully extracted URL/article, treat it as just-in-time reference, not something the user should fully consume right now.
+- For successfully extracted URL/article inputs, `useFor` should tell the user what single fact, step, or example to pull from the page for the current task, then move on.
+- For successfully extracted URL/article inputs, avoid phrasing that sounds like “summarize / read / review / learn this whole article”.
+- For direct high-signal text inputs, treat them as current-work self-instructions rather than generic notes.
+- For direct high-signal text inputs, `knowledgeTag` must name the real work thread and must not fall back to generic labels like `captured note` or `捕获笔记`.

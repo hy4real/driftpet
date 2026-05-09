@@ -1,21 +1,23 @@
+import { useState } from "react";
 import type { AppStatus, StatusSection } from "../../main/types/status";
 
 type StatusPanelProps = {
   isOpen: boolean;
   status: AppStatus | null;
+  onClose: () => void;
   onRefresh: () => void;
 };
 
 const statusLabel = (section: StatusSection): string => {
   if (section.level === "ok") {
-    return "ok";
+    return "正常";
   }
 
   if (section.level === "warn") {
-    return "warn";
+    return "警告";
   }
 
-  return "idle";
+  return "待机";
 };
 
 const formatCheckedAt = (value: number): string => {
@@ -36,101 +38,128 @@ const summarize = (value: string, limit: number): string => {
 
 const extractionLabel = (state: "not_applicable" | "fallback" | "extracted" | "failed"): string => {
   if (state === "extracted") {
-    return "extracted";
+    return "已提取";
   }
 
   if (state === "fallback") {
-    return "fallback";
+    return "降级提取";
   }
 
   if (state === "failed") {
-    return "failed";
+    return "提取失败";
   }
 
-  return "n/a";
+  return "不适用";
 };
 
-export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
+export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
     <aside className={`status-panel ${isOpen ? "open" : ""}`}>
       <header className="status-panel-header">
         <div>
-          <p className="bubble-eyebrow">system health</p>
-          <h2>Can driftpet still digest?</h2>
+          <p className="bubble-eyebrow">driftpet 状态</p>
+          <h2>看看它今天精神好不好。</h2>
         </div>
-        <button
-          className="ghost-button"
-          onClick={onRefresh}
-          type="button"
-        >
-          refresh
-        </button>
+        <div className="panel-actions">
+          <button
+            className="ghost-button"
+            onClick={onRefresh}
+            type="button"
+          >
+            刷新
+          </button>
+          <button
+            className="ghost-button"
+            onClick={onClose}
+            type="button"
+          >
+            返回
+          </button>
+        </div>
       </header>
 
       {status === null ? (
         <div className="status-empty">
-          <p>Loading status...</p>
+          <p>正在加载状态...</p>
         </div>
       ) : (
         <>
-          <div className="status-grid">
+          <div className="status-grid status-grid-primary">
             <article className={`status-card status-${status.pet.level}`}>
               <div className="status-card-head">
-                <strong>Pet</strong>
+                <strong>桌宠</strong>
                 <span>{statusLabel(status.pet)}</span>
               </div>
               <p>{status.pet.summary}</p>
               <small>{status.pet.detail}</small>
             </article>
+          </div>
 
-            <article className={`status-card status-${status.telegram.level}`}>
+          <button
+            className="status-details-toggle"
+            onClick={() => setDetailsOpen((open) => !open)}
+            type="button"
+          >
+            {detailsOpen ? "收起详细状态" : "看看详细状态"}
+          </button>
+
+          {detailsOpen ? (
+            <div className="status-grid">
+              <article className={`status-card status-${status.telegram.level}`}>
               <div className="status-card-head">
-                <strong>Telegram</strong>
+                <strong>手机入口</strong>
                 <span>{statusLabel(status.telegram)}</span>
               </div>
               <p>{status.telegram.summary}</p>
               <small>{status.telegram.detail}</small>
+              <small>{`poller · ${status.telegram.pollerState}`}</small>
+              {status.telegram.lastError !== null ? (
+                <small>{summarize(status.telegram.lastError, 180)}</small>
+              ) : null}
             </article>
 
-            <article className={`status-card status-${status.llm.level}`}>
+              <article className={`status-card status-${status.llm.level}`}>
               <div className="status-card-head">
-                <strong>LLM</strong>
+                <strong>整理脑袋</strong>
                 <span>{statusLabel(status.llm)}</span>
               </div>
               <p>{status.llm.summary}</p>
               <small>{status.llm.detail}</small>
             </article>
 
-            <article className={`status-card status-${status.embeddings.level}`}>
+              <article className={`status-card status-${status.embeddings.level}`}>
               <div className="status-card-head">
-                <strong>Embeddings</strong>
+                <strong>记忆索引</strong>
                 <span>{statusLabel(status.embeddings)}</span>
               </div>
               <p>{status.embeddings.summary}</p>
               <small>{status.embeddings.detail}</small>
             </article>
 
-            <article className={`status-card status-${status.storage.level}`}>
+              <article className={`status-card status-${status.storage.level}`}>
               <div className="status-card-head">
-                <strong>Storage</strong>
+                <strong>小仓库</strong>
                 <span>{statusLabel(status.storage)}</span>
               </div>
               <p>{status.storage.summary}</p>
               <small>{status.storage.detail}</small>
             </article>
-          </div>
+            </div>
+          ) : null}
 
-          {status.storage.latestItem !== null ? (
+          {detailsOpen && status.storage.latestItem !== null ? (
             <section className="capture-panel">
               <header className="capture-panel-header">
-                <strong>Latest capture</strong>
+                <strong>最近收下的东西</strong>
                 <span>
                   #{status.storage.latestItem.id} · {status.storage.latestItem.origin}
                 </span>
               </header>
 
               <div className="capture-block">
-                <span className="bubble-label">Input</span>
+                <span className="bubble-label">原始小纸条</span>
                 <p>{status.storage.latestItem.title}</p>
                 <small>
                   {status.storage.latestItem.source} · {status.storage.latestItem.status}
@@ -141,7 +170,7 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
 
               {status.storage.latestItem.extraction.hasUrl ? (
                 <div className={`capture-block ${status.storage.latestItem.extraction.extractionState === "fallback" || status.storage.latestItem.extraction.extractionState === "failed" ? "capture-block-warn" : ""}`}>
-                  <span className="bubble-label">Extraction</span>
+                  <span className="bubble-label">读链接</span>
                   <p>{status.storage.latestItem.extraction.rawUrl}</p>
                   <small>
                     {extractionLabel(status.storage.latestItem.extraction.extractionState)}
@@ -149,6 +178,12 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
                   </small>
                   {status.storage.latestItem.extraction.detail !== null ? (
                     <small>{summarize(status.storage.latestItem.extraction.detail, 180)}</small>
+                  ) : null}
+                  {status.storage.latestItem.extraction.processor !== null ? (
+                    <small>{`processor · ${status.storage.latestItem.extraction.processor}`}</small>
+                  ) : null}
+                  {status.storage.latestItem.extraction.artifactPath !== null ? (
+                    <small>{summarize(status.storage.latestItem.extraction.artifactPath, 180)}</small>
                   ) : null}
                   {status.storage.latestItem.extraction.extractedTextPreview !== null ? (
                     <small>{status.storage.latestItem.extraction.extractedTextPreview}</small>
@@ -158,7 +193,7 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
 
               {status.storage.latestItem.lastError !== null && status.storage.latestItem.lastError !== status.storage.latestItem.extraction.detail ? (
                 <div className="capture-block capture-block-warn">
-                  <span className="bubble-label">Error</span>
+                  <span className="bubble-label">错误</span>
                   <p>{summarize(status.storage.latestItem.lastError, 180)}</p>
                 </div>
               ) : null}
@@ -166,24 +201,24 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
               {status.storage.latestItem.card !== null ? (
                 <>
                   <div className="capture-block">
-                    <span className="bubble-label">Card</span>
+                    <span className="bubble-label">整理后的小纸条</span>
                     <p>{status.storage.latestItem.card.title}</p>
                     <small>{status.storage.latestItem.card.knowledgeTag}</small>
                   </div>
 
                   <div className="capture-block">
-                    <span className="bubble-label">Next move</span>
+                    <span className="bubble-label">可以先这样</span>
                     <p>{summarize(status.storage.latestItem.card.useFor, 180)}</p>
                   </div>
 
                   <div className="capture-block">
-                    <span className="bubble-label">Remark</span>
+                    <span className="bubble-label">driftpet 悄悄说</span>
                     <p>{status.storage.latestItem.card.petRemark}</p>
                   </div>
 
                   {status.storage.latestItem.card.related.length > 0 ? (
                     <div className="capture-block">
-                      <span className="bubble-label">Related</span>
+                      <span className="bubble-label">它想起了这些</span>
                       <ul className="capture-related-list">
                         {status.storage.latestItem.card.related.map((related) => (
                           <li key={related.cardId}>
@@ -197,19 +232,19 @@ export function StatusPanel({ isOpen, status, onRefresh }: StatusPanelProps) {
                 </>
               ) : (
                 <div className="capture-block">
-                  <span className="bubble-label">Card</span>
-                  <p>No card generated yet.</p>
+                  <span className="bubble-label">小纸条</span>
+                  <p>还没整理出来。</p>
                 </div>
               )}
             </section>
           ) : null}
 
           <footer className="status-footer">
-            <span>checked {formatCheckedAt(status.checkedAt)}</span>
+            <span>检查时间 {formatCheckedAt(status.checkedAt)}</span>
             {status.storage.latestItem !== null ? (
-              <span>latest #{status.storage.latestItem.id}</span>
+              <span>最新 #{status.storage.latestItem.id}</span>
             ) : (
-              <span>no items yet</span>
+              <span>尚无条目</span>
             )}
           </footer>
         </>

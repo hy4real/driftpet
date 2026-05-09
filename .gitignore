@@ -3,8 +3,17 @@ dist
 dist-electron
 .env
 .omx
+.workflow
 reports
 data/app.db
 data/*.db-*
+data/pets/
 *.log
 .DS_Store
+.omx/
+.workflow/
+release/
+.tmp/
+*.db-journal
+*.db-wal
+*.db-shm

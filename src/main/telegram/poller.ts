@@ -1,9 +1,18 @@
 import { getPref, setPref } from "../db/prefs";
 import { ensureEnvLoaded } from "../env";
-import { ingestInput } from "../ingest/ingest";
+import { ingestInputDetailed, type IngestInput } from "../ingest/ingest";
 import type { CardRecord } from "../types/card";
 import { enrichTelegramInput } from "./enrich-input";
 import { parseTelegramMessage } from "./parse-message";
+import { sendTelegramMessage } from "./telegram-api";
+import {
+  markTelegramPollerConflict,
+  markTelegramPollerDisabled,
+  markTelegramPollerError,
+  markTelegramPollerPollSucceeded,
+  markTelegramPollerStarting,
+  markTelegramPollerStopped
+} from "./poller-runtime";
 
 ensureEnvLoaded();
 
@@ -38,6 +47,12 @@ type TelegramApiResponse = {
   result: TelegramUpdate[];
 };
 
+type TelegramApiErrorResponse = {
+  ok: false;
+  error_code?: number;
+  description?: string;
+};
+
 type StartTelegramPollerArgs = {
   onCardCreated: (card: CardRecord) => void;
 };
@@ -45,6 +60,8 @@ type StartTelegramPollerArgs = {
 const TELEGRAM_OFFSET_PREF = "telegram_last_update_id";
 const TELEGRAM_TIMEOUT_SECONDS = 20;
 const RETRY_DELAY_MS = 1500;
+const CONFLICT_RETRY_DELAY_MS = 5000;
+const REPORT_PREF_PREFIX = "telegram_report_sent:";
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => {
@@ -78,7 +95,108 @@ const buildUpdatesUrl = (token: string, offset: number): string => {
   return `https://api.telegram.org/bot${token}/getUpdates?${params.toString()}`;
 };
 
+const buildDigestOverride = (
+  enriched: Awaited<ReturnType<typeof enrichTelegramInput>>
+): IngestInput["digestOverride"] => {
+  if (
+    typeof enriched.processor !== "string"
+    || enriched.processor.length === 0
+    || typeof enriched.workflowTitle !== "string"
+    || enriched.workflowTitle.length === 0
+    || typeof enriched.workflowUseFor !== "string"
+    || enriched.workflowUseFor.length === 0
+    || typeof enriched.workflowKnowledgeTag !== "string"
+    || enriched.workflowKnowledgeTag.length === 0
+    || typeof enriched.workflowPetRemark !== "string"
+    || enriched.workflowPetRemark.length === 0
+  ) {
+    return undefined;
+  }
+
+  const summaryForRetrieval = (enriched.extractedText ?? enriched.rawText).trim();
+  if (summaryForRetrieval.length === 0) {
+    return undefined;
+  }
+
+  return {
+    title: enriched.workflowTitle,
+    useFor: enriched.workflowUseFor,
+    knowledgeTag: enriched.workflowKnowledgeTag,
+    summaryForRetrieval,
+    petRemark: enriched.workflowPetRemark
+  };
+};
+
+const buildReportPrefKey = (tgMessageId: string): string => {
+  return `${REPORT_PREF_PREFIX}${tgMessageId}`;
+};
+
+const hasSentTelegramReport = (tgMessageId: string): boolean => {
+  return getPref(buildReportPrefKey(tgMessageId)) !== null;
+};
+
+const markTelegramReportSent = (tgMessageId: string): void => {
+  setPref(buildReportPrefKey(tgMessageId), String(Date.now()));
+};
+
+const summarize = (value: string, limit: number): string => {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, limit - 3)}...`;
+};
+
+const buildTelegramReportText = (
+  enriched: Awaited<ReturnType<typeof enrichTelegramInput>>,
+  card: CardRecord,
+  created: boolean
+): string => {
+  const outcome = enriched.itemStatus === "failed" ? "失败" : "完成";
+  const artifactLine = enriched.artifactPath === null ? "无" : enriched.artifactPath;
+  const errorLine = enriched.extractionError ?? enriched.lastError ?? null;
+  const lines = [
+    `${created ? "✅" : "↩️"} 已${outcome}`,
+    `标题：${card.title}`,
+    `卡片：#${card.id}`,
+    `处理器：${enriched.processor ?? "unknown"}`,
+    `产物：${artifactLine}`
+  ];
+
+  if (errorLine !== null && errorLine.trim().length > 0) {
+    lines.push(`说明：${summarize(errorLine, 260)}`);
+  }
+
+  return lines.join("\n");
+};
+
+const maybeSendTelegramReport = async (
+  token: string,
+  message: TelegramMessage,
+  enriched: Awaited<ReturnType<typeof enrichTelegramInput>>,
+  card: CardRecord,
+  created: boolean
+): Promise<void> => {
+  if (token.trim().length === 0) {
+    return;
+  }
+
+  if (enriched.source !== "tg_url" || enriched.rawUrl === null) {
+    return;
+  }
+
+  if (hasSentTelegramReport(enriched.tgMessageId)) {
+    return;
+  }
+
+  const reportText = buildTelegramReportText(enriched, card, created);
+  await sendTelegramMessage(token, message.chat.id, reportText, message.message_id);
+  markTelegramReportSent(enriched.tgMessageId);
+};
+
 export const processTelegramUpdates = async (
+  token: string,
   updates: TelegramUpdate[],
   onCardCreated: (card: CardRecord) => void
 ): Promise<number> => {
@@ -93,8 +211,21 @@ export const processTelegramUpdates = async (
       const parsed = parseTelegramMessage(update.message);
       if (parsed !== null) {
         const enriched = await enrichTelegramInput(parsed);
-        const card = await ingestInput(enriched);
-        onCardCreated(card);
+        const result = await ingestInputDetailed({
+          ...enriched,
+          digestOverride: buildDigestOverride(enriched)
+        });
+        if (result.created) {
+          onCardCreated(result.card);
+        }
+
+        await maybeSendTelegramReport(
+          token,
+          update.message,
+          enriched,
+          result.card,
+          result.created
+        );
       }
     }
 
@@ -110,7 +241,8 @@ export const startTelegramPoller = ({
 }: StartTelegramPollerArgs): (() => void) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (token === undefined || token.length === 0) {
-    console.log("[driftpet] Telegram poller disabled: TELEGRAM_BOT_TOKEN is missing.");
+    markTelegramPollerDisabled("TELEGRAM_BOT_TOKEN is not set.");
+    console.log("[driftpet] Telegram 轮询已关闭：TELEGRAM_BOT_TOKEN 未设置。");
     return () => {};
   }
 
@@ -121,20 +253,54 @@ export const startTelegramPoller = ({
     while (active) {
       try {
         const offset = getTelegramOffset();
+        markTelegramPollerStarting(offset);
         const response = await fetch(buildUpdatesUrl(token, offset), {
-          signal: controller.signal
+          signal: AbortSignal.any([AbortSignal.timeout((TELEGRAM_TIMEOUT_SECONDS + 5) * 1000), controller.signal])
         });
 
+        const responseText = await response.text();
+        let parsedResponse: TelegramApiResponse | TelegramApiErrorResponse | null = null;
+        try {
+          parsedResponse = JSON.parse(responseText) as TelegramApiResponse | TelegramApiErrorResponse;
+        } catch {
+          parsedResponse = null;
+        }
+
         if (!response.ok) {
-          throw new Error(`Telegram getUpdates failed with HTTP ${response.status}.`);
+          const description = parsedResponse !== null && "description" in parsedResponse && typeof parsedResponse.description === "string"
+            ? parsedResponse.description
+            : `Telegram getUpdates failed with HTTP ${response.status}.`;
+
+          if (response.status === 409) {
+            markTelegramPollerConflict(description);
+            console.error("[driftpet] Telegram 轮询冲突:", description);
+            await sleep(CONFLICT_RETRY_DELAY_MS);
+            continue;
+          }
+
+          throw new Error(description);
         }
 
-        const payload = await response.json() as TelegramApiResponse;
+        if (parsedResponse === null) {
+          throw new Error("Telegram getUpdates returned invalid JSON.");
+        }
+
+        const payload = parsedResponse as TelegramApiResponse;
         if (!payload.ok) {
-          throw new Error("Telegram API returned ok=false.");
+          const errorPayload = parsedResponse as TelegramApiErrorResponse;
+          if (errorPayload.error_code === 409) {
+            const description = errorPayload.description ?? "Telegram getUpdates conflict.";
+            markTelegramPollerConflict(description);
+            console.error("[driftpet] Telegram 轮询冲突:", description);
+            await sleep(CONFLICT_RETRY_DELAY_MS);
+            continue;
+          }
+
+          throw new Error(errorPayload.description ?? "Telegram API returned ok=false.");
         }
 
-        await processTelegramUpdates(payload.result, onCardCreated);
+        const processedOffset = await processTelegramUpdates(token, payload.result, onCardCreated);
+        markTelegramPollerPollSucceeded(processedOffset);
       } catch (error) {
         if (!active) {
           break;
@@ -144,7 +310,9 @@ export const startTelegramPoller = ({
           break;
         }
 
-        console.error("[driftpet] Telegram polling error:", error);
+        const message = error instanceof Error ? error.message : "Telegram poller failed.";
+        markTelegramPollerError(message);
+        console.error("[driftpet] Telegram 轮询异常:", error);
         await sleep(RETRY_DELAY_MS);
       }
     }
@@ -155,5 +323,6 @@ export const startTelegramPoller = ({
   return () => {
     active = false;
     controller.abort();
+    markTelegramPollerStopped();
   };
 };

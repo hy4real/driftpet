@@ -74,7 +74,8 @@ export const generateEmbedding = async (input: string): Promise<number[] | null>
       model: config.model,
       input,
       ...(config.provider === "ollama" ? {} : { encoding_format: "float" })
-    })
+    }),
+    signal: AbortSignal.timeout(15_000)
   });
 
   const payload = await response.json() as EmbeddingPayload;

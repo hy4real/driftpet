@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+printf '%s\n' '[workflow] validating Lore commit message'
+node scripts/validate-lore-commit.mjs "$1"

@@ -1,10 +1,16 @@
 export const IPC_CHANNELS = {
   showDemo: "pet:show-demo",
   listRecentCards: "cards:list-recent",
-  ingestManualText: "ingest:manual-text",
   ingestChaosReset: "ingest:chaos-reset",
-  setPetMode: "pet:set-mode",
   setPetHourlyBudget: "pet:set-hourly-budget",
+  setWindowSize: "pet:set-window-size",
+  setMiniBubbleVisible: "pet:set-mini-bubble-visible",
+  moveWindowBy: "pet:move-window-by",
   getStatus: "app:get-status",
-  cardCreated: "events:card-created"
+  cardCreated: "events:card-created",
+  petList: "pet:list",
+  petActive: "pet:active",
+  petSetActive: "pet:set-active",
+  petInstall: "pet:install",
+  petActiveChanged: "pet:active-changed"
 } as const;

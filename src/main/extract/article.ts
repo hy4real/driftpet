@@ -67,7 +67,8 @@ export const extractArticleFromUrl = async (url: string): Promise<ExtractedArtic
       headers: {
         "user-agent": "driftpet/0.1 (+https://local.mac)"
       },
-      redirect: "follow"
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000)
     });
 
     if (!response.ok) {

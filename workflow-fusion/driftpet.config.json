@@ -1,0 +1,52 @@
+{
+  "taskId": "driftpet-overnight-loop",
+  "title": "Continue the driftpet overnight loop with real-usage evidence",
+  "taskType": "CODE_CHANGE",
+  "intent": "Continue the existing OMX-led overnight loop without changing driftpet's product scope.",
+  "defaultGoal": "Run the next real-usage pass and leave fresh verification evidence.",
+  "scope": [
+    "src/main/",
+    "src/renderer/",
+    "scripts/overnight-goal.mjs",
+    "docs/",
+    "README.md",
+    "prompts/"
+  ],
+  "outOfScope": [
+    "New dependencies",
+    "Schema changes unless separately planned",
+    "Unrelated UI redesign",
+    "Replacing .omx as the source of truth"
+  ],
+  "acceptance": [
+    "Each iteration lands one bounded improvement.",
+    "Verification evidence is refreshed before claiming completion.",
+    "README, plan docs, and overnight outputs stay aligned with the current product shape.",
+    "Workflow Fusion runtime files remain a projection of .omx state, not a competing authority."
+  ],
+  "riskBoundary": [
+    "Do not widen driftpet beyond the current V1 loop.",
+    "Do not let `.workflow/runtime` drift away from `.omx` without resyncing.",
+    "If verification evidence is missing or contradictory, stop short of claiming `已通过`."
+  ],
+  "evidenceRefs": [
+    ".omx/plans/prd-driftpet-overnight-loop.md",
+    ".omx/plans/test-spec-driftpet-overnight-loop.md",
+    "docs/plan-remaining.md",
+    "reports/",
+    "workflow-fusion/docs/workflow-spec.md"
+  ],
+  "sourceFiles": {
+    "state": ".omx/state/ralph-state.json",
+    "prd": ".omx/plans/prd-driftpet-overnight-loop.md",
+    "testSpec": ".omx/plans/test-spec-driftpet-overnight-loop.md",
+    "remainingPlan": "docs/plan-remaining.md"
+  },
+  "verificationCommands": [
+    "npm run workflow:guard:dispatch",
+    "npm run test:lore",
+    "npm run test:workflow",
+    "npm run typecheck",
+    "npm run build"
+  ]
+}

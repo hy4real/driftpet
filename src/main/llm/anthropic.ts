@@ -46,7 +46,8 @@ export const sendAnthropicPrompt = async ({
           content: prompt
         }
       ]
-    })
+    }),
+    signal: AbortSignal.timeout(30_000)
   });
 
   const payload = await response.json() as AnthropicResponse;

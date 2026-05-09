@@ -157,7 +157,7 @@ const latestRealChaosResult = sqlite(`
 const prefsResult = sqlite(`
   select key, value
   from prefs
-  where key in ('telegram_last_update_id', 'pet_mode', 'pet_hourly_budget')
+  where key in ('telegram_last_update_id', 'pet_hourly_budget')
   order by key;
 `);
 
@@ -296,6 +296,9 @@ Current counts:
 - Related recall excludes synthetic verification data and Telegram ping cards.
 - Fallback digest copy and related-memory reasons now follow the user's input language.
 - Repeated chaos resets no longer surface the immediately previous identical reset as a fake memory.
+- Telegram URL parsing now prefers the fuller URL from message text when entity data looks truncated.
+- Successfully extracted URL cards now bias toward one actionable reference fact instead of article-summary phrasing.
+- Same-page URL references no longer recall each other across Telegram shapes or MDN locale variants.
 - Storage health now prefers the latest successful card over stale fallback text when summarizing current state.
 
 ## Product Shape
@@ -323,10 +326,10 @@ Do not make it a general chatbot yet. The valuable behavior is not conversation 
    Feed more real captures and note where cards still become vague, repetitive, or annoying.
 
 2. Retune prompts and thresholds against the real cards now in SQLite.
-   The next tuning pass should focus on chaos-reset wording and when recall should stay empty.
+   The next tuning pass should focus on chaos-reset wording, high-signal Telegram text, and when recall should stay empty.
 
-3. Run a broader Telegram URL batch pass.
-   Core URL extraction now has fresh live evidence outside the Codex sandbox; the remaining question is how real forwarded links behave through the poller path.
+3. Run another mixed Telegram batch observation through the actual poller path.
+   Keep watching for vague titles, weak knowledge tags, or unnecessary recall across real text + URL captures.
 
 ## Do Not Build Tomorrow
 
@@ -346,7 +349,7 @@ These are tempting, but the core loop still needs observation.
 - Secrets currently live in \`.env\`; rotate exposed keys later.
 - Live Ollama probing can be unavailable from a constrained runner context even when stored vectors prove the path worked earlier.
 - Public URL extraction can look broken inside the Codex sandbox even when the same Electron-as-Node probe succeeds outside it; do not treat sandbox-only \`fetch_failed\` results as product regressions.
-- Telegram URL handling still needs a broader pass through the actual poller path.
+- Historical rows in \`data/app.db\` still reflect pre-fix URL and chaos behavior; use fresh probes to judge the current product path.
 - Historical \`last_error\` values can still exist on successful rows, even though the status surface now avoids surfacing them as the current top-line state.
 
 ## Useful Commands

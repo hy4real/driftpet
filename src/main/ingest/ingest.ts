@@ -1,73 +1,23 @@
 import crypto from "node:crypto";
 import type { CardRecord } from "../types/card";
 import { getDatabase } from "../db/client";
-import { getRecentCards } from "../db/cards";
+import { getRecentCards, mapCardRow } from "../db/cards";
+import type { CardRow } from "../db/cards";
 import { upsertCardEmbedding } from "../db/embeddings";
 import { generateDigestDraft } from "../llm/digest-card";
 import { findRelatedCards } from "../recall/related";
-import type { ItemOrigin, ItemSource, UrlExtractionStage } from "../types/item";
+import type { ItemOrigin, ItemSource, ItemStatus, UrlExtractionStage } from "../types/item";
+import { normalizeText } from "../utils/text";
 
 type ExistingItemRow = {
   id: number;
-};
-
-type CardRow = {
-  id: number;
-  item_id: number;
-  title: string;
-  use_for: string;
-  knowledge_tag: string;
-  summary_for_retrieval: string;
-  related_card_ids: string | null;
-  pet_remark: string;
-  created_at: number;
-};
-
-const normalizeText = (rawText: string): string => {
-  return rawText.trim().replace(/\s+/g, " ");
 };
 
 const buildContentHash = (value: string): string => {
   return crypto.createHash("sha256").update(value).digest("hex");
 };
 
-const mapCardRow = (row: CardRow): CardRecord => {
-  return {
-    id: row.id,
-    itemId: row.item_id,
-    title: row.title,
-    useFor: row.use_for,
-    knowledgeTag: row.knowledge_tag,
-    summaryForRetrieval: row.summary_for_retrieval,
-    related: row.related_card_ids === null ? [] : JSON.parse(row.related_card_ids),
-    petRemark: row.pet_remark,
-    createdAt: row.created_at
-  };
-};
-
 const findCardByItemId = (itemId: number): CardRecord | null => {
-  const db = getDatabase();
-  const row = db.prepare(`
-    SELECT
-      id,
-      item_id,
-      title,
-      use_for,
-      knowledge_tag,
-      summary_for_retrieval,
-      related_card_ids,
-      pet_remark,
-      created_at
-    FROM cards
-    WHERE item_id = ?
-    ORDER BY id DESC
-    LIMIT 1
-  `).get(itemId) as CardRow | undefined;
-
-  return row === undefined ? null : mapCardRow(row);
-};
-
-const findNewestCardByItemId = (itemId: number): CardRecord | null => {
   const db = getDatabase();
   const row = db.prepare(`
     SELECT
@@ -100,6 +50,16 @@ export type IngestInput = {
   extractionStage?: UrlExtractionStage;
   extractionError?: string | null;
   lastError?: string | null;
+  artifactPath?: string | null;
+  processor?: string | null;
+  itemStatus?: ItemStatus;
+  digestOverride?: {
+    title: string;
+    useFor: string;
+    knowledgeTag: string;
+    summaryForRetrieval: string;
+    petRemark: string;
+  };
 };
 
 const buildItemIdentity = (input: IngestInput, normalizedText: string): string => {
@@ -133,6 +93,11 @@ const resolveExtractionStage = (payload: IngestInput): UrlExtractionStage => {
 type PendingItemResult = {
   itemId: number;
   existingCard: CardRecord | null;
+};
+
+export type IngestResult = {
+  card: CardRecord;
+  created: boolean;
 };
 
 const ensurePendingItem = (payload: IngestInput, normalized: string): PendingItemResult => {
@@ -203,7 +168,7 @@ const finalizeCard = (
 ): CardRecord => {
   const db = getDatabase();
   const extractionStage = resolveExtractionStage(payload);
-  const existingCard = findNewestCardByItemId(itemId);
+  const existingCard = findCardByItemId(itemId);
   if (existingCard !== null) {
     return existingCard;
   }
@@ -234,15 +199,17 @@ const finalizeCard = (
 
     db.prepare(`
       UPDATE items
-      SET status = ?, extracted_title = ?, extracted_text = ?, last_error = ?, extraction_stage = ?, extraction_error = ?
+      SET status = ?, extracted_title = ?, extracted_text = ?, last_error = ?, extraction_stage = ?, extraction_error = ?, artifact_path = ?, processor = ?
       WHERE id = ?
     `).run(
-      "digested",
+      payload.itemStatus ?? "digested",
       payload.extractedTitle ?? null,
       payload.extractedText ?? null,
       combinedError,
       extractionStage,
       payload.extractionError ?? null,
+      payload.artifactPath ?? null,
+      payload.processor ?? null,
       itemId
     );
 
@@ -271,7 +238,7 @@ const finalizeCard = (
     return createCard();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE constraint failed: cards.item_id")) {
-      const card = findNewestCardByItemId(itemId);
+      const card = findCardByItemId(itemId);
       if (card !== null) {
         return card;
       }
@@ -281,7 +248,7 @@ const finalizeCard = (
   }
 };
 
-export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
+export const ingestInputDetailed = async (input: IngestInput): Promise<IngestResult> => {
   const normalizedText = normalizeText(input.rawText);
   if (normalizedText.length === 0) {
     throw new Error("Ingest requires non-empty text.");
@@ -289,7 +256,24 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
 
   const pending = ensurePendingItem(input, normalizedText);
   if (pending.existingCard !== null) {
-    return pending.existingCard;
+    return {
+      card: pending.existingCard,
+      created: false
+    };
+  }
+
+  if (input.digestOverride !== undefined) {
+    return {
+      card: finalizeCard(
+        pending.itemId,
+        input,
+        input.digestOverride,
+        input.lastError ?? null,
+        [],
+        null
+      ),
+      created: true
+    };
   }
 
   const recentCards = getRecentCards()
@@ -297,32 +281,34 @@ export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
     .slice(0, 5);
   const digestResult = await generateDigestDraft(input, recentCards);
   const combinedError = joinErrors(input.lastError, digestResult.digestError);
-  const relatedResult = digestResult.mode === "low_signal"
+  const relatedResult = digestResult.mode === "skip_recall"
     ? {
       related: [],
       queryEmbedding: null
     }
     : await findRelatedCards({
       source: input.source,
+      rawUrl: input.rawUrl ?? null,
       title: digestResult.digest.title,
       summaryForRetrieval: digestResult.digest.summaryForRetrieval
     }, pending.itemId);
 
-  return finalizeCard(
-    pending.itemId,
-    input,
-    digestResult.digest,
-    combinedError,
-    relatedResult.related,
-    relatedResult.queryEmbedding
-  );
+  return {
+    card: finalizeCard(
+      pending.itemId,
+      input,
+      digestResult.digest,
+      combinedError,
+      relatedResult.related,
+      relatedResult.queryEmbedding
+    ),
+    created: true
+  };
 };
 
-export const ingestManualText = async (
-  rawText: string,
-  origin: ItemOrigin = "real"
-): Promise<CardRecord> => {
-  return ingestChaosReset(rawText, origin);
+export const ingestInput = async (input: IngestInput): Promise<CardRecord> => {
+  const result = await ingestInputDetailed(input);
+  return result.card;
 };
 
 export const ingestChaosReset = async (

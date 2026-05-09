@@ -1,7 +1,13 @@
 /// <reference types="vite/client" />
 
 import type { CardRecord } from "../main/types/card";
-import type { AppStatus, PetMode } from "../main/types/status";
+import type { AppStatus } from "../main/types/status";
+
+type PetInfo = {
+  slug: string;
+  displayName: string;
+  isBuiltin: boolean;
+};
 
 declare global {
   interface Window {
@@ -9,11 +15,17 @@ declare global {
       showDemo: () => Promise<CardRecord>;
       listRecentCards: () => Promise<CardRecord[]>;
       getStatus: () => Promise<AppStatus>;
-      ingestManualText: (rawText: string) => Promise<CardRecord>;
       ingestChaosReset: (rawText: string) => Promise<CardRecord>;
-      setPetMode: (mode: PetMode) => Promise<void>;
       setPetHourlyBudget: (value: number) => Promise<number>;
+      setWindowSize: (windowSize: "mini" | "compact" | "expanded") => Promise<void>;
+      setMiniBubbleVisible: (visible: boolean) => Promise<void>;
+      moveWindowBy: (deltaX: number, deltaY: number) => void;
+      petList: () => Promise<PetInfo[]>;
+      petActive: () => Promise<{ slug: string; spritesheetPath: string }>;
+      petSetActive: (slug: string) => Promise<void>;
+      petInstall: (input: string) => Promise<{ slug: string; displayName: string }>;
       onCardCreated: (listener: (card: CardRecord) => void) => () => void;
+      onPetActiveChanged: (listener: (assets: { slug: string; spritesheetPath: string }) => void) => () => void;
     };
   }
 }

@@ -11,7 +11,12 @@ export const loadPrompt = (fileName: string): string => {
   }
 
   const fullPath = path.join(getPromptsDir(), fileName);
-  const content = fs.readFileSync(fullPath, "utf8");
-  promptCache.set(fileName, content);
-  return content;
+  try {
+    const content = fs.readFileSync(fullPath, "utf8");
+    promptCache.set(fileName, content);
+    return content;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error.";
+    throw new Error(`Prompt file not found or unreadable: ${fileName} (${message})`);
+  }
 };

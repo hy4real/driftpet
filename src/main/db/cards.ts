@@ -13,7 +13,9 @@ type CardRow = {
   created_at: number;
 };
 
-const parseRelated = (value: string | null): RelatedCardRef[] => {
+export type { CardRow };
+
+export const parseRelated = (value: string | null): RelatedCardRef[] => {
   if (value === null || value.length === 0) {
     return [];
   }
@@ -25,7 +27,7 @@ const parseRelated = (value: string | null): RelatedCardRef[] => {
   }
 };
 
-const mapCardRow = (row: CardRow): CardRecord => {
+export const mapCardRow = (row: CardRow): CardRecord => {
   return {
     id: row.id,
     itemId: row.item_id,

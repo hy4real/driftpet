@@ -3,6 +3,12 @@ import { listRecallCandidates } from "../db/embeddings";
 import { canUseEmbeddings, generateEmbedding } from "../llm/embeddings";
 import { detectOutputLanguage } from "../llm/language";
 import type { ItemSource } from "../types/item";
+import {
+  cosineSimilarity,
+  isNearDuplicateChaosReset,
+  lexicalSimilarity,
+  passesRelatedThreshold,
+} from "./scoring";
 
 type FindRelatedResult = {
   related: RelatedCardRef[];
@@ -13,82 +19,11 @@ type RelatedQuery = {
   source: ItemSource;
   title: string;
   summaryForRetrieval: string;
+  rawUrl?: string | null;
 };
 
 const MAX_RELATED = 2;
 const MAX_CANDIDATES = 50;
-const EMBEDDING_THRESHOLD = 0.44;
-const LEXICAL_ONLY_THRESHOLD = 0.24;
-const CHAOS_DUPLICATE_THRESHOLD = 0.92;
-const CHAOS_SIMILAR_THRESHOLD = 0.68;
-
-const normalizeComparableText = (value: string): string => {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-};
-
-const tokenize = (value: string): string[] => {
-  return value
-    .toLowerCase()
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/[._/-]+/g, " ")
-    .split(/[^a-z0-9\u4e00-\u9fff]+/i)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2)
-    .filter((token) => ![
-      "https",
-      "http",
-      "www",
-      "com",
-      "net",
-      "org",
-      "html",
-      "index",
-      "example"
-    ].includes(token));
-};
-
-const cosineSimilarity = (a: number[], b: number[]): number => {
-  if (a.length !== b.length || a.length === 0) {
-    return 0;
-  }
-
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let index = 0; index < a.length; index += 1) {
-    dot += a[index] * b[index];
-    normA += a[index] * a[index];
-    normB += b[index] * b[index];
-  }
-
-  if (normA === 0 || normB === 0) {
-    return 0;
-  }
-
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-};
-
-const lexicalSimilarity = (left: string, right: string): number => {
-  const leftTokens = new Set(tokenize(left));
-  const rightTokens = new Set(tokenize(right));
-
-  if (leftTokens.size === 0 || rightTokens.size === 0) {
-    return 0;
-  }
-
-  let overlap = 0;
-  for (const token of leftTokens) {
-    if (rightTokens.has(token)) {
-      overlap += 1;
-    }
-  }
-
-  return overlap / Math.sqrt(leftTokens.size * rightTokens.size);
-};
 
 const buildReason = (summary: string, languageHint: string): string => {
   const snippet = summary.trim().replace(/\s+/g, " ").slice(0, 96);
@@ -116,48 +51,58 @@ const isRecallEligible = (candidate: Awaited<ReturnType<typeof listRecallCandida
   return candidate.source !== "tg_text" || looksLikePing === false;
 };
 
-const isNearDuplicateChaosReset = (
+const normalizeUrlForRecall = (value: string): string => {
+  try {
+    const parsed = new URL(value);
+    let pathname = parsed.pathname.replace(/\/+$/, "");
+
+    if (parsed.hostname === "developer.mozilla.org") {
+      pathname = pathname.replace(/^\/[a-z]{2}(?:-[A-Z]{2})?\//, "/");
+    }
+
+    return `${parsed.hostname}${pathname}`.toLowerCase();
+  } catch {
+    return value.trim().toLowerCase();
+  }
+};
+
+const isSameUrlReference = (
   query: RelatedQuery,
-  candidate: Awaited<ReturnType<typeof listRecallCandidates>>[number],
-  lexical: number
+  candidate: Awaited<ReturnType<typeof listRecallCandidates>>[number]
 ): boolean => {
-  if (query.source !== "manual_chaos" || candidate.source !== "manual_chaos") {
+  if (query.source !== "tg_url" || candidate.source !== "tg_url") {
     return false;
   }
 
-  const normalizedTitle = normalizeComparableText(query.title);
-  const normalizedCandidateTitle = normalizeComparableText(candidate.title);
-  if (normalizedTitle.length > 0 && normalizedTitle === normalizedCandidateTitle) {
-    return true;
+  if (query.rawUrl === undefined || query.rawUrl === null || candidate.rawUrl === null) {
+    return false;
   }
 
-  if (
-    normalizedTitle.length > 0 &&
-    normalizedCandidateTitle.length > 0 &&
-    (normalizedTitle.includes(normalizedCandidateTitle) || normalizedCandidateTitle.includes(normalizedTitle))
-  ) {
-    return true;
-  }
-
-  const normalizedSummary = normalizeComparableText(query.summaryForRetrieval);
-  const normalizedCandidateSummary = normalizeComparableText(candidate.summaryForRetrieval);
-  if (
-    normalizedSummary.length > 0 &&
-    normalizedCandidateSummary.length > 0 &&
-    (normalizedSummary.includes(normalizedCandidateSummary) || normalizedCandidateSummary.includes(normalizedSummary))
-  ) {
-    return true;
-  }
-
-  return lexical >= CHAOS_DUPLICATE_THRESHOLD || lexical >= CHAOS_SIMILAR_THRESHOLD;
+  return normalizeUrlForRecall(query.rawUrl) === normalizeUrlForRecall(candidate.rawUrl);
 };
+
+export const isCrossLanguageTelegramTextRecall = (
+  query: RelatedQuery,
+  candidate: Awaited<ReturnType<typeof listRecallCandidates>>[number]
+): boolean => {
+  if (query.source !== "tg_text" || candidate.source !== "tg_text") {
+    return false;
+  }
+
+  const queryLanguage = detectOutputLanguage(query.title, query.summaryForRetrieval);
+  const candidateLanguage = detectOutputLanguage(candidate.title, candidate.summaryForRetrieval);
+  return queryLanguage !== candidateLanguage;
+};
+
 
 export const findRelatedCards = async (
   query: RelatedQuery,
   excludeItemId: number
 ): Promise<FindRelatedResult> => {
   const candidates = listRecallCandidates(excludeItemId, MAX_CANDIDATES)
-    .filter(isRecallEligible);
+    .filter(isRecallEligible)
+    .filter((candidate) => !isSameUrlReference(query, candidate))
+    .filter((candidate) => !isCrossLanguageTelegramTextRecall(query, candidate));
   const queryEmbedding = canUseEmbeddings()
     ? await generateEmbedding(query.summaryForRetrieval).catch(() => null)
     : null;
@@ -179,17 +124,7 @@ export const findRelatedCards = async (
   });
 
   const related = scored
-    .filter((entry) => {
-      if (isNearDuplicateChaosReset(query, entry.candidate, entry.lexical)) {
-        return false;
-      }
-
-      if (entry.embedding !== null) {
-        return entry.finalScore >= EMBEDDING_THRESHOLD && entry.embedding >= 0.38;
-      }
-
-      return entry.finalScore >= LEXICAL_ONLY_THRESHOLD && entry.lexical >= 0.2;
-    })
+    .filter((entry) => passesRelatedThreshold(query, entry))
     .sort((left, right) => right.finalScore - left.finalScore)
     .slice(0, MAX_RELATED)
     .map((entry) => ({

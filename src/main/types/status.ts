@@ -1,8 +1,8 @@
 import type { ItemOrigin, UrlExtractionStage } from "./item";
 import type { RelatedCardRef } from "./card";
+import type { TelegramPollerLifecycle } from "../telegram/poller-runtime";
 
 export type StatusLevel = "ok" | "warn" | "idle";
-export type PetMode = "focus" | "sleep";
 
 export type StatusSection = {
   level: StatusLevel;
@@ -24,6 +24,8 @@ export type LatestCaptureExtractionStatus = {
   rawUrl: string | null;
   extractedTitle: string | null;
   extractedTextPreview: string | null;
+  artifactPath: string | null;
+  processor: string | null;
   extractionState: "not_applicable" | "fallback" | "extracted" | "failed";
   stage: UrlExtractionStage;
   detail: string | null;
@@ -48,7 +50,6 @@ export type AppStatus = {
   checkedAt: number;
   pet: StatusSection & {
     enabled: boolean;
-    mode: PetMode;
     hourlyBudget: number;
     shownThisHour: number;
     canSurfaceAuto: boolean;
@@ -57,6 +58,10 @@ export type AppStatus = {
     enabled: boolean;
     lastUpdateId: number | null;
     recentTelegramItems: number;
+    pollerState: TelegramPollerLifecycle;
+    lastPollAt: number | null;
+    lastSuccessAt: number | null;
+    lastError: string | null;
   };
   llm: StatusSection & {
     enabled: boolean;

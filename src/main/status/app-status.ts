@@ -4,9 +4,11 @@ import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
 import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import { decideAutoSurface } from "../pet/runtime";
+import { getTelegramPollerRuntimeState } from "../telegram/poller-runtime";
 import type { AppStatus, LatestItemStatus, StatusLevel } from "../types/status";
 import type { RelatedCardRef } from "../types/card";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
+import { normalizeText, truncate } from "../utils/text";
 
 type CountsRow = {
   item_count: number;
@@ -30,6 +32,8 @@ type LatestItemRow = {
   last_error: string | null;
   extraction_stage: UrlExtractionStage | null;
   extraction_error: string | null;
+  artifact_path: string | null;
+  processor: string | null;
   card_id: number | null;
   card_title: string | null;
   use_for: string | null;
@@ -39,14 +43,18 @@ type LatestItemRow = {
 };
 
 const DEFAULT_DIGEST_MODEL = "claude-sonnet-4-20250514";
+const TELEGRAM_OFFSET_PREF = "telegram_last_update_id";
 
-const summarize = (value: string, limit: number): string => {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  if (normalized.length <= limit) {
-    return normalized;
+const formatStatusTime = (value: number | null): string | null => {
+  if (value === null) {
+    return null;
   }
 
-  return `${normalized.slice(0, limit - 3)}...`;
+  return new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 };
 
 const parseRelated = (value: string | null): RelatedCardRef[] => {
@@ -93,11 +101,18 @@ const buildExtractionStatus = (row: LatestItemRow): LatestItemStatus["extraction
   if (stage === "readability") {
     extractionState = "extracted";
     detail = "Readability extracted article text.";
-    extractedTextPreview = row.extracted_text === null ? null : summarize(row.extracted_text, 180);
+    extractedTextPreview = row.extracted_text === null ? null : truncate(row.extracted_text, 180);
+  } else if (stage === "note_ingested") {
+    extractionState = "extracted";
+    detail = row.extraction_error ?? "Note runner created markdown and ingest completed.";
+    extractedTextPreview = row.extracted_text === null ? null : truncate(row.extracted_text, 180);
+  } else if (stage === "note_failed") {
+    extractionState = "failed";
+    detail = row.extraction_error ?? "Note runner failed before ingest completed.";
   } else if (stage === "body_fallback") {
     extractionState = "fallback";
     detail = row.extraction_error ?? "Readability returned empty content; using page body text fallback.";
-    extractedTextPreview = row.extracted_text === null ? null : summarize(row.extracted_text, 180);
+    extractedTextPreview = row.extracted_text === null ? null : truncate(row.extracted_text, 180);
   } else if (stage === "fetch_failed") {
     extractionState = "failed";
     detail = row.extraction_error ?? "URL fetch failed before article parsing.";
@@ -111,6 +126,8 @@ const buildExtractionStatus = (row: LatestItemRow): LatestItemStatus["extraction
     rawUrl: row.raw_url,
     extractedTitle: row.extracted_title,
     extractedTextPreview,
+    artifactPath: row.artifact_path,
+    processor: row.processor,
     extractionState,
     stage,
     detail
@@ -124,11 +141,12 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
 
   const fallbackTitle = row.raw_text === null || row.raw_text.length === 0
     ? "Untitled input"
-    : summarize(row.raw_text, 54);
+    : truncate(row.raw_text, 54);
+  const displayTitle = row.card_title ?? row.extracted_title ?? fallbackTitle;
 
   return {
     id: row.id,
-    title: row.extracted_title ?? fallbackTitle,
+    title: displayTitle,
     source: row.source,
     status: row.status,
     receivedAt: row.received_at,
@@ -180,6 +198,8 @@ const getLatestItem = (): LatestItemStatus | null => {
       items.last_error AS last_error,
       items.extraction_stage AS extraction_stage,
       items.extraction_error AS extraction_error,
+      items.artifact_path AS artifact_path,
+      items.processor AS processor,
       cards.id AS card_id,
       cards.title AS card_title,
       cards.use_for AS use_for,
@@ -212,6 +232,8 @@ const getLatestRealItem = (): LatestItemStatus | null => {
       items.last_error AS last_error,
       items.extraction_stage AS extraction_stage,
       items.extraction_error AS extraction_error,
+      items.artifact_path AS artifact_path,
+      items.processor AS processor,
       cards.id AS card_id,
       cards.title AS card_title,
       cards.use_for AS use_for,
@@ -236,16 +258,42 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
   const lastUpdateId = parsedOffset !== null && Number.isFinite(parsedOffset)
     ? parsedOffset
     : null;
+  const runtime = getTelegramPollerRuntimeState();
 
   let level: StatusLevel = "warn";
   let summary = "Telegram disabled";
   let detail = "Set TELEGRAM_BOT_TOKEN to enable phone-to-pet capture.";
 
-  if (enabled && lastUpdateId !== null && lastUpdateId > 0) {
+  if (!enabled) {
+    level = "warn";
+    summary = "Telegram disabled";
+    detail = "Set TELEGRAM_BOT_TOKEN to enable phone-to-pet capture.";
+  } else if (runtime.lifecycle === "conflict") {
+    level = "warn";
+    summary = "Polling conflict";
+    detail = runtime.lastError ?? "Another Driftpet instance is already polling this bot.";
+  } else if (runtime.lifecycle === "error") {
+    level = "warn";
+    summary = "Polling degraded";
+    detail = runtime.lastError ?? "Telegram poller hit an unexpected error.";
+  } else if (runtime.lifecycle === "starting") {
+    level = "idle";
+    summary = "Poller starting";
+    detail = lastUpdateId === null
+      ? "Booting the Telegram poller."
+      : `Booting from offset ${lastUpdateId}.`;
+  } else if (runtime.lifecycle === "stopped") {
+    level = "warn";
+    summary = "Poller stopped";
+    detail = "The app is open, but Telegram polling is not active.";
+  } else if (lastUpdateId !== null && lastUpdateId > 0) {
+    const lastSuccess = formatStatusTime(runtime.lastSuccessAt);
     level = "ok";
     summary = `Polling live · ${recentTelegramItems} Telegram item${recentTelegramItems === 1 ? "" : "s"}`;
-    detail = `Last update offset ${lastUpdateId}`;
-  } else if (enabled) {
+    detail = lastSuccess === null
+      ? `Last update offset ${lastUpdateId}`
+      : `Last update offset ${lastUpdateId} · last poll ${lastSuccess}`;
+  } else {
     level = "idle";
     summary = "Configured, waiting for first update";
     detail = "Send a message to the bot and it should land here.";
@@ -257,25 +305,16 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
     summary,
     detail,
     lastUpdateId,
-    recentTelegramItems
+    recentTelegramItems,
+    pollerState: runtime.lifecycle,
+    lastPollAt: runtime.lastPollAt,
+    lastSuccessAt: runtime.lastSuccessAt,
+    lastError: runtime.lastError
   };
 };
 
 const getPetSection = (): AppStatus["pet"] => {
   const decision = decideAutoSurface();
-
-  if (decision.mode === "sleep") {
-    return {
-      enabled: true,
-      level: "idle",
-      summary: `Sleep mode · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`,
-      detail: "Auto popups are paused until you switch back to focus mode.",
-      mode: decision.mode,
-      hourlyBudget: decision.hourlyBudget,
-      shownThisHour: decision.shownThisHour,
-      canSurfaceAuto: false
-    };
-  }
 
   return {
     enabled: true,
@@ -284,7 +323,6 @@ const getPetSection = (): AppStatus["pet"] => {
     detail: decision.allowed
       ? "Auto popups can still surface new cards."
       : "Hourly surface budget reached; new cards still land in history.",
-    mode: decision.mode,
     hourlyBudget: decision.hourlyBudget,
     shownThisHour: decision.shownThisHour,
     canSurfaceAuto: decision.allowed
@@ -391,9 +429,9 @@ const getStorageSection = (
   }
 
   const detail = summaryItem.extraction.extractionState === "failed" && summaryItem.extraction.detail !== null
-    ? `${summaryItem.source} · ${summaryItem.status} · ${summarize(summaryItem.extraction.detail, 72)}`
+    ? `${summaryItem.source} · ${summaryItem.status} · ${truncate(summaryItem.extraction.detail, 72)}`
     : summaryItem.card === null && summaryItem.lastError !== null && summaryItem.lastError.length > 0
-      ? `${summaryItem.source} · ${summaryItem.status} · ${summarize(summaryItem.lastError, 72)}`
+      ? `${summaryItem.source} · ${summaryItem.status} · ${truncate(summaryItem.lastError, 72)}`
       : `${summaryItem.source} · ${summaryItem.status} · ${summaryItem.title}`;
 
   return {
