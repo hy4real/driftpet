@@ -8,6 +8,12 @@ import bobaSpritesheet from "./assets/boba-spritesheet.webp";
 
 type WindowMode = "mini" | "compact" | "expanded";
 
+type ClaudeDispatchFeedback = {
+  cardId: number;
+  tone: "success" | "error";
+  message: string;
+};
+
 const toSpritesheetUrl = (slug: string, spritesheetPath: string): string => {
   if (slug === "boba" || spritesheetPath.length === 0) {
     return bobaSpritesheet;
@@ -31,16 +37,18 @@ export default function App() {
   const [hasError, setHasError] = useState(false);
   const [eventVersion, setEventVersion] = useState(0);
   const [clipboardOffer, setClipboardOffer] = useState<ClipboardOffer | null>(null);
+  const [isDispatchingCardId, setIsDispatchingCardId] = useState<number | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<number | null>(null);
+  const [claudeDispatchFeedback, setClaudeDispatchFeedback] = useState<ClaudeDispatchFeedback | null>(null);
   const petNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clipboardOfferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const miniBubbleResizeActiveRef = useRef(false);
   const windowModeRef = useRef<WindowMode>("mini");
   const rememberedThread = status?.pet.rememberedThread ?? null;
   const isMini = windowMode === "mini";
   const showBubble = windowMode === "compact";
-  const showMiniOffer = isMini && pendingCard === null && clipboardOffer !== null;
-  const showMiniClickBubble = isMini && !showMiniOffer && petNote !== null;
-  const needsMiniBubbleWidth = showMiniClickBubble || showMiniOffer;
+  const showMiniClickBubble = isMini && petNote !== null;
+  const showMiniResumeThread = isMini && petNote === null && rememberedThread !== null;
+  const needsMiniBubbleWidth = showMiniClickBubble || showMiniResumeThread;
 
   useEffect(() => {
     windowModeRef.current = windowMode;
@@ -117,31 +125,8 @@ export default function App() {
       if (petNoteTimerRef.current !== null) {
         clearTimeout(petNoteTimerRef.current);
       }
-      if (clipboardOfferTimerRef.current !== null) {
-        clearTimeout(clipboardOfferTimerRef.current);
-      }
     };
   }, []);
-
-  // Auto-dismiss a clipboard offer after 12s so the bubble doesn't camp the pet.
-  useEffect(() => {
-    if (clipboardOffer === null) {
-      return;
-    }
-    if (clipboardOfferTimerRef.current !== null) {
-      clearTimeout(clipboardOfferTimerRef.current);
-    }
-    clipboardOfferTimerRef.current = setTimeout(() => {
-      setClipboardOffer(null);
-      clipboardOfferTimerRef.current = null;
-    }, 12_000);
-    return () => {
-      if (clipboardOfferTimerRef.current !== null) {
-        clearTimeout(clipboardOfferTimerRef.current);
-        clipboardOfferTimerRef.current = null;
-      }
-    };
-  }, [clipboardOffer]);
 
   const showPetNote = useCallback((note: string, duration = 4200) => {
     setPetNote(note);
@@ -178,10 +163,6 @@ export default function App() {
 
   const dismissClipboardOffer = () => {
     setClipboardOffer(null);
-    if (clipboardOfferTimerRef.current !== null) {
-      clearTimeout(clipboardOfferTimerRef.current);
-      clipboardOfferTimerRef.current = null;
-    }
   };
 
   const acceptClipboardOffer = async () => {
@@ -201,6 +182,11 @@ export default function App() {
     const fromHistory = history.find((card) => card.id === rememberedThread.cardId) ?? null;
     if (fromHistory !== null) {
       setActiveCard(fromHistory);
+      setPendingCard(null);
+      setHistoryOpen(false);
+      if (windowModeRef.current === "mini") {
+        await setWindowSize("compact", { revealPending: false });
+      }
       return;
     }
     const cards = await window.driftpet.listRecentCards();
@@ -208,9 +194,87 @@ export default function App() {
     const refetched = cards.find((card) => card.id === rememberedThread.cardId) ?? null;
     if (refetched !== null) {
       setActiveCard(refetched);
+      setPendingCard(null);
+      setHistoryOpen(false);
+      if (windowModeRef.current === "mini") {
+        await setWindowSize("compact", { revealPending: false });
+      }
       return;
     }
     showPetNote("这张线我还守着，但卡片要去历史里翻一翻。", 4200);
+  };
+
+  const dispatchClaudeCode = async (card: CardRecord) => {
+    if (isDispatchingCardId !== null || deletingCardId !== null) {
+      return;
+    }
+
+    setIsDispatchingCardId(card.id);
+    setClaudeDispatchFeedback(null);
+    try {
+      const result = await window.driftpet.dispatchClaudeCode(card.id);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: result.status === "failed" ? "error" : "success",
+        message: result.status === "failed"
+          ? `派发失败：${result.error ?? "请检查 Claude / 终端配置。"}`
+          : `已派给 Claude Code：${result.runner}`,
+      });
+      showPetNote(
+        result.status === "failed"
+          ? "派发失败了。先检查 Claude / 终端配置。"
+          : `已派给 Claude Code：${result.runner}`,
+        4200
+      );
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+      const nextHistory = await window.driftpet.listRecentCards();
+      setHistory(nextHistory);
+    } catch (error) {
+      console.error("[driftpet] Claude Code dispatch failed:", error);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: "error",
+        message: error instanceof Error
+          ? `派发失败：${error.message}`
+          : "派发失败了。先检查 Claude / 终端配置。",
+      });
+      showPetNote("派发失败了。先检查 Claude / 终端配置。", 5200);
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+      const nextHistory = await window.driftpet.listRecentCards();
+      setHistory(nextHistory);
+    } finally {
+      setIsDispatchingCardId(null);
+    }
+  };
+
+  const deleteCard = async (card: CardRecord) => {
+    if (isDispatchingCardId !== null || deletingCardId !== null) {
+      return;
+    }
+
+    setDeletingCardId(card.id);
+    setClaudeDispatchFeedback(null);
+    try {
+      const deleted = await window.driftpet.deleteCard(card.id);
+      if (!deleted) {
+        showPetNote("这张卡片没删掉。刷新一下再试。", 4200);
+        return;
+      }
+
+      setHistory((current) => current.filter((entry) => entry.id !== card.id));
+      setActiveCard((current) => current?.id === card.id ? null : current);
+      setPendingCard((current) => current?.id === card.id ? null : current);
+      showPetNote("这张记忆已经删掉了。", 3200);
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+    } catch (error) {
+      console.error("[driftpet] card delete failed:", error);
+      showPetNote("删除失败了。再试一次。", 4200);
+    } finally {
+      setDeletingCardId(null);
+    }
   };
 
   const pokePet = () => {
@@ -276,13 +340,19 @@ export default function App() {
     refreshStatus();
   };
 
-  const setWindowSize = async (windowSize: WindowMode) => {
+  const setWindowSize = async (
+    windowSize: WindowMode,
+    options: { revealPending?: boolean } = {}
+  ) => {
+    const revealPending = options.revealPending ?? true;
     if (windowSize === "mini") {
       setHistoryOpen(false);
       clearPetNote();
     }
     if (windowSize !== "mini") {
-      revealPendingCard();
+      if (revealPending) {
+        revealPendingCard();
+      }
       // If a re-render happens during the awaited resize (e.g. clipboard offer
       // gets dismissed by acceptClipboardOffer), the mini-bubble effect would
       // otherwise see needsMiniBubbleWidth flip false vs ref still true and
@@ -326,6 +396,11 @@ export default function App() {
           cards={history}
           isOpen={historyOpen}
           onClose={() => setHistoryOpen(false)}
+          dispatchingCardId={isDispatchingCardId}
+          deletingCardId={deletingCardId}
+          claudeDispatchFeedback={claudeDispatchFeedback}
+          onDeleteCard={deleteCard}
+          onDispatchClaudeCode={dispatchClaudeCode}
           onSelectCard={(card) => {
             setActiveCard(card);
             setHistoryOpen(false);
@@ -361,7 +436,7 @@ export default function App() {
           hasPendingCard={pendingCard !== null}
           rememberedThread={rememberedThread}
           onResurfaceRememberedThread={resurfaceRememberedThread}
-          clipboardOffer={showMiniOffer ? clipboardOffer : null}
+          clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}
           onDismissClipboardOffer={dismissClipboardOffer}
         />

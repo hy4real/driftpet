@@ -37,7 +37,11 @@ const sampleStatus = {
     hourlyBudget: 3,
     shownThisHour: 1,
     canSurfaceAuto: true,
-    rememberedThread: null,
+    rememberedThread: {
+      cardId: sampleCard.id,
+      title: sampleCard.title,
+      createdAt: sampleCard.createdAt,
+    },
   },
   telegram: {
     level: "ok",
@@ -191,6 +195,15 @@ const setupDom = () => {
   const setWindowSizeCalls = [];
   const setMiniBubbleVisibleCalls = [];
   const moveWindowByCalls = [];
+  const dispatchClaudeCodeCalls = [];
+  const deleteCardCalls = [];
+  const claudeDispatchSettingWrites = [];
+  let latestClaudeDispatch = null;
+  let claudeDispatchSettings = {
+    terminalApp: "Ghostty",
+    workingDirectory: "/Users/mac/driftpet",
+    continuityMode: "continuous",
+  };
 
   if (!dom.window.HTMLElement.prototype.setPointerCapture) {
     dom.window.HTMLElement.prototype.setPointerCapture = function setPointerCapture(pointerId) {
@@ -214,9 +227,34 @@ const setupDom = () => {
 
   window.driftpet = {
     showDemo: async () => sampleCard,
-    listRecentCards: async () => [sampleCard],
+    listRecentCards: async () => [{
+      ...sampleCard,
+      latestClaudeDispatch,
+    }],
+    deleteCard: async (cardId) => {
+      deleteCardCalls.push(cardId);
+      return true;
+    },
     getStatus: async () => sampleStatus,
+    getClaudeDispatchSettings: async () => claudeDispatchSettings,
+    setClaudeDispatchSettings: async (settings) => {
+      claudeDispatchSettingWrites.push(settings);
+      claudeDispatchSettings = settings;
+      return claudeDispatchSettings;
+    },
     ingestChaosReset: async () => sampleCard,
+    dispatchClaudeCode: async (cardId) => {
+      dispatchClaudeCodeCalls.push(cardId);
+      latestClaudeDispatch = {
+        command: `claude mock-dispatch ${cardId}`,
+        promptPath: `/tmp/card-${cardId}.md`,
+        runner: "claude-test",
+        cwd: "/tmp/driftpet-worktree",
+        createdAt: Date.now(),
+        status: "launched",
+      };
+      return latestClaudeDispatch;
+    },
     setPetHourlyBudget: async () => 3,
     setWindowSize: async (windowSize) => {
       setWindowSizeCalls.push(windowSize);
@@ -251,6 +289,9 @@ const setupDom = () => {
     setWindowSizeCalls,
     setMiniBubbleVisibleCalls,
     moveWindowByCalls,
+    dispatchClaudeCodeCalls,
+    deleteCardCalls,
+    claudeDispatchSettingWrites,
     emitClipboardOffer: (offer) => {
       if (clipboardOfferEmitter !== null) {
         clipboardOfferEmitter(offer);
@@ -355,7 +396,7 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   assert.equal(container.querySelector(".mini-card"), null, "mini mode should not show a mini card");
   assert.equal(container.querySelector(".mini-pet-toast"), null, "mini mode should not show a mini toast");
   assert.equal(container.querySelector(".bubble-panel"), null, "mini mode should not show the main bubble");
-  assert.equal(container.textContent.trim(), "", "mini mode should not show default text");
+  assert.equal(container.querySelector(".pet-mini-resume-thread")?.textContent.includes("上次那条线"), true, "mini mode may show the remembered-thread resume entry");
 
   await clickAvatar(container);
 
@@ -384,9 +425,9 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   await cleanupBundle();
 });
 
-test("clipboard offer in mini mode lets the user accept into the nest pre-filled or dismiss it", async () => {
+test("clipboard offer survives the mini handoff and appears in the workbench strip", async () => {
   const { App, cleanupBundle } = await buildAppModule();
-  const { cleanup, setWindowSizeCalls, setMiniBubbleVisibleCalls, emitClipboardOffer } = setupDom();
+  const { cleanup, setWindowSizeCalls, emitClipboardOffer } = setupDom();
   const container = document.getElementById("root");
   assert.ok(container);
 
@@ -396,43 +437,66 @@ test("clipboard offer in mini mode lets the user accept into the nest pre-filled
     root.render(React.createElement(App));
   });
 
-  // Dismiss path: an offer arrives, the user clicks 不用, no window resize happens.
   await act(async () => {
     emitClipboardOffer({ text: "An interesting paragraph the user just copied from a doc.", capturedAt: Date.now() });
   });
 
-  const offer = container.querySelector(".pet-clipboard-offer");
-  assert.ok(offer, "expected the clipboard offer bubble to appear in mini mode");
-  assert.match(offer.textContent ?? "", /复制了一段，要收吗？/);
-  assert.match(offer.textContent ?? "", /An interesting paragraph/);
-  assert.ok(container.querySelector(".app-shell-mini-bubble"), "offer should widen the mini window like the click bubble does");
+  assert.equal(container.querySelector(".pet-clipboard-offer"), null, "mini mode should no longer show the clipboard bubble");
+  assert.equal(container.querySelector(".pet-workbench-clipboard"), null, "workbench clipboard strip should stay hidden until the nest opens");
 
-  const dismiss = offer.querySelector(".pet-clipboard-offer-dismiss");
+  await openNestWithContextMenu(container);
+
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+  const workbenchOffer = container.querySelector(".pet-workbench-clipboard");
+  assert.ok(workbenchOffer, "expected the clipboard strip to appear at the top of the workbench");
+  assert.match(workbenchOffer.textContent ?? "", /剪贴板/);
+  assert.match(workbenchOffer.textContent ?? "", /An interesting paragraph/);
+
+  const dismiss = workbenchOffer.querySelector(".pet-workbench-clipboard-dismiss");
   assert.ok(dismiss);
   await act(async () => {
     dismiss.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
-  assert.equal(container.querySelector(".pet-clipboard-offer"), null, "dismiss should remove the offer");
-  assert.deepEqual(setWindowSizeCalls, [], "dismiss must not change the window mode");
+  assert.equal(container.querySelector(".pet-workbench-clipboard"), null, "dismiss should remove the workbench clipboard strip");
 
-  // Accept path: a fresh offer arrives, the user clicks 收一下, the workbench opens with text pre-filled.
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("accepting a clipboard offer from the workbench fills the textarea without re-expanding", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls, emitClipboardOffer } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
   await act(async () => {
     emitClipboardOffer({ text: "Second copy: tighten the next driftpet card.", capturedAt: Date.now() });
   });
-  const acceptOffer = container.querySelector(".pet-clipboard-offer-accept");
+
+  await openNestWithContextMenu(container);
+
+  assert.deepEqual(setWindowSizeCalls, ["expanded"], "opening the nest should be the only resize");
+  const workbenchOffer = container.querySelector(".pet-workbench-clipboard");
+  assert.ok(workbenchOffer);
+
+  const acceptOffer = workbenchOffer.querySelector(".pet-workbench-clipboard-accept");
   assert.ok(acceptOffer);
-  const miniBubbleCallsBeforeAccept = setMiniBubbleVisibleCalls.slice();
   await act(async () => {
     acceptOffer.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 
-  assert.deepEqual(setWindowSizeCalls, ["expanded"], "accepting should expand the window once");
-  const newMiniBubbleCalls = setMiniBubbleVisibleCalls.slice(miniBubbleCallsBeforeAccept.length);
-  assert.ok(
-    !newMiniBubbleCalls.includes(false),
-    `accepting must not fire setMiniBubbleVisible(false); that IPC arrives behind the expand and shrinks the just-opened nest back to mini. New calls: ${JSON.stringify(newMiniBubbleCalls)}`
-  );
-  assert.equal(container.querySelector(".pet-clipboard-offer"), null, "offer must be cleared once accepted");
+  assert.deepEqual(setWindowSizeCalls, ["expanded"], "accepting in the workbench should not trigger a second expand");
+  assert.equal(container.querySelector(".pet-workbench-clipboard"), null, "accept should clear the clipboard strip");
   const textarea = container.querySelector("textarea");
   assert.ok(textarea, "workbench textarea should be visible after expanding");
   assert.equal(textarea.value, "Second copy: tighten the next driftpet card.", "textarea should be pre-filled with the copied text");
@@ -463,6 +527,44 @@ test("right click opens the nest from pure mini mode", async () => {
   assert.ok(container.querySelector(".pet-shell-expanded"), "expected right click to open the nest");
   assert.ok(container.querySelector(".pet-workbench"), "expected right click to expose the workbench");
   assert.equal(container.querySelector(".pet-avatar-button"), null, "expected nest panel to hide the animated pet");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("mini resume thread opens the remembered card directly", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const resumeThread = container.querySelector(".pet-mini-resume-thread");
+  assert.ok(resumeThread, "expected mini mode to expose the remembered thread");
+  assert.match(resumeThread.textContent ?? "", /上次那条线/);
+  assert.match(resumeThread.textContent ?? "", /继续/);
+
+  await act(async () => {
+    resumeThread.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(setWindowSizeCalls, ["compact"], "resuming from mini should open the compact card");
+  assert.ok(container.querySelector(".pet-shell-compact"), "expected compact shell after resuming the thread");
+  assert.match(container.textContent ?? "", /Ship product work instead of polishing infra/);
+  assert.match(container.textContent ?? "", /Return to the core desk pet loop/);
 
   await act(async () => {
     root.unmount();
@@ -534,6 +636,182 @@ test("nest panel exposes history drawer", async () => {
 
   cleanup();
   await cleanupBundle();
+});
+
+test("history drawer can dispatch a card to Claude Code", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeCodeCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  assert.ok(logToggle, "expected show log button");
+
+  await act(async () => {
+    logToggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const dispatchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("派给 Claude Code"));
+  assert.ok(dispatchButton, "expected Claude Code dispatch button");
+
+  await act(async () => {
+    dispatchButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeCodeCalls, [sampleCard.id], "expected dispatch to receive the selected card id");
+  assert.match(container.textContent ?? "", /已派给 Claude Code：claude-test/, "expected in-panel dispatch feedback");
+  assert.match(container.textContent ?? "", /Claude 已启动/, "expected latest dispatch state to stay visible on the card");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("history drawer can delete a remembered card", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, deleteCardCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  assert.ok(logToggle, "expected show log button");
+
+  await act(async () => {
+    logToggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const deleteButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "删除");
+  assert.ok(deleteButton, "expected delete button");
+
+  await act(async () => {
+    deleteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(deleteCardCalls, [sampleCard.id], "expected delete to receive the selected card id");
+  assert.equal(container.querySelector(".history-card"), null, "expected deleted card to disappear from history");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("settings panel can switch Claude terminal and working directory", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, claudeDispatchSettingWrites, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const settingsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("设置"));
+  assert.ok(settingsButton, "expected settings button");
+
+  await act(async () => {
+    settingsButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+
+  assert.match(container.textContent ?? "", /Claude Code/, "expected Claude settings section");
+
+  const terminalButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Terminal");
+  assert.ok(terminalButton, "expected Terminal toggle");
+
+  await act(async () => {
+    terminalButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const cwdInput = Array.from(container.querySelectorAll("input")).find((input) => input.placeholder === "/absolute/path/to/project");
+  assert.ok(cwdInput, "expected Claude working directory input");
+
+  const isolatedModeButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === "独立卡片");
+  assert.ok(isolatedModeButton, "expected isolated continuity mode toggle");
+
+  await act(async () => {
+    isolatedModeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+
+  await act(async () => {
+    cwdInput.value = "/tmp/claude-project";
+    cwdInput.dispatchEvent(new Event("input", { bubbles: true }));
+    cwdInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await Promise.resolve();
+  });
+  assert.equal(cwdInput.value, "/tmp/claude-project");
+
+  const saveClaudeSettingsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("保存 Claude 设置"));
+  assert.ok(saveClaudeSettingsButton, "expected Claude settings save button");
+
+  await act(async () => {
+    saveClaudeSettingsButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(claudeDispatchSettingWrites[0], {
+    continuityMode: "continuous",
+    terminalApp: "Terminal",
+    workingDirectory: "/Users/mac/driftpet",
+  });
+  assert.deepEqual(claudeDispatchSettingWrites[1], {
+    continuityMode: "isolated",
+    terminalApp: "Terminal",
+    workingDirectory: "/Users/mac/driftpet",
+  });
+  assert.ok(claudeDispatchSettingWrites.length >= 2, "expected at least two settings writes");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("settings panel exposes a vertical scroll container", async () => {
+  const css = await fs.readFile(rendererStyles, "utf8");
+  const panelBlock = Array.from(css.matchAll(/\.pet-skin-panel\s*\{[^}]*\}/g)).at(-1)?.[0] ?? "";
+
+  assert.match(panelBlock, /overflow-y:\s*auto/, "expected settings panel to scroll vertically");
+  assert.match(panelBlock, /max-height:\s*min\(100%,\s*332px\)/, "expected settings panel to keep a bounded height");
+  assert.match(css, /\.pet-skin-panel::\-webkit-scrollbar\s*\{[^}]*width:\s*10px;/, "expected explicit vertical scrollbar width");
 });
 
 test("workbench can capture a note after opening from the avatar", async () => {
@@ -862,6 +1140,3 @@ test("workbench collapse button takes the user straight back to mini", async () 
   cleanup();
   await cleanupBundle();
 });
-
-// TODO: 重新覆盖 PetPresence 的 remembered-thread 切换逻辑。原测试依赖 expanded → compact 中转入口，
-// Phase I4 之后该入口已删除（用户反馈：中转鸡肋）。后续用直接 mount PetShell with windowMode="compact" 的单元测覆盖。

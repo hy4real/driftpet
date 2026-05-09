@@ -524,6 +524,11 @@ textarea:disabled {
   gap: var(--space-4);
 }
 
+.history-card-shell {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .history-card {
   width: 100%;
   display: grid;
@@ -548,6 +553,33 @@ textarea:disabled {
   color: rgba(199, 244, 239, 0.88);
   font-size: var(--font-caption);
   letter-spacing: 0.04em;
+}
+
+.history-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-card-action {
+  min-height: var(--btn-h-sm);
+}
+
+.history-card-action-danger {
+  color: rgba(255, 205, 205, 0.92);
+}
+
+.history-card-dispatch-note {
+  margin: 0;
+  font-size: var(--font-caption);
+  line-height: 1.45;
+}
+
+.history-card-dispatch-note-success {
+  color: rgba(199, 244, 239, 0.9);
+}
+
+.history-card-dispatch-note-error {
+  color: rgba(255, 205, 205, 0.92);
 }
 
 .pet-shell {
@@ -794,8 +826,23 @@ textarea:disabled {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4) var(--space-5);
+  text-align: left;
+  color: inherit;
   border-radius: var(--radius-lg);
   background: var(--surface-2);
+}
+
+.pet-presence-card:disabled {
+  cursor: default;
+}
+
+.pet-presence-card-action {
+  cursor: pointer;
+}
+
+.pet-presence-card-action:hover {
+  border-color: rgba(92, 195, 191, 0.42);
+  background: rgba(92, 195, 191, 0.09);
 }
 
 .pet-presence-card strong {
@@ -811,31 +858,9 @@ textarea:disabled {
   color: rgba(92, 195, 191, 0.94);
 }
 
-.pet-presence-memory-button {
-  display: block;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-  border: none;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.pet-presence-memory-button:hover {
-  text-decoration: underline;
-}
-
-.pet-presence-memory-button:focus-visible {
+.pet-presence-card-action:focus-visible {
   outline: 2px solid rgba(92, 195, 191, 0.6);
   outline-offset: 2px;
-  border-radius: 2px;
 }
 
 .pet-presence-card span {
@@ -936,6 +961,56 @@ textarea:disabled {
   box-shadow: var(--shadow-panel);
 }
 
+.pet-workbench-clipboard {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.pet-workbench-clipboard-copy {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.pet-workbench-clipboard-copy h3 {
+  margin: 0;
+  color: var(--text-0);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.pet-workbench-clipboard-preview {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.pet-workbench-clipboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.pet-workbench-clipboard-accept,
+.pet-workbench-clipboard-dismiss {
+  min-width: 0;
+}
+
+.pet-workbench-clipboard-dismiss {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text-1);
+}
+
 .manual-input-shell {
   display: grid;
   gap: var(--space-2);
@@ -979,6 +1054,59 @@ textarea:disabled {
 .pet-skin-panel {
   display: grid;
   gap: var(--space-5);
+  width: 100%;
+  max-height: min(100%, 332px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.pet-skin-panel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pet-skin-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.pet-skin-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.pet-skin-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.34);
+  background-clip: padding-box;
+}
+
+.pet-settings-group {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.pet-settings-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.pet-settings-copy h3,
+.pet-settings-copy p {
+  margin: 0;
+}
+
+.pet-settings-copy h3 {
+  font-size: var(--font-body);
+  color: var(--text-0);
+}
+
+.pet-settings-copy p {
+  font-size: var(--font-caption);
+  color: var(--text-2);
+  line-height: 1.45;
 }
 
 .pet-skin-panel-header {
@@ -993,6 +1121,12 @@ textarea:disabled {
 
 .pet-skin-list {
   display: grid;
+  gap: var(--space-2);
+}
+
+.pet-settings-terminals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -1030,6 +1164,21 @@ textarea:disabled {
 .pet-skin-install {
   display: flex;
   gap: var(--space-3);
+}
+
+.pet-settings-field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pet-settings-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.pet-settings-label {
+  font-size: var(--font-caption);
+  color: var(--text-2);
 }
 
 .pet-skin-input {
@@ -1098,6 +1247,46 @@ textarea:disabled {
   transform: rotate(-45deg);
 }
 
+.pet-mini-resume-thread {
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  z-index: 3;
+  width: 116px;
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid rgba(92, 195, 191, 0.3);
+  border-radius: 15px 15px 15px 5px;
+  background: rgba(10, 16, 21, 0.82);
+  color: var(--text-0);
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+  animation: pet-click-bubble-in 150ms ease-out;
+  cursor: pointer;
+}
+
+.pet-mini-resume-thread span {
+  color: rgba(92, 195, 191, 0.88);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pet-mini-resume-thread strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.pet-mini-resume-thread:hover {
+  border-color: rgba(92, 195, 191, 0.58);
+  background: rgba(14, 31, 33, 0.88);
+}
+
 @keyframes pet-click-bubble-in {
   from {
     opacity: 0;
@@ -1108,91 +1297,6 @@ textarea:disabled {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.pet-clipboard-offer {
-  position: absolute;
-  left: 8px;
-  top: 12px;
-  z-index: 4;
-  width: max-content;
-  max-width: 110px;
-  padding: 8px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px 14px 14px 5px;
-  background: rgba(10, 16, 21, 0.84);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.26);
-  color: var(--text-0);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 11px;
-  line-height: 1.3;
-  animation: pet-click-bubble-in 150ms ease-out;
-}
-
-.pet-clipboard-offer::after {
-  content: "";
-  position: absolute;
-  right: -5px;
-  bottom: 8px;
-  width: 9px;
-  height: 9px;
-  border-right: 1px solid rgba(255, 255, 255, 0.16);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 16, 21, 0.84);
-  transform: rotate(-45deg);
-}
-
-.pet-clipboard-offer-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.pet-clipboard-offer-prompt {
-  font-weight: 600;
-}
-
-.pet-clipboard-offer-preview {
-  color: var(--text-2);
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
-
-.pet-clipboard-offer-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.pet-clipboard-offer-accept,
-.pet-clipboard-offer-dismiss {
-  flex: 1;
-  padding: 4px 0;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: transparent;
-  color: var(--text-0);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.pet-clipboard-offer-accept {
-  background: rgba(92, 195, 191, 0.22);
-  border-color: rgba(92, 195, 191, 0.38);
-}
-
-.pet-clipboard-offer-accept:hover,
-.pet-clipboard-offer-dismiss:hover {
-  filter: brightness(1.1);
-}
-
-.pet-clipboard-offer-accept:focus-visible,
-.pet-clipboard-offer-dismiss:focus-visible {
-  outline: 2px solid rgba(92, 195, 191, 0.6);
-  outline-offset: 2px;
 }
 
 @keyframes pet-pending-pulse {

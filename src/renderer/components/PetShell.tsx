@@ -50,14 +50,6 @@ type PetShellProps = {
   onDismissClipboardOffer: () => void;
 };
 
-const previewClipboardText = (raw: string, maxLength = 60): string => {
-  const collapsed = raw.replace(/\s+/g, " ").trim();
-  if (collapsed.length <= maxLength) {
-    return collapsed;
-  }
-  return `${collapsed.slice(0, maxLength - 1)}…`;
-};
-
 const clampPresenceTitle = (value: string, maxLength = 28): string => {
   if (value.length <= maxLength) {
     return value;
@@ -140,8 +132,8 @@ export function PetShell({
   const avatarClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reaction, setReaction] = useState<"idle" | "peek" | "nudge">("idle");
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showRememberedThread, setShowRememberedThread] = useState(false);
   const [transientExpression, setTransientExpression] = useState<"review" | null>(null);
+  const [clipboardOfferPreview, setClipboardOfferPreview] = useState<ClipboardOffer | null>(null);
   const transientScheduleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transientClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [triggers, setTriggers] = useState<ExpressionTrigger[]>([]);
@@ -164,6 +156,12 @@ export function PetShell({
     triggerCleanupRefs.current.set(id, timer);
   };
   const isExpanded = windowMode === "expanded";
+
+  useEffect(() => {
+    if (clipboardOffer !== null) {
+      setClipboardOfferPreview(clipboardOffer);
+    }
+  }, [clipboardOffer]);
 
   const triggerReaction = (nextReaction: "peek" | "nudge") => {
     if (reactionTimeoutRef.current !== null) {
@@ -228,12 +226,15 @@ export function PetShell({
   const moodLabel = moodLabelByState[petUiState];
   const statusLabel = statusLabelByState[petUiState];
   const canShowRememberedThread = activeCardTitle === null && rememberedThread !== null;
-  const memoryActive = canShowRememberedThread && showRememberedThread;
+  const memoryActive = canShowRememberedThread;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
   const presenceTitle = memoryActive && rememberedThread !== null
     ? `上次帮你守的线：${clampPresenceTitle(rememberedThread.title)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
   const presenceLabel = memoryActive ? "线程记忆" : moodLabel;
+  const miniRememberedTitle = rememberedThread === null
+    ? null
+    : `继续：${clampPresenceTitle(rememberedThread.title, 18)}`;
   const liveStatusLabel = dragging
     ? runDirection === "left"
       ? "往左跑，我跟着你。"
@@ -349,21 +350,6 @@ export function PetShell({
     };
   }, [dragging, historyOpen, isExpanded, isMini, onCompanionNote]);
 
-  useEffect(() => {
-    if (!canShowRememberedThread) {
-      setShowRememberedThread(false);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setShowRememberedThread((current) => !current);
-    }, 6400);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [canShowRememberedThread]);
-
   // Cleanup trigger timers on unmount
   useEffect(() => {
     return () => {
@@ -406,6 +392,30 @@ export function PetShell({
     onSetWindowSize("expanded");
   };
 
+  const acceptClipboardOffer = () => {
+    if (clipboardOfferPreview === null) {
+      return;
+    }
+
+    setClipboardOfferPreview(null);
+    if (isExpanded) {
+      onChaosTextChange(clipboardOfferPreview.text);
+      onDismissClipboardOffer();
+      return;
+    }
+
+    onAcceptClipboardOffer();
+  };
+
+  const dismissClipboardOffer = () => {
+    if (clipboardOfferPreview === null) {
+      return;
+    }
+
+    setClipboardOfferPreview(null);
+    onDismissClipboardOffer();
+  };
+
   return (
     <section className={`pet-shell pet-shell-${windowMode}`}>
       {!isMini && !isExpanded ? (
@@ -414,27 +424,21 @@ export function PetShell({
         </div>
       ) : null}
 
-      {isMini && clipboardOffer !== null ? (
-        <div className="pet-clipboard-offer" role="dialog" aria-label="复制了一段，要收吗？">
-          <div className="pet-clipboard-offer-text">
-            <span className="pet-clipboard-offer-prompt">复制了一段，要收吗？</span>
-            <span className="pet-clipboard-offer-preview">{previewClipboardText(clipboardOffer.text)}</span>
-          </div>
-          <div className="pet-clipboard-offer-actions">
-            <button type="button" className="pet-clipboard-offer-accept" onClick={onAcceptClipboardOffer}>
-              收一下
-            </button>
-            <button type="button" className="pet-clipboard-offer-dismiss" onClick={onDismissClipboardOffer}>
-              不用
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {isMini && clipboardOffer === null && petNote !== null ? (
+      {isMini && clipboardOfferPreview === null && petNote !== null ? (
         <div className="pet-click-bubble" role="status">
           {petNote}
         </div>
+      ) : null}
+
+      {isMini && clipboardOfferPreview === null && petNote === null && miniRememberedTitle !== null ? (
+        <button
+          className="pet-mini-resume-thread"
+          onClick={onResurfaceRememberedThread}
+          type="button"
+        >
+          <span>上次那条线</span>
+          <strong>{miniRememberedTitle}</strong>
+        </button>
       ) : null}
 
       {!isExpanded ? (
@@ -474,10 +478,11 @@ export function PetShell({
 
           {!isMini ? (
             <PetPresence
+              actionLabel="点击继续这条线"
               label={presenceLabel}
               memoryActive={memoryActive}
               title={presenceTitle}
-              onMemoryClick={memoryActive ? onResurfaceRememberedThread : undefined}
+              onMemoryClick={canShowRememberedThread ? onResurfaceRememberedThread : undefined}
             />
           ) : null}
         </div>
@@ -488,7 +493,10 @@ export function PetShell({
           {isExpanded ? (
             <PetWorkbench
               chaosText={chaosText}
+              clipboardOffer={clipboardOfferPreview}
               onChaosTextChange={onChaosTextChange}
+              onAcceptClipboardOffer={acceptClipboardOffer}
+              onDismissClipboardOffer={dismissClipboardOffer}
               onReturnToPet={() => onSetWindowSize("mini")}
               isSubmitting={isNestSubmitting}
               onSubmitChaosReset={onSubmitChaosReset}
