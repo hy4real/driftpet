@@ -43,13 +43,23 @@ export default function App() {
   }, [windowMode]);
 
   useEffect(() => {
+    if (!isMini) {
+      // Leaving mini mode: drop the bubble-resize tracking without sending IPC.
+      // The expanded/compact resize already set the right bounds, and a stale
+      // setMiniBubbleVisible(false) would shrink the window back to mini size.
+      if (miniBubbleResizeActiveRef.current) {
+        miniBubbleResizeActiveRef.current = false;
+      }
+      return;
+    }
+
     if (showMiniClickBubble === miniBubbleResizeActiveRef.current) {
       return;
     }
 
     miniBubbleResizeActiveRef.current = showMiniClickBubble;
     void window.driftpet.setMiniBubbleVisible(showMiniClickBubble);
-  }, [showMiniClickBubble]);
+  }, [isMini, showMiniClickBubble]);
 
   useEffect(() => {
     return () => {

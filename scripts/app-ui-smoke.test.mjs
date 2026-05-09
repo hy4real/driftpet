@@ -355,7 +355,10 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   await openNestWithContextMenu(container);
 
   assert.deepEqual(setWindowSizeCalls, ["expanded"]);
-  assert.equal(setMiniBubbleVisibleCalls.at(-1), false, "expected opening the nest to restore the non-bubble mini window size");
+  assert.ok(
+    !setMiniBubbleVisibleCalls.includes(false),
+    "leaving mini mode must not fire setMiniBubbleVisible(false); that IPC resizes the window back to mini and shrinks the just-expanded nest"
+  );
   assert.ok(container.querySelector(".pet-shell-expanded"), "expected double click to open the nest");
   assert.ok(container.querySelector(".pet-workbench"), "expected expanded mode to show the workbench");
   assert.equal(container.querySelector(".pet-avatar-button"), null, "expected nest panel to hide the animated pet");
