@@ -47,6 +47,8 @@ type PetShellProps = {
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
   onResurfaceRememberedThread: () => void;
+  recentCards: CardRecord[];
+  onSelectRecentCard: (card: CardRecord) => void;
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -127,6 +129,8 @@ export function PetShell({
   rememberedThread,
   rememberedThreadCard,
   onResurfaceRememberedThread,
+  recentCards,
+  onSelectRecentCard,
   clipboardOffer,
   onAcceptClipboardOffer,
   onDismissClipboardOffer
@@ -520,15 +524,18 @@ export function PetShell({
               resetTemplates={resetTemplates}
               historyOpen={historyOpen}
               onToggleHistory={onToggleHistory}
+              rememberedThread={rememberedThread}
+              rememberedThreadCard={rememberedThreadCard}
+              onResurfaceRememberedThread={onResurfaceRememberedThread}
+              recentCards={recentCards}
+              onSelectRecentCard={onSelectRecentCard}
             />
           ) : (
             <PetControls
-              historyOpen={historyOpen}
               isExpanded={false}
               onMinimize={() => onSetWindowSize("mini")}
               onOpenBench={openBench}
               onPoke={handlePoke}
-              onToggleHistory={onToggleHistory}
             />
           )}
         </div>

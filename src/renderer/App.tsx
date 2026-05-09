@@ -50,6 +50,7 @@ export default function App() {
   const isMini = windowMode === "mini";
   const showBubble = windowMode === "compact" && activeCard !== null;
   const showMiniClickBubble = isMini && petNote !== null;
+  const recentCards = history.slice(0, 5);
   const showMiniResumeThread = isMini && petNote === null && rememberedThread !== null;
   const needsMiniBubbleWidth = showMiniClickBubble || showMiniResumeThread;
 
@@ -168,6 +169,10 @@ export default function App() {
     setClipboardOffer(null);
   };
 
+  const selectRecentCard = (card: CardRecord) => {
+    setActiveCard(card);
+  };
+
   const acceptClipboardOffer = async () => {
     if (clipboardOffer === null) {
       return;
@@ -187,7 +192,7 @@ export default function App() {
       setActiveCard(fromHistory);
       setPendingCard(null);
       setHistoryOpen(false);
-      if (windowModeRef.current === "mini") {
+      if (windowModeRef.current !== "compact") {
         await setWindowSize("compact", { revealPending: false });
       }
       return;
@@ -199,7 +204,7 @@ export default function App() {
       setActiveCard(refetched);
       setPendingCard(null);
       setHistoryOpen(false);
-      if (windowModeRef.current === "mini") {
+      if (windowModeRef.current !== "compact") {
         await setWindowSize("compact", { revealPending: false });
       }
       return;
@@ -440,6 +445,8 @@ export default function App() {
           rememberedThread={rememberedThread}
           rememberedThreadCard={rememberedThreadCard}
           onResurfaceRememberedThread={resurfaceRememberedThread}
+          recentCards={recentCards}
+          onSelectRecentCard={selectRecentCard}
           clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}
           onDismissClipboardOffer={dismissClipboardOffer}

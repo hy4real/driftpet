@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { CardRecord } from "../../main/types/card";
+import type { RememberedThread } from "../../main/types/status";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import { PetSkinPanel } from "./PetSkinPanel";
 
@@ -13,12 +15,17 @@ type PetWorkbenchProps = {
   isSubmitting: boolean;
   resetTemplates: readonly ResetTemplate[];
   historyOpen: boolean;
+  rememberedThread: RememberedThread | null;
+  rememberedThreadCard: CardRecord | null;
+  recentCards: CardRecord[];
   onChaosTextChange: (value: string) => void;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
   onSubmitChaosReset: () => void;
   onReturnToPet: () => void;
   onToggleHistory: () => void;
+  onResurfaceRememberedThread: () => void;
+  onSelectRecentCard: (card: CardRecord) => void;
 };
 
 const previewClipboardText = (raw: string, maxLength = 72): string => {
@@ -35,14 +42,20 @@ export function PetWorkbench({
   isSubmitting,
   resetTemplates,
   historyOpen,
+  rememberedThread,
+  rememberedThreadCard,
+  recentCards,
   onChaosTextChange,
   onAcceptClipboardOffer,
   onDismissClipboardOffer,
   onSubmitChaosReset,
   onReturnToPet,
-  onToggleHistory
+  onToggleHistory,
+  onResurfaceRememberedThread,
+  onSelectRecentCard
 }: PetWorkbenchProps) {
   const [showSkinPanel, setShowSkinPanel] = useState(false);
+  const [historyFoldOpen, setHistoryFoldOpen] = useState(false);
 
   if (showSkinPanel) {
     return (
@@ -81,6 +94,20 @@ export function PetWorkbench({
               </button>
             </div>
           </section>
+        ) : null}
+
+        {rememberedThreadCard !== null ? (
+          <div className="pet-workbench-resume-strip" aria-label="上次那条线可继续">
+            <span className="pet-workbench-resume-strip-eyebrow">上次那条线</span>
+            <span className="pet-workbench-resume-strip-title">{rememberedThreadCard.title}</span>
+            <button
+              type="button"
+              className="pet-workbench-resume-strip-button"
+              onClick={onResurfaceRememberedThread}
+            >
+              继续
+            </button>
+          </div>
         ) : null}
 
         <header className="pet-workbench-header">
@@ -146,6 +173,34 @@ export function PetWorkbench({
             {isSubmitting ? "正在保存..." : "保存到小窝"}
           </button>
         </div>
+
+        {recentCards.length > 0 ? (
+          <div className="pet-workbench-history-fold">
+            <button
+              type="button"
+              className={`pet-workbench-history-toggle ${historyFoldOpen ? "pet-workbench-history-toggle-open" : ""}`}
+              onClick={() => setHistoryFoldOpen((open) => !open)}
+            >
+              {historyFoldOpen ? "收起更早的卡片" : `更早的卡片 (${recentCards.length})`}
+            </button>
+            {historyFoldOpen ? (
+              <ul className="pet-workbench-history-list">
+                {recentCards.map((card) => (
+                  <li key={card.id}>
+                    <button
+                      type="button"
+                      className="pet-workbench-history-item"
+                      onClick={() => onSelectRecentCard(card)}
+                    >
+                      <strong>{card.title}</strong>
+                      <span>{card.knowledgeTag}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     </div>
   );

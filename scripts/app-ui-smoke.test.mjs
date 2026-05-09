@@ -1175,6 +1175,127 @@ test("compact mode renders a full resume thread card with next-step body", async
   await cleanupBundle();
 });
 
+test("expanded workbench shows a resume strip when a remembered thread exists", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const resumeStrip = container.querySelector(".pet-workbench-resume-strip");
+  assert.ok(resumeStrip, "expected the resume strip to render at the top of the expanded workbench");
+  assert.match(resumeStrip.textContent ?? "", /上次那条线/);
+  assert.match(resumeStrip.textContent ?? "", /Ship product work instead of polishing infra/);
+
+  const continueButton = resumeStrip.querySelector(".pet-workbench-resume-strip-button");
+  assert.ok(continueButton, "expected a continue button in the resume strip");
+  assert.match(continueButton.textContent ?? "", /继续/);
+
+  await act(async () => {
+    continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  assert.deepEqual(setWindowSizeCalls, ["expanded", "compact"], "resume from expanded strip should switch to compact mode to show the card");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("expanded workbench earlier-cards fold toggles and selects a card", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const toggle = container.querySelector(".pet-workbench-history-toggle");
+  assert.ok(toggle, "expected the earlier-cards toggle button");
+  assert.match(toggle.textContent ?? "", /更早的卡片/);
+  assert.equal(container.querySelector(".pet-workbench-history-list"), null, "fold should be collapsed by default");
+
+  await act(async () => {
+    toggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  assert.match(toggle.textContent ?? "", /收起更早的卡片/);
+  const historyList = container.querySelector(".pet-workbench-history-list");
+  assert.ok(historyList, "fold should expand to show the card list");
+
+  const items = historyList.querySelectorAll(".pet-workbench-history-item");
+  assert.ok(items.length > 0, "expected at least one history item");
+
+  await act(async () => {
+    items[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  assert.match(container.textContent ?? "", /Ship product work instead of polishing infra/, "selecting a recent card should reveal it on screen");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("compact PetControls has no history button after G3 demotion", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const miniResumeButton = container.querySelector(".pet-mini-resume-thread");
+  assert.ok(miniResumeButton);
+
+  await act(async () => {
+    miniResumeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const compactButtons = Array.from(container.querySelectorAll(".pet-chip-row button"));
+  const buttonTexts = compactButtons.map((button) => button.textContent?.trim());
+  assert.equal(buttonTexts.includes("记忆"), false, "compact PetControls must not expose a history button after G3 demotion");
+  assert.ok(buttonTexts.includes("戳我"), "poke button should remain");
+  assert.ok(buttonTexts.includes("收起"), "minimize button should remain");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
 test("workbench collapse button takes the user straight back to mini", async () => {
   const { App, cleanupBundle } = await buildAppModule();
   const { cleanup, setWindowSizeCalls } = setupDom();
