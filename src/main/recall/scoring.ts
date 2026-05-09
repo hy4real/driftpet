@@ -23,6 +23,11 @@ export const CHAOS_SIMILAR_THRESHOLD = 0.68;
 export const CHAOS_MIN_FINAL_SCORE = 0.64;
 export const CHAOS_MIN_EMBEDDING = 0.58;
 export const CHAOS_MIN_LEXICAL = 0.38;
+// Strong semantic match waives the lexical floor so cross-language and
+// cross-phrasing chaos cards that share the same underlying thread can still
+// recall each other.
+export const CHAOS_STRONG_EMBEDDING = 0.7;
+export const CHAOS_STRONG_MIN_FINAL_SCORE = 0.55;
 export const EMBEDDING_THRESHOLD = 0.44;
 export const LEXICAL_ONLY_THRESHOLD = 0.24;
 
@@ -161,6 +166,10 @@ export const passesRelatedThreshold = (
 
   if (query.source === "manual_chaos" && entry.candidate.source === "manual_chaos") {
     if (entry.embedding !== null) {
+      if (entry.embedding >= CHAOS_STRONG_EMBEDDING) {
+        return entry.finalScore >= CHAOS_STRONG_MIN_FINAL_SCORE;
+      }
+
       return entry.finalScore >= CHAOS_MIN_FINAL_SCORE
         && entry.embedding >= CHAOS_MIN_EMBEDDING
         && entry.lexical >= CHAOS_MIN_LEXICAL;

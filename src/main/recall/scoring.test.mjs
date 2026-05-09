@@ -69,6 +69,39 @@ test("isNearDuplicateChaosReset rejects chaos cards that heavily overlap on core
   assert.equal(isNearDuplicateChaosReset(chaosQuery, overlapCandidate, lexical), true);
 });
 
+test("passesRelatedThreshold accepts strong embedding chaos matches even when lexical overlap is zero", () => {
+  const entry = {
+    candidate: chaosCandidate,
+    lexical: 0,
+    embedding: 0.78,
+    finalScore: 0.6896,
+  };
+
+  assert.equal(passesRelatedThreshold(chaosQuery, entry), true);
+});
+
+test("passesRelatedThreshold still rejects strong-embedding chaos matches when final score is too low", () => {
+  const entry = {
+    candidate: chaosCandidate,
+    lexical: 0,
+    embedding: 0.72,
+    finalScore: 0.5,
+  };
+
+  assert.equal(passesRelatedThreshold(chaosQuery, entry), false);
+});
+
+test("passesRelatedThreshold still requires lexical floor for mid-strength embedding chaos matches", () => {
+  const entry = {
+    candidate: chaosCandidate,
+    lexical: 0,
+    embedding: 0.65,
+    finalScore: 0.6,
+  };
+
+  assert.equal(passesRelatedThreshold(chaosQuery, entry), false);
+});
+
 test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {
   const entry = {
     candidate: {
