@@ -1,6 +1,6 @@
 // Watches the system clipboard for fresh text the user just copied and emits
-// an "offer" event so driftpet can ask, in mini mode, whether to drop it into
-// the nest. Pollling is the only portable option — Electron has no native
+// an "offer" event so driftpet can decide whether to stage it for the nest.
+// Polling is the only portable option — Electron has no native
 // "clipboard changed" event on macOS — so the loop is intentionally cheap and
 // only acts when readText() returns something different from the last poll.
 

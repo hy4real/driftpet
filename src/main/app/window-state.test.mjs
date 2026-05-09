@@ -20,6 +20,13 @@ const workArea = {
   height: 900,
 };
 
+const displayBounds = {
+  x: 0,
+  y: 0,
+  width: 1440,
+  height: 932,
+};
+
 test("getDefaultWindowStateForWorkArea anchors the first launch to the lower-right corner", () => {
   const state = getDefaultWindowStateForWorkArea(workArea);
 
@@ -116,7 +123,7 @@ test("calculateMovedBounds translates the current window while keeping it inside
       x: 180,
       y: -90,
     },
-    workArea
+    displayBounds
   );
 
   assert.deepEqual(moved, {
@@ -131,7 +138,7 @@ test("calculateMovedBounds clamps drag movement that would push the pet off-scre
   const moved = calculateMovedBounds(
     {
       x: 1300,
-      y: 760,
+      y: 820,
       width: 224,
       height: 220,
     },
@@ -139,12 +146,12 @@ test("calculateMovedBounds clamps drag movement that would push the pet off-scre
       x: 300,
       y: 120,
     },
-    workArea
+    displayBounds
   );
 
   assert.deepEqual(moved, {
     x: 1216,
-    y: 680,
+    y: 712,
     width: 224,
     height: 220,
   });

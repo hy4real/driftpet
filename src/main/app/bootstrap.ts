@@ -1,5 +1,5 @@
 import type { App } from "electron";
-import { app, BrowserWindow, clipboard, net, protocol } from "electron";
+import { app, BrowserWindow, clipboard, globalShortcut, net, protocol } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { registerIpcHandlers } from "../../../electron/ipc";
@@ -99,7 +99,6 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
       }
     })
     : null;
-
   // System tray.
   createTray({
     onToggleWindow: () => {
@@ -117,6 +116,7 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
     onQuit: () => {
       stopTelegramPoller();
       clipboardWatcher?.stop();
+      globalShortcut.unregisterAll();
       clearInterval(checkpointInterval);
       closeDatabase();
       electronApp.quit();
@@ -138,6 +138,7 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
     isQuitting = true;
     stopTelegramPoller();
     clipboardWatcher?.stop();
+    globalShortcut.unregisterAll();
     clearInterval(checkpointInterval);
     closeDatabase();
   });

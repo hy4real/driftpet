@@ -195,13 +195,16 @@ export const moveMainWindowBy = (
     y: Math.round(currentBounds.y + currentBounds.height / 2 + deltaY),
   };
   const display = screen.getDisplayNearestPoint(targetCenter);
+  // Dragging the pet should use the full display bounds rather than workArea.
+  // workArea excludes menu bar / dock reserved zones and makes the pet feel
+  // trapped inside a smaller rectangle than the visible screen.
   const nextBounds = calculateMovedBounds(
     currentBounds,
     {
       x: deltaX,
       y: deltaY,
     },
-    display.workArea
+    display.bounds
   );
 
   window.setBounds(nextBounds, false);
