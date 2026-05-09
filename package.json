@@ -22,6 +22,7 @@
     "probe:telegram-mixed-batch": "node scripts/probe-telegram-mixed-batch.mjs",
     "probe:telegram-text-batch": "node scripts/probe-telegram-text-batch.mjs",
     "probe:url-llm-batch": "node scripts/probe-url-llm-batch.mjs",
+    "review:real-usage": "node scripts/real-usage-review.mjs",
     "test:telegram-parse": "node --test --experimental-strip-types scripts/parse-telegram-message.test.mjs",
     "test:telegram-note-workflow": "node --test scripts/telegram-note-workflow.test.mjs",
     "test:url-note-runner": "node --test --experimental-strip-types src/main/telegram/url-classifier.test.mjs src/main/telegram/url-note-runner-parse.test.mjs",
