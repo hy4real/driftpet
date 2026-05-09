@@ -51,11 +51,22 @@ test("passesRelatedThreshold allows stronger manual chaos matches", () => {
   const entry = {
     candidate: chaosCandidate,
     lexical: 0.41,
-    embedding: 0.61,
-    finalScore: 0.64,
+    embedding: 0.63,
+    finalScore: 0.66,
   };
 
   assert.equal(passesRelatedThreshold(chaosQuery, entry), true);
+});
+
+test("isNearDuplicateChaosReset rejects chaos cards that heavily overlap on core tokens", () => {
+  const overlapCandidate = {
+    ...chaosCandidate,
+    title: "Ship product work and stop polishing infra",
+    summaryForRetrieval: "ship product work stop polishing infra and move back to the main thread",
+  };
+
+  const lexical = lexicalSimilarity(chaosQuery.summaryForRetrieval, overlapCandidate.summaryForRetrieval);
+  assert.equal(isNearDuplicateChaosReset(chaosQuery, overlapCandidate, lexical), true);
 });
 
 test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {

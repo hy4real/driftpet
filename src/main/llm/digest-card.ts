@@ -383,19 +383,19 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
 
 const createChaosResetFallback = (input: DigestInput): DigestDraft => {
   const contentBasis = normalizeText(input.rawText);
-  const mainLine = cleanChaosMainLine(contentBasis, "Return to one thread and name the actual deliverable.");
+  const mainLine = cleanChaosMainLine(contentBasis, "Pick one concrete deliverable for this thread.");
   const language = detectOutputLanguage(input.rawText);
 
   if (language === "zh") {
-    const fallbackMainLine = "回到一条主线，并把真正要交付的东西说清楚。";
-    const resolvedMainLine = mainLine === "Return to one thread and name the actual deliverable."
+    const fallbackMainLine = "先定一个这条线现在要交付的具体东西。";
+    const resolvedMainLine = mainLine === "Pick one concrete deliverable for this thread."
       ? truncate(fallbackMainLine, 72)
       : mainLine;
     const stepThread = summarizeChaosThreadForStep(resolvedMainLine, 28);
     const sideQuests = /https?:\/\//i.test(contentBasis)
       ? "先放下那些不能直接推进主交付的链接和标签页。"
       : "先放下所有不能直接推进当前交付的岔线。";
-    const nextStep = `围绕“${stepThread}”，先写下一个最小可交付结果，关掉两个无关标签页，然后立刻做第一个五分钟动作。`;
+    const nextStep = `关掉两个无关标签页，写下“${stepThread}”的第一条检查项，然后立刻做五分钟。`;
 
     return {
       title: resolvedMainLine,
@@ -410,7 +410,7 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     ? "Set aside the extra links and tabs that do not unblock the main deliverable."
     : "Set aside anything that does not move the current deliverable forward.";
   const stepThread = summarizeChaosThreadForStep(mainLine, 40);
-  const nextStep = `For "${stepThread}", write the smallest deliverable that would move it forward, close two unrelated tabs, and do the first five-minute step now.`;
+  const nextStep = `Close two unrelated tabs, write the first checklist line for "${stepThread}", and work on it for five minutes now.`;
 
   return {
     title: mainLine,

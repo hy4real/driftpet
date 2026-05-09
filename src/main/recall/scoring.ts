@@ -20,9 +20,9 @@ export type RecallCandidateLike = {
 
 export const CHAOS_DUPLICATE_THRESHOLD = 0.92;
 export const CHAOS_SIMILAR_THRESHOLD = 0.68;
-export const CHAOS_MIN_FINAL_SCORE = 0.58;
-export const CHAOS_MIN_EMBEDDING = 0.52;
-export const CHAOS_MIN_LEXICAL = 0.34;
+export const CHAOS_MIN_FINAL_SCORE = 0.64;
+export const CHAOS_MIN_EMBEDDING = 0.58;
+export const CHAOS_MIN_LEXICAL = 0.38;
 export const EMBEDDING_THRESHOLD = 0.44;
 export const LEXICAL_ONLY_THRESHOLD = 0.24;
 
@@ -125,6 +125,22 @@ export const isNearDuplicateChaosReset = (
     (normalizedSummary.includes(normalizedCandidateSummary) || normalizedCandidateSummary.includes(normalizedSummary))
   ) {
     return true;
+  }
+
+  const queryTokens = new Set(tokenize(`${query.title} ${query.summaryForRetrieval}`));
+  const candidateTokens = new Set(tokenize(`${candidate.title} ${candidate.summaryForRetrieval}`));
+  if (queryTokens.size > 0 && candidateTokens.size > 0) {
+    let overlap = 0;
+    for (const token of queryTokens) {
+      if (candidateTokens.has(token)) {
+        overlap += 1;
+      }
+    }
+
+    const overlapRatio = overlap / Math.min(queryTokens.size, candidateTokens.size);
+    if (overlapRatio >= 0.7) {
+      return true;
+    }
   }
 
   return lexical >= CHAOS_DUPLICATE_THRESHOLD || lexical >= CHAOS_SIMILAR_THRESHOLD;
