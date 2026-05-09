@@ -7,7 +7,48 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reportsDir = path.join(root, "reports");
 const dataDir = process.env.DRIFTPET_DATA_DIR?.trim() || path.join(root, "data");
 const dbPath = process.env.DRIFTPET_DB_PATH?.trim() || path.join(dataDir, "app.db");
-const limit = Math.max(1, Math.min(100, Number(process.argv[2] ?? 30) || 30));
+
+const args = process.argv.slice(2);
+
+const readOption = (name) => {
+  const prefix = `${name}=`;
+  const inline = args.find((arg) => arg.startsWith(prefix));
+  if (inline !== undefined) {
+    return inline.slice(prefix.length);
+  }
+
+  const index = args.indexOf(name);
+  if (index !== -1) {
+    return args[index + 1] ?? "";
+  }
+
+  return null;
+};
+
+const firstPositional = args.find((arg) => !arg.startsWith("--"));
+const limit = Math.max(1, Math.min(100, Number(readOption("--limit") ?? firstPositional ?? 30) || 30));
+const sinceInput = readOption("--since") ?? process.env.DRIFTPET_REVIEW_SINCE ?? null;
+
+const parseSince = (value) => {
+  if (value === null || value.trim().length === 0) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric;
+  }
+
+  const parsed = Date.parse(trimmed);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  throw new Error(`Invalid --since value: ${value}`);
+};
+
+const sinceMs = parseSince(sinceInput);
 
 const formatDate = (value) => {
   return new Intl.DateTimeFormat("en-CA", {
@@ -110,6 +151,7 @@ const sql = `
   FROM cards
   INNER JOIN items ON items.id = cards.item_id
   WHERE items.origin = 'real'
+    ${sinceMs === null ? "" : `AND cards.created_at >= ${sinceMs}`}
   ORDER BY cards.created_at DESC
   LIMIT ${limit}
 `;
@@ -164,6 +206,8 @@ const summary = {
   generatedAt: new Date().toISOString(),
   dbPath,
   requestedLimit: limit,
+  since: sinceInput,
+  sinceMs,
   cards: cards.length,
   bySource: cards.reduce((acc, card) => {
     acc[card.source] = (acc[card.source] ?? 0) + 1;
@@ -183,6 +227,7 @@ const markdown = [
   "",
   `- Database: \`${dbPath}\``,
   `- Cards exported: ${summary.cards}`,
+  `- Since: ${summary.since ?? "not filtered"}`,
   `- Flagged by heuristics: ${summary.flaggedCards}`,
   `- Sources: ${Object.entries(summary.bySource).map(([source, count]) => `${source}=${count}`).join(", ") || "none"}`,
   "",
@@ -234,4 +279,5 @@ console.log(JSON.stringify({
   jsonPath,
   cards: summary.cards,
   flaggedCards: summary.flaggedCards,
+  since: summary.since,
 }, null, 2));
