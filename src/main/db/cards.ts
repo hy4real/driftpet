@@ -1,5 +1,7 @@
 import type { CardRecord, RelatedCardRef } from "../types/card";
+import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
 import { getDatabase } from "./client";
+import { getPref } from "./prefs";
 
 type CardRow = {
   id: number;
@@ -27,6 +29,10 @@ export const parseRelated = (value: string | null): RelatedCardRef[] => {
   }
 };
 
+const getLatestClaudeDispatch = (cardId: number) => {
+  return parseClaudeDispatchMeta(getPref(getClaudeDispatchPrefKey(cardId)));
+};
+
 export const mapCardRow = (row: CardRow): CardRecord => {
   return {
     id: row.id,
@@ -37,7 +43,8 @@ export const mapCardRow = (row: CardRow): CardRecord => {
     summaryForRetrieval: row.summary_for_retrieval,
     related: parseRelated(row.related_card_ids),
     petRemark: row.pet_remark,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    latestClaudeDispatch: getLatestClaudeDispatch(row.id)
   };
 };
 
@@ -60,4 +67,28 @@ export const getRecentCards = (): CardRecord[] => {
   `).all() as CardRow[];
 
   return rows.map(mapCardRow);
+};
+
+export const deleteCardById = (cardId: number): boolean => {
+  const db = getDatabase();
+
+  const row = db.prepare(`
+    SELECT id, item_id
+    FROM cards
+    WHERE id = ?
+    LIMIT 1
+  `).get(cardId) as { id: number; item_id: number } | undefined;
+
+  if (row === undefined) {
+    return false;
+  }
+
+  const deleteTransaction = db.transaction((targetCardId: number, targetItemId: number) => {
+    db.prepare(`DELETE FROM card_embeddings WHERE card_id = ?`).run(targetCardId);
+    db.prepare(`DELETE FROM cards WHERE id = ?`).run(targetCardId);
+    db.prepare(`DELETE FROM items WHERE id = ?`).run(targetItemId);
+  });
+
+  deleteTransaction(row.id, row.item_id);
+  return true;
 };

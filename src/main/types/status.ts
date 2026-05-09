@@ -1,5 +1,6 @@
 import type { ItemOrigin, UrlExtractionStage } from "./item";
 import type { RelatedCardRef } from "./card";
+import type { ClaudeDispatchMeta } from "./claude";
 import type { TelegramPollerLifecycle } from "../telegram/poller-runtime";
 
 export type StatusLevel = "ok" | "warn" | "idle";
@@ -23,6 +24,7 @@ export type LatestCaptureCardStatus = {
   knowledgeTag: string;
   petRemark: string;
   related: RelatedCardRef[];
+  latestClaudeDispatch: ClaudeDispatchMeta | null;
 };
 
 export type LatestCaptureExtractionStatus = {

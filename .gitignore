@@ -7,6 +7,7 @@ dist-electron
 reports
 data/app.db
 data/*.db-*
+data/claude-dispatches/
 data/pets/
 *.log
 .DS_Store

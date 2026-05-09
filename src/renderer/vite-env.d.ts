@@ -3,6 +3,7 @@
 import type { CardRecord } from "../main/types/card";
 import type { ClipboardOffer } from "../main/clipboard/watcher";
 import type { AppStatus } from "../main/types/status";
+import type { ClaudeDispatchMeta } from "../main/types/claude";
 
 type PetInfo = {
   slug: string;
@@ -10,13 +11,23 @@ type PetInfo = {
   isBuiltin: boolean;
 };
 
+type ClaudeDispatchSettings = {
+  terminalApp: string;
+  workingDirectory: string;
+  continuityMode: "continuous" | "isolated";
+};
+
 declare global {
   interface Window {
     driftpet: {
       showDemo: () => Promise<CardRecord>;
       listRecentCards: () => Promise<CardRecord[]>;
+      deleteCard: (cardId: number) => Promise<boolean>;
       getStatus: () => Promise<AppStatus>;
+      getClaudeDispatchSettings: () => Promise<ClaudeDispatchSettings>;
+      setClaudeDispatchSettings: (settings: ClaudeDispatchSettings) => Promise<ClaudeDispatchSettings>;
       ingestChaosReset: (rawText: string) => Promise<CardRecord>;
+      dispatchClaudeCode: (cardId: number) => Promise<ClaudeDispatchMeta>;
       setPetHourlyBudget: (value: number) => Promise<number>;
       setWindowSize: (windowSize: "mini" | "compact" | "expanded") => Promise<void>;
       setMiniBubbleVisible: (visible: boolean) => Promise<void>;

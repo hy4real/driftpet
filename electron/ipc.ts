@@ -1,7 +1,11 @@
 import { BrowserWindow, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
-import { getRecentCards } from "../src/main/db/cards";
+import { deleteCardById, getRecentCards } from "../src/main/db/cards";
+import { getPref, setPref } from "../src/main/db/prefs";
 import { ingestChaosReset } from "../src/main/ingest/ingest";
+import { launchClaudeCodeTask, getClaudeDispatchPrefKey } from "../src/main/claude/dispatch";
+import { getClaudeDispatchSettings, setClaudeDispatchSettings } from "../src/main/claude/settings";
 import type { CardRecord } from "../src/main/types/card";
+import type { ClaudeDispatchMeta } from "../src/main/types/claude";
 import { setPetHourlyBudget } from "../src/main/pet/runtime";
 import type { AppStatus } from "../src/main/types/status";
 import { getAppStatus } from "../src/main/status/app-status";
@@ -71,9 +75,59 @@ export const registerIpcHandlers = (
     return getRecentCards();
   });
 
+  ipcMain.handle("cards:delete", async (_event, cardId: number): Promise<boolean> => {
+    return deleteCardById(cardId);
+  });
+
+  ipcMain.handle("card:dispatch-claude-code", async (_event, cardId: number): Promise<ClaudeDispatchMeta> => {
+    const card = getRecentCards().find((entry) => entry.id === cardId);
+    if (card === undefined) {
+      throw new Error(`card not found: ${cardId}`);
+    }
+
+    const status = await getAppStatus();
+    const settings = getClaudeDispatchSettings();
+    try {
+      const result = await launchClaudeCodeTask({
+        card,
+        rememberedThread: settings.continuityMode === "continuous" ? status.pet.rememberedThread : null,
+        recentCards: getRecentCards(),
+      });
+
+      setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(result));
+      return result;
+    } catch (error) {
+      const failedResult: ClaudeDispatchMeta = {
+        command: "",
+        promptPath: "",
+        runner: "",
+        cwd: settings.workingDirectory,
+        createdAt: Date.now(),
+        status: "failed",
+        error: error instanceof Error ? error.message : "Claude Code dispatch failed.",
+      };
+      setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(failedResult));
+      throw error;
+    }
+  });
+
   ipcMain.handle("app:get-status", async (): Promise<AppStatus> => {
     return getAppStatus();
   });
+
+  ipcMain.handle("claude:get-dispatch-settings", async (): Promise<{ terminalApp: string; workingDirectory: string; continuityMode: "continuous" | "isolated" }> => {
+    return getClaudeDispatchSettings();
+  });
+
+  ipcMain.handle(
+    "claude:set-dispatch-settings",
+    async (
+      _event,
+      settings: { terminalApp: string; workingDirectory: string; continuityMode: "continuous" | "isolated" }
+    ): Promise<{ terminalApp: string; workingDirectory: string; continuityMode: "continuous" | "isolated" }> => {
+      return setClaudeDispatchSettings(settings);
+    }
+  );
 
   ipcMain.handle("ingest:chaos-reset", async (_event, rawText: string): Promise<CardRecord> => {
     const card = await ingestChaosReset(rawText);

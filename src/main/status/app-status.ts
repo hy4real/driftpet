@@ -1,11 +1,14 @@
 import { getDatabase } from "../db/client";
 import { getPref } from "../db/prefs";
+import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
+import { getClaudeDispatchSettings } from "../claude/settings";
 import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
 import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import { decideAutoSurface } from "../pet/runtime";
 import { getTelegramPollerRuntimeState } from "../telegram/poller-runtime";
 import type { AppStatus, LatestItemStatus, RememberedThread, StatusLevel } from "../types/status";
+import type { ClaudeDispatchMeta } from "../types/claude";
 import type { RelatedCardRef } from "../types/card";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
 import { normalizeText, truncate } from "../utils/text";
@@ -164,9 +167,14 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
         useFor: row.use_for,
         knowledgeTag: row.knowledge_tag,
         petRemark: row.pet_remark,
-        related: parseRelated(row.related_card_ids)
+        related: parseRelated(row.related_card_ids),
+        latestClaudeDispatch: getLatestClaudeDispatch(row.card_id)
       }
   };
+};
+
+const getLatestClaudeDispatch = (cardId: number): ClaudeDispatchMeta | null => {
+  return parseClaudeDispatchMeta(getPref(getClaudeDispatchPrefKey(cardId)));
 };
 
 const getCounts = (): CountsRow => {
@@ -350,6 +358,7 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
 
 const getPetSection = (): AppStatus["pet"] => {
   const decision = decideAutoSurface();
+  const continuityMode = getClaudeDispatchSettings().continuityMode;
 
   return {
     enabled: true,
@@ -361,7 +370,7 @@ const getPetSection = (): AppStatus["pet"] => {
     hourlyBudget: decision.hourlyBudget,
     shownThisHour: decision.shownThisHour,
     canSurfaceAuto: decision.allowed,
-    rememberedThread: getRememberedThread()
+    rememberedThread: continuityMode === "continuous" ? getRememberedThread() : null
   };
 };
 

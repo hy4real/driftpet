@@ -1,3 +1,5 @@
+import type { ClaudeDispatchMeta } from "./claude";
+
 export type RelatedCardRef = {
   cardId: number;
   title: string;
@@ -14,4 +16,5 @@ export type CardRecord = {
   related: RelatedCardRef[];
   petRemark: string;
   createdAt: number;
+  latestClaudeDispatch?: ClaudeDispatchMeta | null;
 };
