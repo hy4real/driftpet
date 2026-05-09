@@ -96,8 +96,11 @@ const qualityFlagsFor = (row, related) => {
   if (title.length === 0 || title.length > 80) {
     flags.push("title");
   }
-  if (useFor.length === 0 || useFor.length > 180) {
+  if (useFor.length === 0 || useFor.length > 300) {
     flags.push("next-step");
+  }
+  if (/next concrete output|first five-minute step|下一条具体产出|第?一?个?五分钟动作/i.test(useFor)) {
+    flags.push("generic-next-step");
   }
   if (/write the smallest deliverable|最小可交付|todo/i.test(useFor)) {
     flags.push("meta-next-step");
