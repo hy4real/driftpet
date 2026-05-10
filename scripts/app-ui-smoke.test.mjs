@@ -751,8 +751,9 @@ test("status panel shows the latest Telegram processing result", async () => {
   });
 
   assert.match(container.textContent ?? "", /last update · 232043301/);
+  assert.match(container.textContent ?? "", /笔记已接住：/);
   assert.match(container.textContent ?? "", /https:\/\/b23\.tv\/Cmz4QJI/);
-  assert.match(container.textContent ?? "", /result · created_or_updated_card/);
+  assert.match(container.textContent ?? "", /result · 已生成或更新卡片/);
   assert.match(container.textContent ?? "", /AI\/Bilibili/);
 
   await act(async () => {

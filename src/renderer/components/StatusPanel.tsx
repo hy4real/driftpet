@@ -52,6 +52,26 @@ const extractionLabel = (state: "not_applicable" | "fallback" | "extracted" | "f
   return "不适用";
 };
 
+const telegramResultLabel = (value: string | null): string | null => {
+  if (value === null) {
+    return null;
+  }
+
+  if (value === "created_or_updated_card") {
+    return "已生成或更新卡片";
+  }
+
+  if (value === "dedup_reused_existing_card") {
+    return "命中去重，复用已有卡片";
+  }
+
+  if (value === "ignored_empty_text_or_caption") {
+    return "消息已收到，但正文为空";
+  }
+
+  return value;
+};
+
 export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const lastTelegramResult = status?.telegram.lastProcessedResult ?? null;
@@ -122,11 +142,14 @@ export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelP
               {lastTelegramResult !== null ? (
                 <>
                   <small>{`last update · ${lastTelegramResult.updateId}`}</small>
+                  {lastTelegramResult.cardTitle !== null ? (
+                    <small>{summarize(lastTelegramResult.cardTitle, 180)}</small>
+                  ) : null}
                   {lastTelegramResult.rawUrl !== null ? (
                     <small>{summarize(lastTelegramResult.rawUrl, 180)}</small>
                   ) : null}
-                  {lastTelegramResult.note !== null ? (
-                    <small>{`result · ${lastTelegramResult.note}`}</small>
+                  {telegramResultLabel(lastTelegramResult.note) !== null ? (
+                    <small>{`result · ${telegramResultLabel(lastTelegramResult.note)}`}</small>
                   ) : null}
                   {lastTelegramResult.artifactPath !== undefined && lastTelegramResult.artifactPath !== null ? (
                     <small>{summarize(lastTelegramResult.artifactPath, 180)}</small>
