@@ -7,14 +7,18 @@ const DEFAULT_HOURLY_BUDGET = 3;
 const MIN_HOURLY_BUDGET = 0;
 const MAX_HOURLY_BUDGET = 9;
 const HOUR_MS = 60 * 60 * 1000;
+export const AUTO_SURFACE_COOLDOWN_MS = 10 * 60 * 1000;
 
-type AutoSurfaceReason = "ok" | "budget_reached";
+export type AutoSurfaceReason = "ok" | "budget_reached" | "cooldown";
 
 export type AutoSurfaceDecision = {
   allowed: boolean;
   hourlyBudget: number;
   shownThisHour: number;
   reason: AutoSurfaceReason;
+  lastShownAt: number | null;
+  cooldownMs: number;
+  cooldownRemainingMs: number;
 };
 
 const clampBudget = (value: number): number => {
@@ -52,6 +56,19 @@ export const getShownAutoCardsThisHour = (): number => {
   return row.count;
 };
 
+export const getLastAutoCardShownAt = (): number | null => {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT created_at AS createdAt
+    FROM events
+    WHERE type = 'card_shown_auto'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get() as { createdAt: number } | undefined;
+
+  return row?.createdAt ?? null;
+};
+
 const appendEvent = (type: string, payload: unknown): void => {
   const db = getDatabase();
   db.prepare(`
@@ -81,13 +98,32 @@ export const recordAutoCardSuppressed = (
 export const decideAutoSurface = (): AutoSurfaceDecision => {
   const hourlyBudget = getPetHourlyBudget();
   const shownThisHour = getShownAutoCardsThisHour();
+  const lastShownAt = getLastAutoCardShownAt();
+  const cooldownRemainingMs = lastShownAt === null
+    ? 0
+    : Math.max(0, AUTO_SURFACE_COOLDOWN_MS - (Date.now() - lastShownAt));
 
   if (shownThisHour >= hourlyBudget) {
     return {
       allowed: false,
       hourlyBudget,
       shownThisHour,
-      reason: "budget_reached"
+      reason: "budget_reached",
+      lastShownAt,
+      cooldownMs: AUTO_SURFACE_COOLDOWN_MS,
+      cooldownRemainingMs
+    };
+  }
+
+  if (cooldownRemainingMs > 0) {
+    return {
+      allowed: false,
+      hourlyBudget,
+      shownThisHour,
+      reason: "cooldown",
+      lastShownAt,
+      cooldownMs: AUTO_SURFACE_COOLDOWN_MS,
+      cooldownRemainingMs
     };
   }
 
@@ -95,6 +131,9 @@ export const decideAutoSurface = (): AutoSurfaceDecision => {
     allowed: true,
     hourlyBudget,
     shownThisHour,
-    reason: "ok"
+    reason: "ok",
+    lastShownAt,
+    cooldownMs: AUTO_SURFACE_COOLDOWN_MS,
+    cooldownRemainingMs
   };
 };

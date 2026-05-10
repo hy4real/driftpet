@@ -51,6 +51,7 @@ type LatestItemRow = {
 
 const DEFAULT_DIGEST_MODEL = "claude-sonnet-4-20250514";
 const TELEGRAM_OFFSET_PREF = "telegram_last_update_id";
+const MINUTE_MS = 60 * 1000;
 
 const formatStatusTime = (value: number | null): string | null => {
   if (value === null) {
@@ -62,6 +63,11 @@ const formatStatusTime = (value: number | null): string | null => {
     minute: "2-digit",
     second: "2-digit"
   });
+};
+
+const formatRemainingMinutes = (value: number): string => {
+  const minutes = Math.max(1, Math.ceil(value / MINUTE_MS));
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
 };
 
 const parseRelated = (value: string | null): RelatedCardRef[] => {
@@ -371,14 +377,19 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
 const getPetSection = (): AppStatus["pet"] => {
   const decision = decideAutoSurface();
   const continuityMode = getClaudeDispatchSettings().continuityMode;
+  const quietDetail = decision.reason === "cooldown"
+    ? `Quiet cooldown for about ${formatRemainingMinutes(decision.cooldownRemainingMs)}; new cards still land in history.`
+    : "Hourly surface budget reached; new cards still land in history.";
 
   return {
     enabled: true,
     level: decision.allowed ? "ok" : "warn",
-    summary: `Focus mode · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`,
+    summary: decision.reason === "cooldown"
+      ? `Focus mode · quiet ${formatRemainingMinutes(decision.cooldownRemainingMs)} · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`
+      : `Focus mode · ${decision.shownThisHour}/${decision.hourlyBudget} shown this hour`,
     detail: decision.allowed
       ? "Auto popups can still surface new cards."
-      : "Hourly surface budget reached; new cards still land in history.",
+      : quietDetail,
     hourlyBudget: decision.hourlyBudget,
     shownThisHour: decision.shownThisHour,
     canSurfaceAuto: decision.allowed,
