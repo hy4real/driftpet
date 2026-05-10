@@ -42,6 +42,15 @@ type ExistingArtifactMatch = {
   matchedBy: "source" | "title";
 };
 
+const isBilibiliHost = (value: string): boolean => {
+  try {
+    const hostname = new URL(value).hostname;
+    return /(^|\.)bilibili\.com$/i.test(hostname) || /(^|\.)b23\.tv$/i.test(hostname);
+  } catch {
+    return false;
+  }
+};
+
 const resolveClaudeTimeoutMs = (): number => {
   const rawValue = process.env.DRIFTPET_CLAUDE_TIMEOUT_MS?.trim() ?? "";
   const parsed = Number(rawValue);
@@ -76,7 +85,7 @@ const expandShortVideoUrl = async (url: string): Promise<string> => {
 
 const buildPrompt = (url: string, kind: UrlNoteKind): string => {
   if (kind === "video") {
-    const isBilibili = /(^|\.)bilibili\.com$/i.test(new URL(url).hostname);
+    const isBilibili = isBilibiliHost(url);
     return [
       "/video-to-note",
       url,
@@ -363,7 +372,7 @@ const normalizeLooseText = (value: string): string => {
 };
 
 const resolveVideoOutputDir = (url: string): string => {
-  const platform = /(^|\.)bilibili\.com$/i.test(new URL(url).hostname) ? "bilibili" : "youtube";
+  const platform = isBilibiliHost(url) ? "bilibili" : "youtube";
   return path.join(VAULT_DIR, platform === "bilibili" ? "AI/Bilibili" : "AI/YouTube");
 };
 
@@ -460,7 +469,7 @@ const writeFallbackVideoNote = async (
     };
   }
 
-  const platform = /(^|\.)bilibili\.com$/i.test(new URL(metadata.url).hostname) ? "bilibili" : "youtube";
+  const platform = isBilibiliHost(metadata.url) ? "bilibili" : "youtube";
   const outputDir = resolveVideoOutputDir(metadata.url);
   fs.mkdirSync(outputDir, { recursive: true });
 

@@ -13,6 +13,10 @@ import {
   markTelegramPollerStarting,
   markTelegramPollerStopped
 } from "./poller-runtime";
+import {
+  persistTelegramPollerRuntimeState,
+  persistTelegramProcessResult
+} from "./poller-prefs";
 
 ensureEnvLoaded();
 
@@ -63,6 +67,23 @@ const RETRY_DELAY_MS = 1500;
 const CONFLICT_RETRY_DELAY_MS = 5000;
 const REPORT_PREF_PREFIX = "telegram_report_sent:";
 
+const preview = (value: string | undefined, limit = 160): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, limit - 3)}...`;
+};
+
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -81,6 +102,18 @@ const getTelegramOffset = (): number => {
 
 const persistTelegramOffset = (updateId: number): void => {
   setPref(TELEGRAM_OFFSET_PREF, String(updateId));
+};
+
+const syncPersistedRuntimeState = (): void => {
+  persistTelegramPollerRuntimeState({
+    enabled: true,
+    active: false,
+    lifecycle: "stopped",
+    lastOffset: getTelegramOffset(),
+    lastPollAt: null,
+    lastSuccessAt: null,
+    lastError: null
+  });
 };
 
 const buildUpdatesUrl = (token: string, offset: number): string => {
@@ -215,6 +248,25 @@ export const processTelegramUpdates = async (
           ...enriched,
           digestOverride: buildDigestOverride(enriched)
         });
+        persistTelegramProcessResult({
+          updateId: update.update_id,
+          tgMessageId: enriched.tgMessageId,
+          source: enriched.source,
+          rawUrl: enriched.rawUrl,
+          created: result.created,
+          cardId: result.card.id,
+          cardTitle: result.card.title,
+          processor: enriched.processor ?? null,
+          extractionStage: enriched.extractionStage ?? null,
+          itemStatus: enriched.itemStatus ?? null,
+          textPreview: preview(update.message.text),
+          captionPreview: preview(update.message.caption),
+          entityTypes: [
+            ...(update.message.entities ?? []).map((entity) => entity.type),
+            ...(update.message.caption_entities ?? []).map((entity) => entity.type)
+          ],
+          note: result.created ? "created_or_updated_card" : "dedup_reused_existing_card"
+        });
         if (result.created) {
           onCardCreated(result.card);
         }
@@ -226,6 +278,26 @@ export const processTelegramUpdates = async (
           result.card,
           result.created
         );
+      } else {
+        persistTelegramProcessResult({
+          updateId: update.update_id,
+          tgMessageId: `${update.message.chat.id}:${update.message.message_id}`,
+          source: null,
+          rawUrl: null,
+          created: null,
+          cardId: null,
+          cardTitle: null,
+          processor: null,
+          extractionStage: null,
+          itemStatus: null,
+          textPreview: preview(update.message.text),
+          captionPreview: preview(update.message.caption),
+          entityTypes: [
+            ...(update.message.entities ?? []).map((entity) => entity.type),
+            ...(update.message.caption_entities ?? []).map((entity) => entity.type)
+          ],
+          note: "ignored_empty_text_or_caption"
+        });
       }
     }
 
@@ -241,19 +313,21 @@ export const startTelegramPoller = ({
 }: StartTelegramPollerArgs): (() => void) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (token === undefined || token.length === 0) {
-    markTelegramPollerDisabled("TELEGRAM_BOT_TOKEN is not set.");
+    const state = markTelegramPollerDisabled("TELEGRAM_BOT_TOKEN is not set.");
+    persistTelegramPollerRuntimeState(state);
     console.log("[driftpet] Telegram 轮询已关闭：TELEGRAM_BOT_TOKEN 未设置。");
     return () => {};
   }
 
   let active = true;
   const controller = new AbortController();
+  syncPersistedRuntimeState();
 
   const loop = async (): Promise<void> => {
     while (active) {
       try {
         const offset = getTelegramOffset();
-        markTelegramPollerStarting(offset);
+        persistTelegramPollerRuntimeState(markTelegramPollerStarting(offset));
         const response = await fetch(buildUpdatesUrl(token, offset), {
           signal: AbortSignal.any([AbortSignal.timeout((TELEGRAM_TIMEOUT_SECONDS + 5) * 1000), controller.signal])
         });
@@ -272,7 +346,7 @@ export const startTelegramPoller = ({
             : `Telegram getUpdates failed with HTTP ${response.status}.`;
 
           if (response.status === 409) {
-            markTelegramPollerConflict(description);
+            persistTelegramPollerRuntimeState(markTelegramPollerConflict(description));
             console.error("[driftpet] Telegram 轮询冲突:", description);
             await sleep(CONFLICT_RETRY_DELAY_MS);
             continue;
@@ -290,7 +364,7 @@ export const startTelegramPoller = ({
           const errorPayload = parsedResponse as TelegramApiErrorResponse;
           if (errorPayload.error_code === 409) {
             const description = errorPayload.description ?? "Telegram getUpdates conflict.";
-            markTelegramPollerConflict(description);
+            persistTelegramPollerRuntimeState(markTelegramPollerConflict(description));
             console.error("[driftpet] Telegram 轮询冲突:", description);
             await sleep(CONFLICT_RETRY_DELAY_MS);
             continue;
@@ -300,7 +374,7 @@ export const startTelegramPoller = ({
         }
 
         const processedOffset = await processTelegramUpdates(token, payload.result, onCardCreated);
-        markTelegramPollerPollSucceeded(processedOffset);
+        persistTelegramPollerRuntimeState(markTelegramPollerPollSucceeded(processedOffset));
       } catch (error) {
         if (!active) {
           break;
@@ -311,7 +385,7 @@ export const startTelegramPoller = ({
         }
 
         const message = error instanceof Error ? error.message : "Telegram poller failed.";
-        markTelegramPollerError(message);
+        persistTelegramPollerRuntimeState(markTelegramPollerError(message));
         console.error("[driftpet] Telegram 轮询异常:", error);
         await sleep(RETRY_DELAY_MS);
       }
@@ -323,6 +397,6 @@ export const startTelegramPoller = ({
   return () => {
     active = false;
     controller.abort();
-    markTelegramPollerStopped();
+    persistTelegramPollerRuntimeState(markTelegramPollerStopped());
   };
 };

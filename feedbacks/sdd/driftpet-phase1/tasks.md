@@ -19,7 +19,7 @@ Status legend:
 
 ### T1. Freeze the implementation boundary
 
-- Status: `待执行`
+- Status: `已通过`
 - Scope:
   - confirm Phase 1 only covers desktop-pet presence and Telegram link handoff
   - confirm click-to-chat and simple memory remain deferred
@@ -27,10 +27,11 @@ Status legend:
   - plan and tasks remain aligned with the approved spec
 - Verification:
   - manual review against `spec.md`
+  - repository workflow baseline updated to `workflow-portable`
 
 ### T2. Add controlled pet drag and direction state
 
-- Status: `待执行`
+- Status: `已通过`
 - Scope:
   - design or implement explicit drag-state handling for the pet window
   - expose any needed IPC to move the window during drag
@@ -39,12 +40,12 @@ Status legend:
   - the pet can be dragged freely
   - drag direction can drive visible movement state
 - Verification:
-  - targeted UI test or manual verification path
+  - `npm run test:ui-smoke`
   - `npm run typecheck`
 
 ### T3. Tighten basic pet aliveness
 
-- Status: `待执行`
+- Status: `已通过`
 - Scope:
   - keep or refine blink / idle loop
   - make cursor contact trigger a visible reaction
@@ -52,12 +53,12 @@ Status legend:
 - Expected output:
   - the startup pet presence satisfies the minimal acceptance experience
 - Verification:
-  - UI smoke coverage where practical
-  - manual visual verification if needed
+  - `npm run test:ui-smoke`
+  - manual visual verification still recommended before phase close
 
 ### T4. Replace `tg_url` local extraction with note-runner routing
 
-- Status: `待执行`
+- Status: `已通过`
 - Scope:
   - stop treating every Telegram URL as local article text extraction
   - add URL classification into `video` or `article`
@@ -65,12 +66,12 @@ Status legend:
 - Expected output:
   - `tg_url` becomes a note-handoff path instead of a generic digest path
 - Verification:
-  - targeted unit tests for routing
-  - regression check for Telegram parsing
+  - `npm run test:telegram-parse`
+  - `npm run test:url-note-runner`
 
 ### T5. Build the vault note runner boundary
 
-- Status: `待执行`
+- Status: `待验收`
 - Scope:
   - run `video-to-note` for video URLs
   - run `article-to-note` for article URLs
@@ -80,13 +81,14 @@ Status legend:
 - Expected output:
   - deterministic runner behavior with explicit success/failure reporting
 - Verification:
-  - runner-level test or probe
-  - artifact path capture confirmed
-  - completion report confirmed
+  - `npm run test:telegram-note-workflow`
+  - `node --test scripts/telegram-note-poller-integration.test.mjs`
+  - `node --test src/main/telegram/poller-report.test.mjs`
+  - real vault write with one video URL and one article URL still pending manual acceptance
 
 ### T6. Final reporting and verification
 
-- Status: `待执行`
+- Status: `执行中`
 - Scope:
   - ensure the system reports task completion and produced artifacts back to the user
   - run repo verification
@@ -95,7 +97,12 @@ Status legend:
 - Verification:
   - `npm run typecheck`
   - `npm run check:repo`
-  - any new targeted tests
+  - `npm run test:ui-smoke`
+  - `npm run test:telegram-parse`
+  - `npm run test:telegram-note-workflow`
+  - `npm run test:url-note-runner`
+  - `node --test scripts/telegram-note-poller-integration.test.mjs`
+  - `node --test src/main/telegram/poller-report.test.mjs`
 
 ## Execution Order
 
@@ -109,10 +116,10 @@ Status legend:
 ## Blockers / Smallest Next Move
 
 Current blocker status:
-- `待执行` only; no active hard blocker yet
+- 无自动化阻塞；当前剩余的是 Phase 1 手动验收口
 
 Most likely blocker:
-- the exact external command path for launching Claude + skill execution in `/Users/mac/my-obsidian-vault`
+- real-world Claude / skill execution against `/Users/mac/my-obsidian-vault` may still differ from the mocked test contract
 
 If blocked there, the smallest next move is:
-- capture the exact command contract for invoking Claude with `video-to-note` and `article-to-note` in that vault directory before implementation starts
+- send one real article URL and one real video URL through Telegram, then record produced artifact paths and any runner mismatch

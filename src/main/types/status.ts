@@ -71,6 +71,23 @@ export type AppStatus = {
     lastPollAt: number | null;
     lastSuccessAt: number | null;
     lastError: string | null;
+    lastProcessedResult: {
+      updateId: number;
+      tgMessageId: string | null;
+      source: string | null;
+      rawUrl: string | null;
+      created: boolean | null;
+      cardId: number | null;
+      cardTitle: string | null;
+      processor: string | null;
+      extractionStage: string | null;
+      itemStatus: string | null;
+      textPreview: string | null;
+      captionPreview: string | null;
+      entityTypes: string[];
+      note: string | null;
+      updatedAt: number;
+    } | null;
   };
   llm: StatusSection & {
     enabled: boolean;

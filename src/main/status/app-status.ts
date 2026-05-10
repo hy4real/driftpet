@@ -7,6 +7,10 @@ import { canUseLlm, getLlmMissingReason } from "../llm/client";
 import { canUseEmbeddings, getEmbeddingMissingReason } from "../llm/embeddings";
 import { decideAutoSurface } from "../pet/runtime";
 import { getTelegramPollerRuntimeState } from "../telegram/poller-runtime";
+import {
+  readPersistedTelegramPollerRuntimeState,
+  readPersistedTelegramProcessResult
+} from "../telegram/poller-prefs";
 import type { AppStatus, LatestItemStatus, RememberedThread, StatusLevel } from "../types/status";
 import type { ClaudeDispatchMeta } from "../types/claude";
 import type { RelatedCardRef } from "../types/card";
@@ -301,11 +305,18 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
   const lastUpdateId = parsedOffset !== null && Number.isFinite(parsedOffset)
     ? parsedOffset
     : null;
-  const runtime = getTelegramPollerRuntimeState();
+  const inMemoryRuntime = getTelegramPollerRuntimeState();
+  const persistedRuntime = readPersistedTelegramPollerRuntimeState();
+  const runtime = inMemoryRuntime.lastPollAt !== null || inMemoryRuntime.lastSuccessAt !== null || inMemoryRuntime.lastError !== null
+    ? inMemoryRuntime
+    : persistedRuntime ?? inMemoryRuntime;
+  const lastProcessedResult = readPersistedTelegramProcessResult();
 
   let level: StatusLevel = "warn";
   let summary = "Telegram disabled";
   let detail = "Set TELEGRAM_BOT_TOKEN to enable phone-to-pet capture.";
+
+  const hasSuccessfulPoll = runtime.lastSuccessAt !== null;
 
   if (!enabled) {
     level = "warn";
@@ -319,13 +330,13 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
     level = "warn";
     summary = "Polling degraded";
     detail = runtime.lastError ?? "Telegram poller hit an unexpected error.";
-  } else if (runtime.lifecycle === "starting") {
+  } else if (runtime.lifecycle === "starting" && !hasSuccessfulPoll) {
     level = "idle";
     summary = "Poller starting";
     detail = lastUpdateId === null
       ? "Booting the Telegram poller."
       : `Booting from offset ${lastUpdateId}.`;
-  } else if (runtime.lifecycle === "stopped") {
+  } else if (runtime.lifecycle === "stopped" && !hasSuccessfulPoll) {
     level = "warn";
     summary = "Poller stopped";
     detail = "The app is open, but Telegram polling is not active.";
@@ -352,7 +363,8 @@ const getTelegramSection = (recentTelegramItems: number): AppStatus["telegram"] 
     pollerState: runtime.lifecycle,
     lastPollAt: runtime.lastPollAt,
     lastSuccessAt: runtime.lastSuccessAt,
-    lastError: runtime.lastError
+    lastError: runtime.lastError,
+    lastProcessedResult
   };
 };
 
