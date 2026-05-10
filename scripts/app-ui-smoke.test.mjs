@@ -14,6 +14,8 @@ const rendererPetUiState = path.resolve("src/renderer/pet-ui-state.ts");
 const rendererStyles = path.resolve("src/renderer/styles.css");
 const require = createRequire(import.meta.url);
 const localTempRoot = path.resolve(".tmp");
+const sampleVaultDir = "/tmp/driftpet-vault";
+const sampleRepoDir = "/tmp/driftpet-repo";
 
 const sampleCard = {
   id: 17,
@@ -59,7 +61,7 @@ const sampleStatus = {
       tgMessageId: "5100853111:13",
       source: "tg_url",
       rawUrl: "https://b23.tv/Cmz4QJI",
-      artifactPath: "/Users/mac/my-obsidian-vault/AI/Bilibili/【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md",
+      artifactPath: `${sampleVaultDir}/AI/Bilibili/【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md`,
       created: true,
       cardId: 40,
       cardTitle: "【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！",
@@ -246,7 +248,7 @@ const setupDom = () => {
   let latestClaudeDispatch = null;
   let claudeDispatchSettings = {
     terminalApp: "Ghostty",
-    workingDirectory: "/Users/mac/driftpet",
+    workingDirectory: sampleRepoDir,
     continuityMode: "continuous",
   };
 
@@ -871,12 +873,12 @@ test("settings panel can switch Claude terminal and working directory", async ()
   assert.deepEqual(claudeDispatchSettingWrites[0], {
     continuityMode: "continuous",
     terminalApp: "Terminal",
-    workingDirectory: "/Users/mac/driftpet",
+    workingDirectory: sampleRepoDir,
   });
   assert.deepEqual(claudeDispatchSettingWrites[1], {
     continuityMode: "isolated",
     terminalApp: "Terminal",
-    workingDirectory: "/Users/mac/driftpet",
+    workingDirectory: sampleRepoDir,
   });
   assert.ok(claudeDispatchSettingWrites.length >= 2, "expected at least two settings writes");
 

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+const sampleVaultDir = "/tmp/driftpet-vault";
+
 const buildDigestOverride = (enriched) => (
   enriched.processor === null
   || enriched.workflowTitle === null
@@ -20,7 +22,7 @@ const buildDigestOverride = (enriched) => (
 test("buildDigestOverride returns deterministic card payload for note workflow", () => {
   const enriched = {
     rawText: "https://example.com/post",
-    extractedText: "Skill: article-to-note\n\nArtifact: /Users/mac/my-obsidian-vault/AI/Articles/foo.md",
+    extractedText: `Skill: article-to-note\n\nArtifact: ${sampleVaultDir}/AI/Articles/foo.md`,
     processor: "article-to-note",
     workflowTitle: "foo",
     workflowUseFor: "先看生成的笔记是否落在预期目录，再决定要不要继续做二次 ingest 或整理。",
@@ -32,7 +34,7 @@ test("buildDigestOverride returns deterministic card payload for note workflow",
     title: "foo",
     useFor: "先看生成的笔记是否落在预期目录，再决定要不要继续做二次 ingest 或整理。",
     knowledgeTag: "article-to-note",
-    summaryForRetrieval: "Skill: article-to-note\n\nArtifact: /Users/mac/my-obsidian-vault/AI/Articles/foo.md",
+    summaryForRetrieval: `Skill: article-to-note\n\nArtifact: ${sampleVaultDir}/AI/Articles/foo.md`,
     petRemark: "链接我已经替你送进本地仓库了。"
   });
 });

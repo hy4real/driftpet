@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { ensureEnvLoaded } from "../env";
@@ -20,7 +21,7 @@ export type NoteRunnerResult = {
   lastError: string | null;
 };
 
-const DEFAULT_VAULT_DIR = "/Users/mac/my-obsidian-vault";
+const DEFAULT_VAULT_DIR = path.join(os.homedir(), "my-obsidian-vault");
 const VAULT_DIR = process.env.DRIFTPET_VAULT_DIR?.trim() || DEFAULT_VAULT_DIR;
 const CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_BIN?.trim() || "claude";
 const YT_DLP_BIN = process.env.DRIFTPET_YT_DLP_BIN?.trim() || "yt-dlp";

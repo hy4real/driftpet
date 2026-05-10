@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve("/Users/mac/driftpet");
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(scriptDir, "..");
 const reportsDir = path.join(root, "reports");
 const today = new Date();
 const formatDate = (value) => {
@@ -357,14 +359,14 @@ These are tempting, but the core loop still needs observation.
 Start app:
 
 \`\`\`bash
-cd /Users/mac/driftpet
+cd ${root}
 npm run dev
 \`\`\`
 
 Run verification:
 
 \`\`\`bash
-cd /Users/mac/driftpet
+cd ${root}
 node scripts/overnight-goal.mjs
 \`\`\`
 

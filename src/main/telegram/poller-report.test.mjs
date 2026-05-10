@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+const sampleVaultDir = "/tmp/driftpet-vault";
+
 const summarize = (value, limit) => {
   const normalized = value.trim().replace(/\s+/g, " ");
   if (normalized.length <= limit) {
@@ -32,7 +34,7 @@ const buildTelegramReportText = (enriched, card, created) => {
 test("buildTelegramReportText renders success payload with artifact path", () => {
   const text = buildTelegramReportText({
     itemStatus: "digested",
-    artifactPath: "/Users/mac/my-obsidian-vault/AI/Bilibili/test.md",
+    artifactPath: `${sampleVaultDir}/AI/Bilibili/test.md`,
     extractionError: null,
     lastError: null,
     processor: "video-to-note"
@@ -45,7 +47,7 @@ test("buildTelegramReportText renders success payload with artifact path", () =>
   assert.match(text, /标题：test/);
   assert.match(text, /卡片：#75/);
   assert.match(text, /处理器：video-to-note/);
-  assert.match(text, /产物：\/Users\/mac\/my-obsidian-vault\/AI\/Bilibili\/test\.md/);
+  assert.match(text, /产物：\/tmp\/driftpet-vault\/AI\/Bilibili\/test\.md/);
 });
 
 test("buildTelegramReportText renders failure payload with explanation", () => {
