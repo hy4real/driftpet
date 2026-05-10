@@ -164,6 +164,15 @@ const readArtifactPreview = (artifactPath: string | null): string => {
   }
 };
 
+const inferArtifactTitle = (artifactPath: string | null, fallbackTitle: string): string => {
+  if (artifactPath === null) {
+    return fallbackTitle;
+  }
+
+  const baseName = path.basename(artifactPath, path.extname(artifactPath)).trim();
+  return baseName.length > 0 ? baseName : fallbackTitle;
+};
+
 const runClaudePrompt = async (prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
   return await new Promise((resolve, reject) => {
     const timeoutMs = resolveClaudeTimeoutMs();
@@ -451,7 +460,7 @@ const writeFallbackVideoNote = async (
       kind: "video",
       processor,
       artifactPath: existingArtifact.artifactPath,
-      title: `笔记已接住：${path.basename(existingArtifact.artifactPath)}`,
+      title: inferArtifactTitle(existingArtifact.artifactPath, metadata.title),
       useFor: "视频笔记已经落进本地仓库了。先确认内容是否符合预期，再决定要不要继续收紧 skill 契约。",
       knowledgeTag: processor,
       petRemark: "笔记已经写出来了，我直接把现成产物接回来。",
@@ -535,7 +544,7 @@ const writeFallbackVideoNote = async (
     kind: "video",
     processor: `${processor}:fallback`,
     artifactPath,
-    title: `笔记已接住：${path.basename(artifactPath)}`,
+    title: inferArtifactTitle(artifactPath, metadata.title),
     useFor: "我已经先把视频笔记落进本地仓库了。先确认内容是否够用，再决定要不要继续补全转录链路。",
     knowledgeTag: processor,
     petRemark: "完整转录没拿到，但链接我没有让它掉地上。",
@@ -638,7 +647,7 @@ export const runUrlNoteWorkflow = async (url: string): Promise<NoteRunnerResult>
       kind,
       processor,
       artifactPath,
-      title: `笔记已接住：${path.basename(artifactPath)}`,
+      title: inferArtifactTitle(artifactPath, path.basename(artifactPath, path.extname(artifactPath))),
       useFor: "先看生成的笔记是否落在预期目录，再决定要不要继续做二次 ingest 或整理。",
       knowledgeTag: processor,
       petRemark: "链接我已经替你送进本地仓库了。",

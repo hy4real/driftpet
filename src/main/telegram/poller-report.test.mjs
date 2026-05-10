@@ -38,11 +38,11 @@ test("buildTelegramReportText renders success payload with artifact path", () =>
     processor: "video-to-note"
   }, {
     id: 75,
-    title: "笔记已接住：test.md"
+    title: "test"
   }, true);
 
   assert.match(text, /^✅ 已完成/m);
-  assert.match(text, /标题：笔记已接住：test\.md/);
+  assert.match(text, /标题：test/);
   assert.match(text, /卡片：#75/);
   assert.match(text, /处理器：video-to-note/);
   assert.match(text, /产物：\/Users\/mac\/my-obsidian-vault\/AI\/Bilibili\/test\.md/);

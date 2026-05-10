@@ -151,7 +151,7 @@ test("processTelegramUpdates turns tg_url into note-workflow card with artifact 
     assert.match(row.extractedText, new RegExp(artifactPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.equal(row.extractionError, null);
     assert.equal(row.lastError, null);
-    assert.equal(row.cardTitle, `笔记已接住：${path.basename(artifactPath)}`);
+    assert.equal(row.cardTitle, path.basename(artifactPath, path.extname(artifactPath)));
     assert.equal(row.knowledgeTag, "article-to-note");
     assert.equal(row.petRemark, "链接我已经替你送进本地仓库了。");
   } finally {
