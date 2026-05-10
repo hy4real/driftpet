@@ -76,6 +76,7 @@ export type AppStatus = {
       tgMessageId: string | null;
       source: string | null;
       rawUrl: string | null;
+      artifactPath: string | null;
       created: boolean | null;
       cardId: number | null;
       cardTitle: string | null;

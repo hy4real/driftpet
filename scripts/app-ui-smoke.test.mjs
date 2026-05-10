@@ -54,6 +54,24 @@ const sampleStatus = {
     lastPollAt: Date.now(),
     lastSuccessAt: Date.now(),
     lastError: null,
+    lastProcessedResult: {
+      updateId: 232043301,
+      tgMessageId: "5100853111:13",
+      source: "tg_url",
+      rawUrl: "https://b23.tv/Cmz4QJI",
+      artifactPath: "/Users/mac/my-obsidian-vault/AI/Bilibili/【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md",
+      created: true,
+      cardId: 40,
+      cardTitle: "笔记已接住：【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md",
+      processor: "video-to-note",
+      extractionStage: "note_ingested",
+      itemStatus: "digested",
+      textPreview: "【【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！-哔哩哔哩】 https://b23.tv/Cmz4QJI",
+      captionPreview: null,
+      entityTypes: ["url"],
+      note: "created_or_updated_card",
+      updatedAt: Date.now(),
+    },
   },
   llm: {
     level: "ok",
@@ -135,6 +153,33 @@ const buildAppModule = async () => {
   const moduleExports = require(outfile);
   return {
     App: moduleExports.default ?? moduleExports,
+    cleanupBundle: async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    },
+  };
+};
+
+const buildStatusPanelModule = async () => {
+  await fs.mkdir(localTempRoot, { recursive: true });
+  const tempDir = await fs.mkdtemp(path.join(localTempRoot, "driftpet-status-panel-"));
+  const outfile = path.join(tempDir, "StatusPanel.cjs");
+
+  await build({
+    entryPoints: [path.resolve("src/renderer/components/StatusPanel.tsx")],
+    bundle: true,
+    format: "cjs",
+    platform: "node",
+    outfile,
+    jsx: "automatic",
+    loader: {
+      ".tsx": "tsx",
+    },
+    external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
+  });
+
+  const moduleExports = require(outfile);
+  return {
+    StatusPanel: moduleExports.StatusPanel ?? moduleExports.default ?? moduleExports,
     cleanupBundle: async () => {
       await fs.rm(tempDir, { recursive: true, force: true });
     },
@@ -672,6 +717,43 @@ test("history drawer can dispatch a card to Claude Code", async () => {
   assert.deepEqual(dispatchClaudeCodeCalls, [sampleCard.id], "expected dispatch to receive the selected card id");
   assert.match(container.textContent ?? "", /已派给 Claude Code：claude-test/, "expected in-panel dispatch feedback");
   assert.match(container.textContent ?? "", /Claude 已启动/, "expected latest dispatch state to stay visible on the card");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("status panel shows the latest Telegram processing result", async () => {
+  const { StatusPanel, cleanupBundle } = await buildStatusPanelModule();
+  const { cleanup } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(StatusPanel, {
+      isOpen: true,
+      status: sampleStatus,
+      onClose: () => {},
+      onRefresh: () => {},
+    }));
+  });
+
+  const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("看看详细状态"));
+  assert.ok(detailsButton, "expected details toggle");
+
+  await act(async () => {
+    detailsButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  assert.match(container.textContent ?? "", /last update · 232043301/);
+  assert.match(container.textContent ?? "", /https:\/\/b23\.tv\/Cmz4QJI/);
+  assert.match(container.textContent ?? "", /result · created_or_updated_card/);
+  assert.match(container.textContent ?? "", /AI\/Bilibili/);
 
   await act(async () => {
     root.unmount();

@@ -54,6 +54,7 @@ const extractionLabel = (state: "not_applicable" | "fallback" | "extracted" | "f
 
 export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const lastTelegramResult = status?.telegram.lastProcessedResult ?? null;
 
   return (
     <aside className={`status-panel ${isOpen ? "open" : ""}`}>
@@ -117,6 +118,20 @@ export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelP
               <small>{`poller · ${status.telegram.pollerState}`}</small>
               {status.telegram.lastError !== null ? (
                 <small>{summarize(status.telegram.lastError, 180)}</small>
+              ) : null}
+              {lastTelegramResult !== null ? (
+                <>
+                  <small>{`last update · ${lastTelegramResult.updateId}`}</small>
+                  {lastTelegramResult.rawUrl !== null ? (
+                    <small>{summarize(lastTelegramResult.rawUrl, 180)}</small>
+                  ) : null}
+                  {lastTelegramResult.note !== null ? (
+                    <small>{`result · ${lastTelegramResult.note}`}</small>
+                  ) : null}
+                  {lastTelegramResult.artifactPath !== undefined && lastTelegramResult.artifactPath !== null ? (
+                    <small>{summarize(lastTelegramResult.artifactPath, 180)}</small>
+                  ) : null}
+                </>
               ) : null}
             </article>
 
