@@ -29,6 +29,7 @@ const api = {
   setClaudeDispatchSettings: (settings: ClaudeDispatchSettings): Promise<ClaudeDispatchSettings> => ipcRenderer.invoke("claude:set-dispatch-settings", settings),
   ingestChaosReset: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:chaos-reset", rawText),
   dispatchClaudeCode: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-code", cardId),
+  dispatchClaudeThread: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-thread", cardId),
   setPetHourlyBudget: (value: number): Promise<number> => ipcRenderer.invoke("pet:set-hourly-budget", value),
   setWindowSize: (windowSize: "mini" | "compact" | "expanded"): Promise<void> => ipcRenderer.invoke("pet:set-window-size", windowSize),
   setMiniBubbleVisible: (visible: boolean): Promise<void> => ipcRenderer.invoke("pet:set-mini-bubble-visible", visible),

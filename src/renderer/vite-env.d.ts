@@ -28,6 +28,7 @@ declare global {
       setClaudeDispatchSettings: (settings: ClaudeDispatchSettings) => Promise<ClaudeDispatchSettings>;
       ingestChaosReset: (rawText: string) => Promise<CardRecord>;
       dispatchClaudeCode: (cardId: number) => Promise<ClaudeDispatchMeta>;
+      dispatchClaudeThread: (cardId: number) => Promise<ClaudeDispatchMeta>;
       setPetHourlyBudget: (value: number) => Promise<number>;
       setWindowSize: (windowSize: "mini" | "compact" | "expanded") => Promise<void>;
       setMiniBubbleVisible: (visible: boolean) => Promise<void>;

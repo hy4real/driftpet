@@ -24,10 +24,48 @@ const sampleCard = {
   useFor: "Return to the core desk pet loop and stop widening the shell.",
   knowledgeTag: "thread reset",
   summaryForRetrieval: "ship product work stop polishing infra",
-  related: [],
+  related: [
+    {
+      cardId: 18,
+      title: "Trim portability cleanup into one follow-up",
+      reason: "same work thread",
+    },
+  ],
   petRemark: "This is the active thread.",
   createdAt: Date.now(),
 };
+
+const sampleThreadCard = {
+  id: 18,
+  itemId: 10,
+  title: "Trim portability cleanup into one follow-up",
+  useFor: "Keep the portability cleanup narrow and get back to feature work.",
+  knowledgeTag: "thread reset",
+  summaryForRetrieval: "trim portability cleanup and get back to feature work",
+  related: [],
+  petRemark: "Still part of the same line.",
+  createdAt: sampleCard.createdAt - 1000,
+};
+
+const sampleBacklinkCard = {
+  id: 19,
+  itemId: 11,
+  title: "Thread the next feature through the existing workbench",
+  useFor: "Show continuity in the UI before inventing new storage.",
+  knowledgeTag: "thread mode",
+  summaryForRetrieval: "show continuity in the ui before inventing new storage",
+  related: [
+    {
+      cardId: sampleCard.id,
+      title: sampleCard.title,
+      reason: "depends on the anchor card",
+    },
+  ],
+  petRemark: "This one loops back to the anchor.",
+  createdAt: sampleCard.createdAt - 2000,
+};
+
+const sampleHistory = [sampleCard, sampleThreadCard, sampleBacklinkCard];
 
 const sampleStatus = {
   checkedAt: Date.now(),
@@ -126,7 +164,7 @@ const sampleStatus = {
         useFor: sampleCard.useFor,
         knowledgeTag: sampleCard.knowledgeTag,
         petRemark: sampleCard.petRemark,
-        related: [],
+        related: sampleCard.related,
       },
     },
   },
@@ -243,6 +281,7 @@ const setupDom = () => {
   const setMiniBubbleVisibleCalls = [];
   const moveWindowByCalls = [];
   const dispatchClaudeCodeCalls = [];
+  const dispatchClaudeThreadCalls = [];
   const deleteCardCalls = [];
   const claudeDispatchSettingWrites = [];
   let latestClaudeDispatch = null;
@@ -274,10 +313,10 @@ const setupDom = () => {
 
   window.driftpet = {
     showDemo: async () => sampleCard,
-    listRecentCards: async () => [{
-      ...sampleCard,
+    listRecentCards: async () => sampleHistory.map((card) => ({
+      ...card,
       latestClaudeDispatch,
-    }],
+    })),
     deleteCard: async (cardId) => {
       deleteCardCalls.push(cardId);
       return true;
@@ -299,6 +338,20 @@ const setupDom = () => {
         cwd: "/tmp/driftpet-worktree",
         createdAt: Date.now(),
         status: "launched",
+        mode: "card",
+      };
+      return latestClaudeDispatch;
+    },
+    dispatchClaudeThread: async (cardId) => {
+      dispatchClaudeThreadCalls.push(cardId);
+      latestClaudeDispatch = {
+        command: `claude mock-thread-dispatch ${cardId}`,
+        promptPath: `/tmp/thread-${cardId}.md`,
+        runner: "claude-test",
+        cwd: "/tmp/driftpet-worktree",
+        createdAt: Date.now(),
+        status: "launched",
+        mode: "thread",
       };
       return latestClaudeDispatch;
     },
@@ -337,6 +390,7 @@ const setupDom = () => {
     setMiniBubbleVisibleCalls,
     moveWindowByCalls,
     dispatchClaudeCodeCalls,
+    dispatchClaudeThreadCalls,
     deleteCardCalls,
     claudeDispatchSettingWrites,
     emitClipboardOffer: (offer) => {
@@ -728,6 +782,73 @@ test("history drawer can dispatch a card to Claude Code", async () => {
   await cleanupBundle();
 });
 
+test("workbench shows the active thread bundle in continuous mode", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const threadPanel = container.querySelector(".pet-workbench-thread-panel");
+  assert.ok(threadPanel, "expected an active thread panel in the workbench");
+  assert.match(threadPanel.textContent ?? "", /线头模式/);
+  assert.match(threadPanel.textContent ?? "", /Ship product work instead of polishing infra/);
+  assert.match(threadPanel.textContent ?? "", /Trim portability cleanup into one follow-up/);
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("workbench can dispatch the whole active thread to Claude Code", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeThreadCalls, dispatchClaudeCodeCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const dispatchThreadButton = Array.from(container.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("派给 Claude Code（整条线）")
+  );
+  assert.ok(dispatchThreadButton, "expected thread dispatch button");
+
+  await act(async () => {
+    dispatchThreadButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeThreadCalls, [sampleCard.id], "expected whole-thread dispatch to use the anchor card id");
+  assert.deepEqual(dispatchClaudeCodeCalls, [], "thread dispatch must not fall back to single-card dispatch");
+  assert.match(container.textContent ?? "", /整条线已派给 Claude Code：claude-test/);
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
 test("status panel shows the latest Telegram processing result", async () => {
   const { StatusPanel, cleanupBundle } = await buildStatusPanelModule();
   const { cleanup } = setupDom();
@@ -798,7 +919,11 @@ test("history drawer can delete a remembered card", async () => {
   });
 
   assert.deepEqual(deleteCardCalls, [sampleCard.id], "expected delete to receive the selected card id");
-  assert.equal(container.querySelector(".history-card"), null, "expected deleted card to disappear from history");
+  assert.doesNotMatch(
+    container.textContent ?? "",
+    /Ship product work instead of polishing infra/,
+    "expected the deleted card title to disappear from history"
+  );
 
   await act(async () => {
     root.unmount();

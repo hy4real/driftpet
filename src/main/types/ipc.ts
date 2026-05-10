@@ -12,6 +12,7 @@ export const IPC_CHANNELS = {
   setClaudeDispatchSettings: "claude:set-dispatch-settings",
   cardCreated: "events:card-created",
   dispatchClaudeCode: "card:dispatch-claude-code",
+  dispatchClaudeThread: "card:dispatch-claude-thread",
   petList: "pet:list",
   petActive: "pet:active",
   petSetActive: "pet:set-active",

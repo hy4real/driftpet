@@ -14,7 +14,7 @@ Use this index to tell what is current source-of-truth versus what is historical
 - `sdd-workflow.md`
   How this repo currently uses SDD packets under `feedbacks/sdd/`.
 - `manual-verification-resume-dispatch.md`
-  Current manual QA checklist for remembered-thread resume and Claude Code dispatch.
+  Current manual QA checklist for remembered-thread resume, thread-mode dispatch, and Claude Code dispatch.
 - `plan-remaining.md`
   Current remaining product-work order after the completed Telegram/note-workflow hardening pass.
 
@@ -23,8 +23,11 @@ Use this index to tell what is current source-of-truth versus what is historical
 - `../feedbacks/sdd/driftpet-phase1/spec.md`
 - `../feedbacks/sdd/driftpet-phase1/plan.md`
 - `../feedbacks/sdd/driftpet-phase1/tasks.md`
+- `../feedbacks/sdd/thread-mode/spec.md`
+- `../feedbacks/sdd/thread-mode/plan.md`
+- `../feedbacks/sdd/thread-mode/tasks.md`
 
-These are the active Phase 1 packet files. They outrank older narrative docs when there is overlap.
+These are the active packet files. They outrank older narrative docs when there is overlap.
 
 ## Historical snapshots
 

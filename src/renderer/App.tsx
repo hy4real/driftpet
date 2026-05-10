@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CardRecord } from "../main/types/card";
 import type { ClipboardOffer } from "../main/clipboard/watcher";
 import type { AppStatus } from "../main/types/status";
+import { buildThreadBundle } from "../shared/thread-bundle";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { PetShell } from "./components/PetShell";
 import bobaSpritesheet from "./assets/boba-spritesheet.webp";
@@ -47,6 +48,7 @@ export default function App() {
   const rememberedThreadCard = rememberedThread !== null
     ? history.find((card) => card.id === rememberedThread.cardId) ?? null
     : null;
+  const activeThreadBundle = buildThreadBundle(rememberedThreadCard, history);
   const isMini = windowMode === "mini";
   const showBubble = windowMode === "compact" && activeCard !== null;
   const showMiniClickBubble = isMini && petNote !== null;
@@ -257,6 +259,51 @@ export default function App() {
     }
   };
 
+  const dispatchClaudeThread = async (card: CardRecord) => {
+    if (isDispatchingCardId !== null || deletingCardId !== null) {
+      return;
+    }
+
+    setIsDispatchingCardId(card.id);
+    setClaudeDispatchFeedback(null);
+    try {
+      const result = await window.driftpet.dispatchClaudeThread(card.id);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: result.status === "failed" ? "error" : "success",
+        message: result.status === "failed"
+          ? `整条线派发失败：${result.error ?? "请检查 Claude / 终端配置。"}`
+          : `整条线已派给 Claude Code：${result.runner}`,
+      });
+      showPetNote(
+        result.status === "failed"
+          ? "整条线派发失败了。先检查 Claude / 终端配置。"
+          : `整条线已派给 Claude Code：${result.runner}`,
+        4200
+      );
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+      const nextHistory = await window.driftpet.listRecentCards();
+      setHistory(nextHistory);
+    } catch (error) {
+      console.error("[driftpet] Claude thread dispatch failed:", error);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: "error",
+        message: error instanceof Error
+          ? `整条线派发失败：${error.message}`
+          : "整条线派发失败了。先检查 Claude / 终端配置。",
+      });
+      showPetNote("整条线派发失败了。先检查 Claude / 终端配置。", 5200);
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+      const nextHistory = await window.driftpet.listRecentCards();
+      setHistory(nextHistory);
+    } finally {
+      setIsDispatchingCardId(null);
+    }
+  };
+
   const deleteCard = async (card: CardRecord) => {
     if (isDispatchingCardId !== null || deletingCardId !== null) {
       return;
@@ -444,9 +491,11 @@ export default function App() {
           hasPendingCard={pendingCard !== null}
           rememberedThread={rememberedThread}
           rememberedThreadCard={rememberedThreadCard}
+          activeThreadBundle={activeThreadBundle}
           onResurfaceRememberedThread={resurfaceRememberedThread}
           recentCards={recentCards}
           onSelectRecentCard={selectRecentCard}
+          onDispatchClaudeThread={dispatchClaudeThread}
           clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}
           onDismissClipboardOffer={dismissClipboardOffer}

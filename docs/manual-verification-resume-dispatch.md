@@ -39,11 +39,13 @@ Use this after changes to remembered-thread resume, Claude Code dispatch, clipbo
 
 5. Continuity mode
    - Set `连续模式`.
-   - Dispatch a card.
+   - Open the nest and confirm a `线头模式` panel appears when remembered-thread data exists.
+   - Click `派给 Claude Code（整条线）`.
+   - Expected: generated prompt includes both `Dispatch mode` and `Active thread bundle`.
    - Expected: generated prompt includes a `Remembered thread` section when one exists.
    - Set `独立卡片`.
    - Dispatch another card.
-   - Expected: generated prompt excludes the remembered-thread section.
+   - Expected: generated prompt excludes the remembered-thread section and the workbench no longer shows a fake thread bundle.
 
 6. Card deletion
    - Delete a non-critical test card from history.
@@ -59,6 +61,7 @@ npm run test:claude-settings
 npm run test:recall
 npm run test:digest-card
 npm run test:window-state
+node --test --experimental-strip-types src/shared/thread-bundle.test.mjs
 ```
 
 ## Known Gaps

@@ -28,6 +28,7 @@ const buildDispatchModule = async () => {
 
   const moduleExports = require(outfile);
   return {
+    buildClaudeCodePrompt: moduleExports.buildClaudeCodePrompt,
     buildClaudeLaunchCommand: moduleExports.buildClaudeLaunchCommand,
     buildTerminalLaunch: moduleExports.buildTerminalLaunch,
     parseClaudeDispatchMeta: moduleExports.parseClaudeDispatchMeta,
@@ -93,6 +94,7 @@ test("parseClaudeDispatchMeta preserves failed status and backfills legacy launc
       cwd: "/repo",
       createdAt: 0,
       status: "launched",
+      mode: "card",
       error: undefined,
     });
 
@@ -111,10 +113,80 @@ test("parseClaudeDispatchMeta preserves failed status and backfills legacy launc
       cwd: "/repo",
       createdAt: 1778320000000,
       status: "failed",
+      mode: "card",
       error: "Terminal automation denied",
     });
 
     assert.equal(parseClaudeDispatchMeta("{broken"), null);
+  } finally {
+    await cleanupBundle();
+  }
+});
+
+test("buildClaudeCodePrompt includes active thread bundle in thread mode", async () => {
+  const { buildClaudeCodePrompt, cleanupBundle } = await buildDispatchModule();
+
+  try {
+    const prompt = buildClaudeCodePrompt({
+      card: {
+        id: 17,
+        itemId: 9,
+        title: "Ship thread mode",
+        useFor: "Show continuity first.",
+        knowledgeTag: "thread mode",
+        summaryForRetrieval: "ship thread mode show continuity first",
+        related: [],
+        petRemark: "Anchor card",
+        createdAt: Date.now(),
+      },
+      rememberedThread: {
+        cardId: 17,
+        title: "Ship thread mode",
+        createdAt: Date.now(),
+      },
+      recentCards: [],
+      mode: "thread",
+      threadBundle: {
+        anchorCardId: 17,
+        anchorTitle: "Ship thread mode",
+        anchorKnowledgeTag: "thread mode",
+        cards: [
+          {
+            reason: "anchor",
+            card: {
+              id: 17,
+              itemId: 9,
+              title: "Ship thread mode",
+              useFor: "Show continuity first.",
+              knowledgeTag: "thread mode",
+              summaryForRetrieval: "ship thread mode show continuity first",
+              related: [],
+              petRemark: "Anchor card",
+              createdAt: Date.now(),
+            },
+          },
+          {
+            reason: "related",
+            card: {
+              id: 18,
+              itemId: 10,
+              title: "Reuse related cards",
+              useFor: "Stay inside current surfaces.",
+              knowledgeTag: "thread mode",
+              summaryForRetrieval: "reuse related cards and current surfaces",
+              related: [],
+              petRemark: "Related card",
+              createdAt: Date.now(),
+            },
+          },
+        ],
+      },
+    });
+
+    assert.match(prompt, /## Dispatch mode/);
+    assert.match(prompt, /Thread mode:/);
+    assert.match(prompt, /## Active thread bundle/);
+    assert.match(prompt, /Reuse related cards/);
   } finally {
     await cleanupBundle();
   }

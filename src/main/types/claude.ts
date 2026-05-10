@@ -1,3 +1,5 @@
+export type ClaudeDispatchMode = "card" | "thread";
+
 export type ClaudeDispatchMeta = {
   command: string;
   promptPath: string;
@@ -5,5 +7,6 @@ export type ClaudeDispatchMeta = {
   cwd: string;
   createdAt: number;
   status: "launched" | "failed";
+  mode?: ClaudeDispatchMode;
   error?: string;
 };

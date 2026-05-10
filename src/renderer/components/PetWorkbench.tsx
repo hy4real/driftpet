@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CardRecord } from "../../main/types/card";
 import type { RememberedThread } from "../../main/types/status";
+import type { ThreadBundle } from "../../main/types/thread";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import { PetSkinPanel } from "./PetSkinPanel";
 
@@ -17,6 +18,7 @@ type PetWorkbenchProps = {
   historyOpen: boolean;
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
+  activeThreadBundle: ThreadBundle | null;
   recentCards: CardRecord[];
   onChaosTextChange: (value: string) => void;
   onAcceptClipboardOffer: () => void;
@@ -26,6 +28,7 @@ type PetWorkbenchProps = {
   onToggleHistory: () => void;
   onResurfaceRememberedThread: () => void;
   onSelectRecentCard: (card: CardRecord) => void;
+  onDispatchClaudeThread: (card: CardRecord) => void;
 };
 
 const previewClipboardText = (raw: string, maxLength = 72): string => {
@@ -44,6 +47,7 @@ export function PetWorkbench({
   historyOpen,
   rememberedThread,
   rememberedThreadCard,
+  activeThreadBundle,
   recentCards,
   onChaosTextChange,
   onAcceptClipboardOffer,
@@ -52,7 +56,8 @@ export function PetWorkbench({
   onReturnToPet,
   onToggleHistory,
   onResurfaceRememberedThread,
-  onSelectRecentCard
+  onSelectRecentCard,
+  onDispatchClaudeThread
 }: PetWorkbenchProps) {
   const [showSkinPanel, setShowSkinPanel] = useState(false);
   const [historyFoldOpen, setHistoryFoldOpen] = useState(false);
@@ -108,6 +113,42 @@ export function PetWorkbench({
               继续
             </button>
           </div>
+        ) : null}
+
+        {activeThreadBundle !== null ? (
+          <section className="pet-workbench-thread-panel" aria-label="当前线头">
+            <div className="pet-workbench-thread-header">
+              <div>
+                <p className="bubble-eyebrow">线头模式</p>
+                <h3>这条线最近长了什么</h3>
+              </div>
+              <button
+                type="button"
+                className="pet-button pet-button-strong"
+                onClick={() => onDispatchClaudeThread(activeThreadBundle.cards[0].card)}
+              >
+                派给 Claude Code（整条线）
+              </button>
+            </div>
+            <p className="pet-workbench-thread-copy">
+              先沿着这条线往下做，不用每次都从孤立卡片重新起步。
+            </p>
+            <ul className="pet-workbench-thread-list">
+              {activeThreadBundle.cards.map((entry) => (
+                <li key={entry.card.id}>
+                  <button
+                    type="button"
+                    className="pet-workbench-thread-item"
+                    onClick={() => onSelectRecentCard(entry.card)}
+                  >
+                    <strong>{entry.card.title}</strong>
+                    <span>{entry.card.knowledgeTag}</span>
+                    <p>{entry.card.useFor}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         <header className="pet-workbench-header">

@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CardRecord } from "../../main/types/card";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import type { RememberedThread } from "../../main/types/status";
+import type { ThreadBundle } from "../../main/types/thread";
 import { PetAvatar } from "./PetAvatar";
 import { PetBubble } from "./PetBubble";
 import { PetControls } from "./PetControls";
@@ -46,9 +47,11 @@ type PetShellProps = {
   hasPendingCard: boolean;
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
+  activeThreadBundle: ThreadBundle | null;
   onResurfaceRememberedThread: () => void;
   recentCards: CardRecord[];
   onSelectRecentCard: (card: CardRecord) => void;
+  onDispatchClaudeThread: (card: CardRecord) => void;
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -128,9 +131,11 @@ export function PetShell({
   hasPendingCard,
   rememberedThread,
   rememberedThreadCard,
+  activeThreadBundle,
   onResurfaceRememberedThread,
   recentCards,
   onSelectRecentCard,
+  onDispatchClaudeThread,
   clipboardOffer,
   onAcceptClipboardOffer,
   onDismissClipboardOffer
@@ -526,9 +531,11 @@ export function PetShell({
               onToggleHistory={onToggleHistory}
               rememberedThread={rememberedThread}
               rememberedThreadCard={rememberedThreadCard}
+              activeThreadBundle={activeThreadBundle}
               onResurfaceRememberedThread={onResurfaceRememberedThread}
               recentCards={recentCards}
               onSelectRecentCard={onSelectRecentCard}
+              onDispatchClaudeThread={onDispatchClaudeThread}
             />
           ) : (
             <PetControls

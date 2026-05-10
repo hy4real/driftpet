@@ -8,6 +8,7 @@ Current V1 shape:
 - 你可以把文字或 URL 从手机转发到 Telegram，也可以直接放进 driftpet 的“小窝”。
 - 它会把输入收成一张小纸条：一个可以先做的下一步、一点标签、几句宠物备注。
 - 它会把旧内容放进“记忆”，需要时再让你翻出来。
+- 连续模式下，它会把“上次那条线”附近的相关卡片收成一个小线头，直接在 workbench 里继续。
 - 新内容默认低打扰：先轻轻提示，点开后再看详情。
 - 详细的 Telegram / LLM / embeddings / storage 状态还在，但默认藏在“详细状态”里。
 
@@ -155,6 +156,7 @@ The template package defaults to `specs/<feature>/...`, but this repo's adopted 
 - `Telegram capture`: polls your bot with long polling and stores text / URL inputs locally.
 - `Little notes`: turns a capture into a compact card with a suggested next step, a tag, and a pet remark. When the model falls back, the local copy still tracks the input language.
 - `Pet memory`: recalls a small number of prior real cards and presents them as things driftpet remembers, not as a raw database list.
+- `Thread mode`: continuous mode derives a small thread bundle from remembered-thread, related-card links, and recent history so the workbench can show and dispatch one ongoing line of work.
 - `Low-interruption surfacing`: new content first becomes a gentle pending note; opening the pet reveals the full card.
 - `Status`: the status drawer first shows the pet's own state, with Telegram / LLM / embeddings / storage details available behind a toggle.
 - `Generated brief`: `node scripts/overnight-goal.mjs` regenerates a morning brief and JSON verification snapshot under `reports/`.

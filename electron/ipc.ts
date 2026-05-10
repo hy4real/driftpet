@@ -9,6 +9,7 @@ import type { ClaudeDispatchMeta } from "../src/main/types/claude";
 import { setPetHourlyBudget } from "../src/main/pet/runtime";
 import type { AppStatus } from "../src/main/types/status";
 import { getAppStatus } from "../src/main/status/app-status";
+import { buildThreadBundle } from "../src/shared/thread-bundle";
 import { moveMainWindowBy, resizeMainWindow } from "../src/main/app/windows";
 import {
   COMPACT_WINDOW_HEIGHT,
@@ -92,6 +93,7 @@ export const registerIpcHandlers = (
         card,
         rememberedThread: settings.continuityMode === "continuous" ? status.pet.rememberedThread : null,
         recentCards: getRecentCards(),
+        mode: "card",
       });
 
       setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(result));
@@ -104,7 +106,49 @@ export const registerIpcHandlers = (
         cwd: settings.workingDirectory,
         createdAt: Date.now(),
         status: "failed",
+        mode: "card",
         error: error instanceof Error ? error.message : "Claude Code dispatch failed.",
+      };
+      setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(failedResult));
+      throw error;
+    }
+  });
+
+  ipcMain.handle("card:dispatch-claude-thread", async (_event, cardId: number): Promise<ClaudeDispatchMeta> => {
+    const recentCards = getRecentCards();
+    const card = recentCards.find((entry) => entry.id === cardId);
+    if (card === undefined) {
+      throw new Error(`card not found: ${cardId}`);
+    }
+
+    const status = await getAppStatus();
+    const settings = getClaudeDispatchSettings();
+    const rememberedThread = settings.continuityMode === "continuous" ? status.pet.rememberedThread : null;
+    const anchorCard = rememberedThread === null
+      ? card
+      : recentCards.find((entry) => entry.id === rememberedThread.cardId) ?? card;
+
+    try {
+      const result = await launchClaudeCodeTask({
+        card,
+        rememberedThread,
+        recentCards,
+        threadBundle: rememberedThread === null ? null : buildThreadBundle(anchorCard, recentCards),
+        mode: "thread",
+      });
+
+      setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(result));
+      return result;
+    } catch (error) {
+      const failedResult: ClaudeDispatchMeta = {
+        command: "",
+        promptPath: "",
+        runner: "",
+        cwd: settings.workingDirectory,
+        createdAt: Date.now(),
+        status: "failed",
+        mode: "thread",
+        error: error instanceof Error ? error.message : "Claude thread dispatch failed.",
       };
       setPref(getClaudeDispatchPrefKey(cardId), JSON.stringify(failedResult));
       throw error;

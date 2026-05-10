@@ -3,7 +3,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import type { CardRecord } from "../types/card";
 import type { RememberedThread } from "../types/status";
-import type { ClaudeDispatchMeta } from "../types/claude";
+import type { ClaudeDispatchMeta, ClaudeDispatchMode } from "../types/claude";
+import type { ThreadBundle } from "../types/thread";
 import { getDataDir } from "../paths";
 import { getClaudeDispatchSettings, type ClaudeDispatchSettings } from "./settings";
 
@@ -11,6 +12,8 @@ export type ClaudeDispatchPayload = {
   card: CardRecord;
   rememberedThread: RememberedThread | null;
   recentCards: CardRecord[];
+  threadBundle?: ThreadBundle | null;
+  mode?: ClaudeDispatchMode;
 };
 
 export type ClaudeDispatchResult = ClaudeDispatchMeta;
@@ -32,6 +35,7 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
       cwd?: unknown;
       createdAt?: unknown;
       status?: unknown;
+      mode?: unknown;
       error?: unknown;
     };
     if (
@@ -50,6 +54,7 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
       cwd: parsed.cwd,
       createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : 0,
       status: parsed.status === "failed" ? "failed" : "launched",
+      mode: parsed.mode === "thread" ? "thread" : "card",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
     };
   } catch {
@@ -71,10 +76,13 @@ export const buildClaudeCodePrompt = ({
   card,
   rememberedThread,
   recentCards,
+  threadBundle,
+  mode = "card",
 }: ClaudeDispatchPayload): string => {
   const siblingCards = recentCards
     .filter((entry) => entry.id !== card.id)
     .slice(0, 3);
+  const threadCards = threadBundle?.cards.filter((entry) => entry.card.id !== card.id) ?? [];
 
   return [
     "# driftpet -> Claude Code task",
@@ -82,12 +90,25 @@ export const buildClaudeCodePrompt = ({
     "You are receiving a task packet from driftpet.",
     "Work from the current repository. Stay focused on the immediate task before widening scope.",
     "",
+    "## Dispatch mode",
+    mode === "thread"
+      ? "Thread mode: treat the current card as part of one continuing line of work. Preserve continuity unless repo evidence says the line should split."
+      : "Card mode: solve the current card directly without assuming a broader thread beyond the supplied context.",
+    "",
     "## Current card",
     `Title: ${card.title}`,
     `Next step: ${card.useFor}`,
     `Knowledge tag: ${card.knowledgeTag}`,
     `Pet remark: ${card.petRemark}`,
     "",
+    ...(mode === "thread" && threadBundle !== null && threadBundle !== undefined
+      ? [
+        "## Active thread bundle",
+        `Anchor: ${threadBundle.anchorTitle}`,
+        ...threadBundle.cards.map((entry, index) => `${index + 1}. ${entry.card.title} | ${entry.card.useFor} | ${entry.reason}`),
+        "",
+      ]
+      : []),
     ...(rememberedThread === null
       ? []
       : [
@@ -109,6 +130,14 @@ export const buildClaudeCodePrompt = ({
         ...siblingCards.map((entry, index) => `${index + 1}. ${entry.title} | ${entry.useFor}`),
         "",
       ]),
+    ...(mode === "thread" && threadCards.length > 0
+      ? [
+        "## Thread handling",
+        "Use the active thread bundle first when deciding scope and sequencing.",
+        "Pull in sibling cards only when the thread bundle is insufficient.",
+        "",
+      ]
+      : []),
     "## Task",
     "1. Read the repository state relevant to this card.",
     "2. Decide the smallest concrete implementation or investigation that satisfies the card's next step.",
@@ -198,6 +227,7 @@ export const launchClaudeCodeTask = async (payload: ClaudeDispatchPayload): Prom
     cwd: settings.workingDirectory,
     createdAt: Date.now(),
     status: "launched",
+    mode: payload.mode ?? "card",
   };
 };
 
