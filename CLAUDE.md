@@ -7,7 +7,7 @@
 - 项目名：driftpet
 - 项目类型：桌面应用（如：Web 应用 / CLI 工具 / 研究脚本 / 知识库）
 - 主语言/技术栈：TypeScript + Electron + React + Vite
-- 验证命令：npm run check:repo && npm run test:ui-smoke && npm run test:telegram-note-workflow（必填，至少一条可机器执行的命令）
+- 验证命令：npm run check:repo && npm run test:ui-smoke && npm run test:telegram-note-workflow && npm run test:url-note-runner（必填，至少一条可机器执行的命令）
 - 回滚方式：git restore --source=HEAD -- .（如：`git reset --hard <ref>` / 删除新建文件）
 - 接入级别：L0（见 `workflow-portable/docs/adoption-guide.md`）
 - 多线程协作：否（否则忽略派发/回报/QA 三个模板）

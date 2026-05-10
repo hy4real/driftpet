@@ -29,6 +29,9 @@ feedbacks/
 
 Use one folder per work item, not one giant shared document.
 
+This repo intentionally uses `feedbacks/sdd/` instead of the template package's default `specs/` path.
+When `workflow-portable/spec-kit/*` examples mention `specs/<feature>/...`, translate them to `feedbacks/sdd/<task-slug>/...` for driftpet.
+
 Suggested slug shape:
 
 - `driftpet-phase1`

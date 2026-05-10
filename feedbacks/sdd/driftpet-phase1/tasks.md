@@ -71,24 +71,26 @@ Status legend:
 
 ### T5. Build the vault note runner boundary
 
-- Status: `待验收`
+- Status: `已通过`
 - Scope:
   - run `video-to-note` for video URLs
   - run `article-to-note` for article URLs
-  - operate against `/Users/mac/my-obsidian-vault`
+  - operate against the configured vault root, defaulting to `$HOME/my-obsidian-vault`
   - ingest the produced markdown artifact afterward
   - capture completion status and artifact information
 - Expected output:
   - deterministic runner behavior with explicit success/failure reporting
+  - vault-relative artifact handling stays portable across machines
 - Verification:
   - `npm run test:telegram-note-workflow`
   - `node --test scripts/telegram-note-poller-integration.test.mjs`
   - `node --test src/main/telegram/poller-report.test.mjs`
-  - real vault write with one video URL and one article URL still pending manual acceptance
+  - `node --test scripts/migration-009-backfill-note-titles.test.mjs`
+  - `node --test src/main/telegram/url-note-runner-parse.test.mjs`
 
 ### T6. Final reporting and verification
 
-- Status: `执行中`
+- Status: `已通过`
 - Scope:
   - ensure the system reports task completion and produced artifacts back to the user
   - run repo verification
@@ -103,6 +105,7 @@ Status legend:
   - `npm run test:url-note-runner`
   - `node --test scripts/telegram-note-poller-integration.test.mjs`
   - `node --test src/main/telegram/poller-report.test.mjs`
+  - `node --test scripts/migration-009-backfill-note-titles.test.mjs`
 
 ## Execution Order
 
@@ -116,10 +119,10 @@ Status legend:
 ## Blockers / Smallest Next Move
 
 Current blocker status:
-- 无自动化阻塞；当前剩余的是 Phase 1 手动验收口
+- 无自动化阻塞；Phase 1 代码与回归验证已闭环
 
 Most likely blocker:
-- real-world Claude / skill execution against `/Users/mac/my-obsidian-vault` may still differ from the mocked test contract
+- live external skill execution may still differ from the mocked test contract on a fresh machine
 
 If blocked there, the smallest next move is:
-- send one real article URL and one real video URL through Telegram, then record produced artifact paths and any runner mismatch
+- set `DRIFTPET_VAULT_DIR` and command overrides on the target machine, then send one real article URL and one real video URL through Telegram to capture any environment-specific mismatch

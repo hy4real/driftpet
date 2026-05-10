@@ -63,8 +63,10 @@ After startup, the pet should:
 When the user drops a link into Telegram for the app, the app should:
 
 - receive the link
-- hand it off into the local vault workflow under `/Users/mac/my-obsidian-vault`
-- start Claude from that directory
+- hand it off into the configured local vault workflow
+- default the vault root to `$HOME/my-obsidian-vault` when no override is set
+- allow the vault root to be overridden via `DRIFTPET_VAULT_DIR`
+- start Claude from that vault directory
 - trigger ingest from there
 
 Phase 1 cares about the end-to-end handoff path existing and feeling reliable.
@@ -89,7 +91,7 @@ Phase 1 is correct when the user can say all of the following are true:
 2. When the cursor touches the pet, it reacts with a new action.
 3. The pet can be dragged anywhere on screen.
 4. During drag, the pet's movement feels direction-aware rather than static.
-5. When a link is sent through Telegram, driftpet routes that link into `/Users/mac/my-obsidian-vault`.
+5. When a link is sent through Telegram, driftpet routes that link into the configured Obsidian vault.
 6. The local handoff starts Claude in that directory and runs ingest from there.
 
 ## Constraints

@@ -138,7 +138,7 @@ That runner should own:
 
 The current repo does not yet contain a built-in ingest runner for:
 
-- launching Claude in `/Users/mac/my-obsidian-vault`
+- launching Claude in the configured vault directory
 - applying `video-to-note` or `article-to-note`
 - then ingesting the produced markdown
 
@@ -146,7 +146,8 @@ Therefore the first implementation should isolate this behind a runner contract.
 
 The plan should support:
 
-- fixed vault path for Phase 1: `/Users/mac/my-obsidian-vault`
+- default vault path for Phase 1: `$HOME/my-obsidian-vault`
+- explicit vault override via `DRIFTPET_VAULT_DIR`
 - explicit classification to `video` or `article`
 - a replaceable command-execution layer
 - captured stdout/stderr or status summary

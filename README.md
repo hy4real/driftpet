@@ -131,6 +131,7 @@ Current workflow surfaces are:
 - `CLAUDE.md` for the repo-local execution contract
 - `constitution.md` for durable product and engineering constraints
 - `feedbacks/sdd/` for non-trivial `spec.md` / `plan.md` / `tasks.md` packets
+- `docs/README.md` for the current-vs-historical doc map
 
 Use it like this:
 
@@ -145,6 +146,7 @@ For new scoped work, start from `docs/sdd-workflow.md` and create or update a pa
 `npm run hooks:install` points local git hooks at `.githooks/`, where pre-commit runs the same repo gate.
 `.githooks/commit-msg` validates Lore commit format before a commit is accepted.
 Template-level guidance lives in `workflow-portable/docs/adoption-guide.md` and `workflow-portable/spec-kit/README.md`.
+The template package defaults to `specs/<feature>/...`, but this repo's adopted convention is `feedbacks/sdd/<task-slug>/...`; prefer the repo-local convention when they differ.
 
 ## What the app currently does
 
