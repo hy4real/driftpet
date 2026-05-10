@@ -11,4 +11,6 @@ export type ClaudeDispatchMeta = {
   status: ClaudeDispatchStatus;
   mode?: ClaudeDispatchMode;
   error?: string;
+  resultSummary?: string;
+  resultCapturedAt?: number;
 };

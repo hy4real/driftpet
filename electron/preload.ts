@@ -31,6 +31,7 @@ const api = {
   dispatchClaudeCode: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-code", cardId),
   dispatchClaudeThread: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-thread", cardId),
   updateClaudeDispatchStatus: (cardId: number, status: ClaudeDispatchUserStatus): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:update-claude-dispatch-status", cardId, status),
+  captureClaudeDispatchResult: (cardId: number, resultSummary: string): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:capture-claude-dispatch-result", cardId, resultSummary),
   setPetHourlyBudget: (value: number): Promise<number> => ipcRenderer.invoke("pet:set-hourly-budget", value),
   setWindowSize: (windowSize: "mini" | "compact" | "expanded"): Promise<void> => ipcRenderer.invoke("pet:set-window-size", windowSize),
   setMiniBubbleVisible: (visible: boolean): Promise<void> => ipcRenderer.invoke("pet:set-mini-bubble-visible", visible),

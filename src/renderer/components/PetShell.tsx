@@ -51,11 +51,13 @@ type PetShellProps = {
   activeThreadBundle: ThreadBundle | null;
   dispatchingCardId: number | null;
   updatingDispatchCardId: number | null;
+  capturingDispatchResultCardId: number | null;
   onResurfaceRememberedThread: () => void;
   recentCards: CardRecord[];
   onSelectRecentCard: (card: CardRecord) => void;
   onDispatchClaudeThread: (card: CardRecord) => void;
   onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
+  onCaptureClaudeDispatchResult: (card: CardRecord, resultSummary: string) => void;
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -138,11 +140,13 @@ export function PetShell({
   activeThreadBundle,
   dispatchingCardId,
   updatingDispatchCardId,
+  capturingDispatchResultCardId,
   onResurfaceRememberedThread,
   recentCards,
   onSelectRecentCard,
   onDispatchClaudeThread,
   onUpdateClaudeDispatchStatus,
+  onCaptureClaudeDispatchResult,
   clipboardOffer,
   onAcceptClipboardOffer,
   onDismissClipboardOffer
@@ -541,11 +545,13 @@ export function PetShell({
               activeThreadBundle={activeThreadBundle}
               dispatchingCardId={dispatchingCardId}
               updatingDispatchCardId={updatingDispatchCardId}
+              capturingDispatchResultCardId={capturingDispatchResultCardId}
               onResurfaceRememberedThread={onResurfaceRememberedThread}
               recentCards={recentCards}
               onSelectRecentCard={onSelectRecentCard}
               onDispatchClaudeThread={onDispatchClaudeThread}
               onUpdateClaudeDispatchStatus={onUpdateClaudeDispatchStatus}
+              onCaptureClaudeDispatchResult={onCaptureClaudeDispatchResult}
             />
           ) : (
             <PetControls

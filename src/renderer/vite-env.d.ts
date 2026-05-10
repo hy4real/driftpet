@@ -30,6 +30,7 @@ declare global {
       dispatchClaudeCode: (cardId: number) => Promise<ClaudeDispatchMeta>;
       dispatchClaudeThread: (cardId: number) => Promise<ClaudeDispatchMeta>;
       updateClaudeDispatchStatus: (cardId: number, status: ClaudeDispatchUserStatus) => Promise<ClaudeDispatchMeta>;
+      captureClaudeDispatchResult: (cardId: number, resultSummary: string) => Promise<ClaudeDispatchMeta>;
       setPetHourlyBudget: (value: number) => Promise<number>;
       setWindowSize: (windowSize: "mini" | "compact" | "expanded") => Promise<void>;
       setMiniBubbleVisible: (visible: boolean) => Promise<void>;

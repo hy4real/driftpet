@@ -156,7 +156,7 @@ The template package defaults to `specs/<feature>/...`, but this repo's adopted 
 - `Telegram capture`: polls your bot with long polling and stores text / URL inputs locally.
 - `Little notes`: turns a capture into a compact card with a suggested next step, a tag, and a pet remark. When the model falls back, the local copy still tracks the input language.
 - `Pet memory`: recalls a small number of prior real cards and presents them as things driftpet remembers, not as a raw database list.
-- `Thread mode`: continuous mode derives a small thread bundle from remembered-thread, related-card links, and recent history so the workbench can show and dispatch one ongoing line of work, then let you mark or dismiss the visible dispatch record.
+- `Thread mode`: continuous mode derives a small thread bundle from remembered-thread, related-card links, and recent history so the workbench can show and dispatch one ongoing line of work, then lets you mark, dismiss, or manually paste back the visible Claude result for the next dispatch prompt.
 - `Low-interruption surfacing`: new content first becomes a gentle pending note; opening the pet reveals the full card.
 - `Status`: the status drawer first shows the pet's own state, with Telegram / LLM / embeddings / storage details available behind a toggle.
 - `Generated brief`: `node scripts/overnight-goal.mjs` regenerates a morning brief and JSON verification snapshot under `reports/`.

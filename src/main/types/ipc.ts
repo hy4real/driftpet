@@ -14,6 +14,7 @@ export const IPC_CHANNELS = {
   dispatchClaudeCode: "card:dispatch-claude-code",
   dispatchClaudeThread: "card:dispatch-claude-thread",
   updateClaudeDispatchStatus: "card:update-claude-dispatch-status",
+  captureClaudeDispatchResult: "card:capture-claude-dispatch-result",
   petList: "pet:list",
   petActive: "pet:active",
   petSetActive: "pet:set-active",

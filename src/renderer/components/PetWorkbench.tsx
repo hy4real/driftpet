@@ -24,6 +24,7 @@ type PetWorkbenchProps = {
   recentCards: CardRecord[];
   dispatchingCardId: number | null;
   updatingDispatchCardId: number | null;
+  capturingDispatchResultCardId: number | null;
   onChaosTextChange: (value: string) => void;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -34,6 +35,7 @@ type PetWorkbenchProps = {
   onSelectRecentCard: (card: CardRecord) => void;
   onDispatchClaudeThread: (card: CardRecord) => void;
   onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
+  onCaptureClaudeDispatchResult: (card: CardRecord, resultSummary: string) => void;
 };
 
 const previewClipboardText = (raw: string, maxLength = 72): string => {
@@ -56,6 +58,7 @@ export function PetWorkbench({
   recentCards,
   dispatchingCardId,
   updatingDispatchCardId,
+  capturingDispatchResultCardId,
   onChaosTextChange,
   onAcceptClipboardOffer,
   onDismissClipboardOffer,
@@ -65,14 +68,18 @@ export function PetWorkbench({
   onResurfaceRememberedThread,
   onSelectRecentCard,
   onDispatchClaudeThread,
-  onUpdateClaudeDispatchStatus
+  onUpdateClaudeDispatchStatus,
+  onCaptureClaudeDispatchResult
 }: PetWorkbenchProps) {
   const [showSkinPanel, setShowSkinPanel] = useState(false);
   const [historyFoldOpen, setHistoryFoldOpen] = useState(false);
+  const [threadResultEditorOpen, setThreadResultEditorOpen] = useState(false);
   const threadAnchorCard = activeThreadBundle?.cards[0]?.card ?? null;
   const threadDispatchView = getClaudeDispatchStatusView(threadAnchorCard?.latestClaudeDispatch);
   const threadDispatch = threadAnchorCard?.latestClaudeDispatch ?? null;
-  const threadStatusActionsDisabled = dispatchingCardId !== null || updatingDispatchCardId !== null;
+  const threadStatusActionsDisabled = dispatchingCardId !== null
+    || updatingDispatchCardId !== null
+    || capturingDispatchResultCardId !== null;
 
   if (showSkinPanel) {
     return (
@@ -156,24 +163,71 @@ export function PetWorkbench({
               <div className={`pet-workbench-thread-dispatch pet-workbench-thread-dispatch-${threadDispatchView.tone}`} role="status">
                 <span>{threadDispatchView.label}</span>
                 {threadDispatchView.detail !== null ? <small>{threadDispatchView.detail}</small> : null}
-                {threadDispatch.status === "launched" ? (
+                {threadDispatch.resultSummary !== undefined ? (
+                  <p className="pet-workbench-thread-dispatch-result">{threadDispatch.resultSummary}</p>
+                ) : null}
+                {threadDispatch.status === "launched" || threadDispatch.status === "done" ? (
                   <div className="pet-workbench-thread-dispatch-actions">
+                    {threadDispatch.status === "launched" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ghost-button pet-workbench-thread-dispatch-action"
+                          disabled={threadStatusActionsDisabled}
+                          onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "done")}
+                        >
+                          {updatingDispatchCardId === threadAnchorCard.id ? "更新中..." : "标记完成"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button pet-workbench-thread-dispatch-action"
+                          disabled={threadStatusActionsDisabled}
+                          onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "dismissed")}
+                        >
+                          收起记录
+                        </button>
+                      </>
+                    ) : null}
                     <button
                       type="button"
                       className="ghost-button pet-workbench-thread-dispatch-action"
                       disabled={threadStatusActionsDisabled}
-                      onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "done")}
+                      onClick={() => setThreadResultEditorOpen((open) => !open)}
                     >
-                      {updatingDispatchCardId === threadAnchorCard.id ? "更新中..." : "标记完成"}
+                      记录结果
                     </button>
-                    <button
-                      type="button"
-                      className="ghost-button pet-workbench-thread-dispatch-action"
-                      disabled={threadStatusActionsDisabled}
-                      onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "dismissed")}
-                    >
-                      收起记录
-                    </button>
+                  </div>
+                ) : null}
+                {threadResultEditorOpen ? (
+                  <div className="pet-workbench-thread-result-editor">
+                    <textarea
+                      className="pet-workbench-thread-result-input"
+                      defaultValue={threadDispatch.resultSummary ?? ""}
+                      disabled={capturingDispatchResultCardId !== null}
+                      placeholder="粘贴 Claude Code 做了什么、验证了什么。"
+                    />
+                    <div className="pet-workbench-thread-dispatch-actions">
+                      <button
+                        type="button"
+                        className="ghost-button pet-workbench-thread-dispatch-action"
+                        disabled={threadStatusActionsDisabled}
+                        onClick={(event) => {
+                          const editor = event.currentTarget.closest(".pet-workbench-thread-result-editor");
+                          const input = editor?.querySelector<HTMLTextAreaElement>(".pet-workbench-thread-result-input");
+                          onCaptureClaudeDispatchResult(threadAnchorCard, input?.value ?? "");
+                        }}
+                      >
+                        {capturingDispatchResultCardId === threadAnchorCard.id ? "保存中..." : "保存结果"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button pet-workbench-thread-dispatch-action"
+                        disabled={capturingDispatchResultCardId !== null}
+                        onClick={() => setThreadResultEditorOpen(false)}
+                      >
+                        取消
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </div>

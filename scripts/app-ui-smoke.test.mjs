@@ -283,6 +283,7 @@ const setupDom = () => {
   const dispatchClaudeCodeCalls = [];
   const dispatchClaudeThreadCalls = [];
   const updateClaudeDispatchStatusCalls = [];
+  const captureClaudeDispatchResultCalls = [];
   const deleteCardCalls = [];
   const claudeDispatchSettingWrites = [];
   let latestClaudeDispatch = null;
@@ -367,6 +368,19 @@ const setupDom = () => {
       };
       return latestClaudeDispatch;
     },
+    captureClaudeDispatchResult: async (cardId, resultSummary) => {
+      captureClaudeDispatchResultCalls.push([cardId, resultSummary]);
+      if (latestClaudeDispatch === null) {
+        throw new Error(`Claude dispatch not found: ${cardId}`);
+      }
+      latestClaudeDispatch = {
+        ...latestClaudeDispatch,
+        status: "done",
+        resultSummary: resultSummary.trim(),
+        resultCapturedAt: Date.now(),
+      };
+      return latestClaudeDispatch;
+    },
     setPetHourlyBudget: async () => 3,
     setWindowSize: async (windowSize) => {
       setWindowSizeCalls.push(windowSize);
@@ -404,6 +418,7 @@ const setupDom = () => {
     dispatchClaudeCodeCalls,
     dispatchClaudeThreadCalls,
     updateClaudeDispatchStatusCalls,
+    captureClaudeDispatchResultCalls,
     deleteCardCalls,
     claudeDispatchSettingWrites,
     emitClipboardOffer: (offer) => {
@@ -489,6 +504,27 @@ const collapseNest = async (container) => {
 
   await act(async () => {
     collapseButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+};
+
+const setFormControlValue = async (control, value) => {
+  await act(async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      control instanceof window.HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype,
+      "value"
+    );
+    assert.ok(descriptor?.set, "expected form control value setter");
+    descriptor.set.call(control, value);
+    control.dispatchEvent(new window.InputEvent("input", {
+      bubbles: true,
+      data: value,
+      inputType: "insertText",
+    }));
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
   });
 };
 
@@ -850,6 +886,78 @@ test("history drawer can mark a launched Claude dispatch done", async () => {
   await cleanupBundle();
 });
 
+test("history drawer can capture a Claude dispatch result summary", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeCodeCalls, captureClaudeDispatchResultCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  assert.ok(logToggle, "expected show log button");
+
+  await act(async () => {
+    logToggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const dispatchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("派给 Claude Code"));
+  assert.ok(dispatchButton, "expected Claude Code dispatch button");
+
+  await act(async () => {
+    dispatchButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeCodeCalls, [sampleCard.id], "expected dispatch to receive the selected card id");
+
+  const historyDrawer = container.querySelector(".history-drawer.open");
+  assert.ok(historyDrawer, "expected open history drawer");
+
+  const recordResultButton = Array.from(historyDrawer.querySelectorAll("button")).find((button) => button.textContent?.includes("记录结果"));
+  assert.ok(recordResultButton, "expected record-result action for launched dispatch");
+
+  await act(async () => {
+    recordResultButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const resultInput = historyDrawer.querySelector(".history-card-dispatch-result-input");
+  assert.ok(resultInput, "expected result summary textarea");
+
+  await setFormControlValue(resultInput, "Changed the dispatch close-loop and verified smoke tests.");
+
+  const saveResultButton = Array.from(historyDrawer.querySelectorAll("button")).find((button) => button.textContent?.includes("保存结果"));
+  assert.ok(saveResultButton, "expected save-result action");
+
+  await act(async () => {
+    saveResultButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(captureClaudeDispatchResultCalls, [
+    [sampleCard.id, "Changed the dispatch close-loop and verified smoke tests."],
+  ], "expected result capture to receive the summary");
+  assert.match(container.textContent ?? "", /单卡已完成/, "capturing a result should mark the dispatch done");
+  assert.match(container.textContent ?? "", /Changed the dispatch close-loop and verified smoke tests\./, "expected captured result to stay visible");
+  assert.match(container.textContent ?? "", /Claude 结果已记回这条线。/, "expected capture feedback");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
 test("workbench shows the active thread bundle in continuous mode", async () => {
   const { App, cleanupBundle } = await buildAppModule();
   const { cleanup, setWindowSizeCalls } = setupDom();
@@ -959,6 +1067,72 @@ test("workbench can dismiss the visible whole-thread dispatch record", async () 
   assert.deepEqual(updateClaudeDispatchStatusCalls, [[sampleCard.id, "dismissed"]], "expected status update to dismiss the selected thread dispatch");
   assert.doesNotMatch(container.textContent ?? "", /整条线已派发/, "dismissed dispatch should not keep the thread status note visible");
   assert.match(container.textContent ?? "", /Claude 派发记录已收起。/, "expected transient feedback after dismissing");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("workbench can capture a whole-thread Claude result summary", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeThreadCalls, captureClaudeDispatchResultCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const dispatchThreadButton = Array.from(container.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("派给 Claude Code（整条线）")
+  );
+  assert.ok(dispatchThreadButton, "expected thread dispatch button");
+
+  await act(async () => {
+    dispatchThreadButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeThreadCalls, [sampleCard.id], "expected whole-thread dispatch to use the anchor card id");
+
+  const threadPanel = container.querySelector(".pet-workbench-thread-panel");
+  assert.ok(threadPanel, "expected active thread panel");
+
+  const recordResultButton = Array.from(threadPanel.querySelectorAll("button")).find((button) => button.textContent?.includes("记录结果"));
+  assert.ok(recordResultButton, "expected record-result action for launched thread dispatch");
+
+  await act(async () => {
+    recordResultButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const resultInput = threadPanel.querySelector(".pet-workbench-thread-result-input");
+  assert.ok(resultInput, "expected thread result summary textarea");
+
+  await setFormControlValue(resultInput, "Thread dispatch landed the UI state and docs.");
+
+  const saveResultButton = Array.from(threadPanel.querySelectorAll("button")).find((button) => button.textContent?.includes("保存结果"));
+  assert.ok(saveResultButton, "expected save-result action");
+
+  await act(async () => {
+    saveResultButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(captureClaudeDispatchResultCalls, [
+    [sampleCard.id, "Thread dispatch landed the UI state and docs."],
+  ], "expected thread result capture to receive the summary");
+  assert.match(container.textContent ?? "", /整条线已完成/, "capturing a thread result should mark the dispatch done");
+  assert.match(container.textContent ?? "", /Thread dispatch landed the UI state and docs\./, "expected captured thread result to stay visible");
 
   await act(async () => {
     root.unmount();

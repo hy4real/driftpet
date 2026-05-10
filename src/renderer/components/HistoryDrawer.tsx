@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CardRecord } from "../../main/types/card";
 import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
 import { getClaudeDispatchStatusView } from "../claude-dispatch-view";
@@ -14,11 +15,13 @@ type HistoryDrawerProps = {
   dispatchingCardId: number | null;
   deletingCardId: number | null;
   updatingDispatchCardId: number | null;
+  capturingDispatchResultCardId: number | null;
   claudeDispatchFeedback: ClaudeDispatchFeedback | null;
   onClose: () => void;
   onDeleteCard: (card: CardRecord) => void;
   onDispatchClaudeCode: (card: CardRecord) => void;
   onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
+  onCaptureClaudeDispatchResult: (card: CardRecord, resultSummary: string) => void;
   onSelectCard: (card: CardRecord) => void;
 };
 
@@ -39,13 +42,17 @@ export function HistoryDrawer({
   dispatchingCardId,
   deletingCardId,
   updatingDispatchCardId,
+  capturingDispatchResultCardId,
   claudeDispatchFeedback,
   onClose,
   onDeleteCard,
   onDispatchClaudeCode,
   onUpdateClaudeDispatchStatus,
+  onCaptureClaudeDispatchResult,
   onSelectCard
 }: HistoryDrawerProps) {
+  const [resultEditorCardId, setResultEditorCardId] = useState<number | null>(null);
+
   return (
     <aside className={`history-drawer ${isOpen ? "open" : ""}`}>
       <header className="drawer-header">
@@ -108,9 +115,12 @@ export function HistoryDrawer({
                   }
 
                   const showActions = dispatch.status === "launched";
+                  const showResultEditor = resultEditorCardId === card.id;
+                  const canRecordResult = dispatch.status === "launched" || dispatch.status === "done";
                   const actionsDisabled = dispatchingCardId !== null
                     || deletingCardId !== null
-                    || updatingDispatchCardId !== null;
+                    || updatingDispatchCardId !== null
+                    || capturingDispatchResultCardId !== null;
 
                   return (
                     <div
@@ -119,24 +129,73 @@ export function HistoryDrawer({
                     >
                       <span>{dispatchView.label}</span>
                       {dispatchView.detail !== null ? <small>{dispatchView.detail}</small> : null}
-                      {showActions ? (
+                      {dispatch.resultSummary !== undefined ? (
+                        <p className="history-card-dispatch-result">{dispatch.resultSummary}</p>
+                      ) : null}
+                      {showActions || canRecordResult ? (
                         <div className="history-card-dispatch-actions">
-                          <button
-                            className="ghost-button history-card-dispatch-action"
-                            disabled={actionsDisabled}
-                            onClick={() => onUpdateClaudeDispatchStatus(card, "done")}
-                            type="button"
-                          >
-                            {updatingDispatchCardId === card.id ? "更新中..." : "标记完成"}
-                          </button>
-                          <button
-                            className="ghost-button history-card-dispatch-action"
-                            disabled={actionsDisabled}
-                            onClick={() => onUpdateClaudeDispatchStatus(card, "dismissed")}
-                            type="button"
-                          >
-                            收起记录
-                          </button>
+                          {showActions ? (
+                            <>
+                              <button
+                                className="ghost-button history-card-dispatch-action"
+                                disabled={actionsDisabled}
+                                onClick={() => onUpdateClaudeDispatchStatus(card, "done")}
+                                type="button"
+                              >
+                                {updatingDispatchCardId === card.id ? "更新中..." : "标记完成"}
+                              </button>
+                              <button
+                                className="ghost-button history-card-dispatch-action"
+                                disabled={actionsDisabled}
+                                onClick={() => onUpdateClaudeDispatchStatus(card, "dismissed")}
+                                type="button"
+                              >
+                                收起记录
+                              </button>
+                            </>
+                          ) : null}
+                          {canRecordResult ? (
+                            <button
+                              className="ghost-button history-card-dispatch-action"
+                              disabled={actionsDisabled}
+                              onClick={() => setResultEditorCardId((current) => current === card.id ? null : card.id)}
+                              type="button"
+                            >
+                              记录结果
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {showResultEditor ? (
+                        <div className="history-card-dispatch-result-editor">
+                          <textarea
+                            className="history-card-dispatch-result-input"
+                            defaultValue={dispatch.resultSummary ?? ""}
+                            disabled={capturingDispatchResultCardId !== null}
+                            placeholder="粘贴 Claude Code 做了什么、验证了什么。"
+                          />
+                          <div className="history-card-dispatch-actions">
+                            <button
+                              className="ghost-button history-card-dispatch-action"
+                              disabled={actionsDisabled}
+                              onClick={(event) => {
+                                const editor = event.currentTarget.closest(".history-card-dispatch-result-editor");
+                                const input = editor?.querySelector<HTMLTextAreaElement>(".history-card-dispatch-result-input");
+                                onCaptureClaudeDispatchResult(card, input?.value ?? "");
+                              }}
+                              type="button"
+                            >
+                              {capturingDispatchResultCardId === card.id ? "保存中..." : "保存结果"}
+                            </button>
+                            <button
+                              className="ghost-button history-card-dispatch-action"
+                              disabled={capturingDispatchResultCardId !== null}
+                              onClick={() => setResultEditorCardId(null)}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                     </div>

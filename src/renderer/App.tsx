@@ -41,6 +41,7 @@ export default function App() {
   const [clipboardOffer, setClipboardOffer] = useState<ClipboardOffer | null>(null);
   const [isDispatchingCardId, setIsDispatchingCardId] = useState<number | null>(null);
   const [updatingDispatchCardId, setUpdatingDispatchCardId] = useState<number | null>(null);
+  const [capturingDispatchResultCardId, setCapturingDispatchResultCardId] = useState<number | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<number | null>(null);
   const [claudeDispatchFeedback, setClaudeDispatchFeedback] = useState<ClaudeDispatchFeedback | null>(null);
   const petNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,7 +218,7 @@ export default function App() {
   };
 
   const dispatchClaudeCode = async (card: CardRecord) => {
-    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || deletingCardId !== null) {
+    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
       return;
     }
 
@@ -262,7 +263,7 @@ export default function App() {
   };
 
   const dispatchClaudeThread = async (card: CardRecord) => {
-    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || deletingCardId !== null) {
+    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
       return;
     }
 
@@ -307,7 +308,7 @@ export default function App() {
   };
 
   const deleteCard = async (card: CardRecord) => {
-    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || deletingCardId !== null) {
+    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
       return;
     }
 
@@ -335,7 +336,7 @@ export default function App() {
   };
 
   const updateClaudeDispatchStatus = async (card: CardRecord, nextStatus: ClaudeDispatchUserStatus) => {
-    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || deletingCardId !== null) {
+    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
       return;
     }
 
@@ -372,6 +373,46 @@ export default function App() {
       showPetNote("更新派发状态失败。", 4200);
     } finally {
       setUpdatingDispatchCardId(null);
+    }
+  };
+
+  const captureClaudeDispatchResult = async (card: CardRecord, resultSummary: string) => {
+    if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
+      return;
+    }
+
+    setCapturingDispatchResultCardId(card.id);
+    setClaudeDispatchFeedback(null);
+    try {
+      const updatedDispatch = await window.driftpet.captureClaudeDispatchResult(card.id, resultSummary);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: "success",
+        message: "Claude 结果已记回这条线。",
+      });
+      showPetNote("Claude 结果已记回这条线。", 3200);
+      setActiveCard((current) => current?.id === card.id
+        ? { ...current, latestClaudeDispatch: updatedDispatch }
+        : current);
+      setPendingCard((current) => current?.id === card.id
+        ? { ...current, latestClaudeDispatch: updatedDispatch }
+        : current);
+      const nextStatusSnapshot = await window.driftpet.getStatus();
+      setStatus(nextStatusSnapshot);
+      const nextHistory = await window.driftpet.listRecentCards();
+      setHistory(nextHistory);
+    } catch (error) {
+      console.error("[driftpet] Claude dispatch result capture failed:", error);
+      setClaudeDispatchFeedback({
+        cardId: card.id,
+        tone: "error",
+        message: error instanceof Error
+          ? `记录 Claude 结果失败：${error.message}`
+          : "记录 Claude 结果失败。",
+      });
+      showPetNote("记录 Claude 结果失败。", 4200);
+    } finally {
+      setCapturingDispatchResultCardId(null);
     }
   };
 
@@ -497,10 +538,12 @@ export default function App() {
           dispatchingCardId={isDispatchingCardId}
           deletingCardId={deletingCardId}
           updatingDispatchCardId={updatingDispatchCardId}
+          capturingDispatchResultCardId={capturingDispatchResultCardId}
           claudeDispatchFeedback={claudeDispatchFeedback}
           onDeleteCard={deleteCard}
           onDispatchClaudeCode={dispatchClaudeCode}
           onUpdateClaudeDispatchStatus={updateClaudeDispatchStatus}
+          onCaptureClaudeDispatchResult={captureClaudeDispatchResult}
           onSelectCard={(card) => {
             setActiveCard(card);
             setHistoryOpen(false);
@@ -539,11 +582,13 @@ export default function App() {
           activeThreadBundle={activeThreadBundle}
           dispatchingCardId={isDispatchingCardId}
           updatingDispatchCardId={updatingDispatchCardId}
+          capturingDispatchResultCardId={capturingDispatchResultCardId}
           onResurfaceRememberedThread={resurfaceRememberedThread}
           recentCards={recentCards}
           onSelectRecentCard={selectRecentCard}
           onDispatchClaudeThread={dispatchClaudeThread}
           onUpdateClaudeDispatchStatus={updateClaudeDispatchStatus}
+          onCaptureClaudeDispatchResult={captureClaudeDispatchResult}
           clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}
           onDismissClipboardOffer={dismissClipboardOffer}

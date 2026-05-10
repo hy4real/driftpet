@@ -33,6 +33,8 @@ Use this after changes to remembered-thread resume, Claude Code dispatch, clipbo
    - Expected: the card shows `单卡已派发` after dispatch returns.
    - Click `标记完成`.
    - Expected: the card changes to `单卡已完成` and no longer shows close-loop action buttons.
+   - Click `记录结果`, paste a short Claude Code completion summary, then click `保存结果`.
+   - Expected: the summary remains visible on the card and the dispatch stays `单卡已完成`.
 
 4. Claude dispatch failure
    - Set an invalid terminal app or invalid Claude binary environment.
@@ -46,6 +48,10 @@ Use this after changes to remembered-thread resume, Claude Code dispatch, clipbo
    - Expected: generated prompt includes both `Dispatch mode` and `Active thread bundle`.
    - Expected: generated prompt includes a `Remembered thread` section when one exists.
    - Expected: the workbench thread panel shows `整条线已派发` with `标记完成` and `收起记录`.
+   - Click `记录结果`, paste a short thread result summary, then click `保存结果`.
+   - Expected: the thread panel shows `整条线已完成` and keeps the summary visible.
+   - Dispatch the same thread again.
+   - Expected: the generated prompt includes `Prior Claude dispatch results` with the saved summary.
    - Click `收起记录`.
    - Expected: the thread dispatch note disappears without deleting the card or dispatch prompt file.
    - Set `独立卡片`.
@@ -71,6 +77,6 @@ node --test --experimental-strip-types src/shared/thread-bundle.test.mjs
 
 ## Known Gaps
 
-- This checklist does not prove Claude completes the task or writes a result back to driftpet.
-- `标记完成` is a local manual state; driftpet does not yet read Claude Code completion automatically.
+- `记录结果` is a manual paste-back step; driftpet does not yet read Claude Code completion automatically.
+- `标记完成` is a local manual state and does not prove Claude-side completion.
 - Terminal automation can fail for local macOS permission reasons even when the app code is correct.

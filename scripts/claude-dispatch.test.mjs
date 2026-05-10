@@ -96,6 +96,8 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       status: "launched",
       mode: "card",
       error: undefined,
+      resultSummary: undefined,
+      resultCapturedAt: undefined,
     });
 
     assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
@@ -115,6 +117,8 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       status: "failed",
       mode: "card",
       error: "Terminal automation denied",
+      resultSummary: undefined,
+      resultCapturedAt: undefined,
     });
 
     assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
@@ -125,6 +129,8 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       createdAt: 1778320000001,
       status: "done",
       mode: "thread",
+      resultSummary: "Implemented the thread UI and verified smoke tests.",
+      resultCapturedAt: 1778320000999,
     })), {
       command: "cmd",
       promptPath: "/tmp/prompt.md",
@@ -134,6 +140,8 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       status: "done",
       mode: "thread",
       error: undefined,
+      resultSummary: "Implemented the thread UI and verified smoke tests.",
+      resultCapturedAt: 1778320000999,
     });
 
     assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
@@ -144,6 +152,7 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       createdAt: 1778320000002,
       status: "dismissed",
       mode: "card",
+      resultSummary: "",
     })), {
       command: "cmd",
       promptPath: "/tmp/prompt.md",
@@ -153,6 +162,8 @@ test("parseClaudeDispatchMeta preserves known statuses and backfills legacy laun
       status: "dismissed",
       mode: "card",
       error: undefined,
+      resultSummary: undefined,
+      resultCapturedAt: undefined,
     });
 
     assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
@@ -233,6 +244,101 @@ test("buildClaudeCodePrompt includes active thread bundle in thread mode", async
     assert.match(prompt, /Thread mode:/);
     assert.match(prompt, /## Active thread bundle/);
     assert.match(prompt, /Reuse related cards/);
+  } finally {
+    await cleanupBundle();
+  }
+});
+
+test("buildClaudeCodePrompt includes captured Claude results as prior context", async () => {
+  const { buildClaudeCodePrompt, cleanupBundle } = await buildDispatchModule();
+
+  try {
+    const prompt = buildClaudeCodePrompt({
+      card: {
+        id: 17,
+        itemId: 9,
+        title: "Ship thread mode",
+        useFor: "Show continuity first.",
+        knowledgeTag: "thread mode",
+        summaryForRetrieval: "ship thread mode show continuity first",
+        related: [],
+        petRemark: "Anchor card",
+        createdAt: Date.now(),
+        latestClaudeDispatch: {
+          command: "cmd",
+          promptPath: "/tmp/prompt.md",
+          runner: "claude",
+          cwd: "/repo",
+          createdAt: Date.now(),
+          status: "done",
+          mode: "thread",
+          resultSummary: "Added visible dispatch state and smoke coverage.",
+          resultCapturedAt: Date.now(),
+        },
+      },
+      rememberedThread: null,
+      recentCards: [
+        {
+          id: 18,
+          itemId: 10,
+          title: "Follow-up cleanup",
+          useFor: "Keep the result visible.",
+          knowledgeTag: "thread mode",
+          summaryForRetrieval: "follow-up cleanup keep result visible",
+          related: [],
+          petRemark: "Related card",
+          createdAt: Date.now(),
+          latestClaudeDispatch: {
+            command: "cmd",
+            promptPath: "/tmp/related.md",
+            runner: "claude",
+            cwd: "/repo",
+            createdAt: Date.now(),
+            status: "done",
+            mode: "card",
+            resultSummary: "Documented manual verification gaps.",
+            resultCapturedAt: Date.now(),
+          },
+        },
+      ],
+      mode: "thread",
+      threadBundle: {
+        anchorCardId: 17,
+        anchorTitle: "Ship thread mode",
+        anchorKnowledgeTag: "thread mode",
+        cards: [
+          {
+            reason: "anchor",
+            card: {
+              id: 17,
+              itemId: 9,
+              title: "Ship thread mode",
+              useFor: "Show continuity first.",
+              knowledgeTag: "thread mode",
+              summaryForRetrieval: "ship thread mode show continuity first",
+              related: [],
+              petRemark: "Anchor card",
+              createdAt: Date.now(),
+              latestClaudeDispatch: {
+                command: "cmd",
+                promptPath: "/tmp/prompt.md",
+                runner: "claude",
+                cwd: "/repo",
+                createdAt: Date.now(),
+                status: "done",
+                mode: "thread",
+                resultSummary: "Added visible dispatch state and smoke coverage.",
+                resultCapturedAt: Date.now(),
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    assert.match(prompt, /## Prior Claude dispatch results/);
+    assert.match(prompt, /Ship thread mode: Added visible dispatch state and smoke coverage\./);
+    assert.match(prompt, /Follow-up cleanup: Documented manual verification gaps\./);
   } finally {
     await cleanupBundle();
   }

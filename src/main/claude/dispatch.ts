@@ -45,6 +45,8 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
       status?: unknown;
       mode?: unknown;
       error?: unknown;
+      resultSummary?: unknown;
+      resultCapturedAt?: unknown;
     };
     if (
       typeof parsed.command !== "string"
@@ -64,10 +66,35 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
       status: normalizeClaudeDispatchStatus(parsed.status),
       mode: parsed.mode === "thread" ? "thread" : "card",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
+      resultSummary: typeof parsed.resultSummary === "string" && parsed.resultSummary.trim().length > 0
+        ? parsed.resultSummary
+        : undefined,
+      resultCapturedAt: typeof parsed.resultCapturedAt === "number" ? parsed.resultCapturedAt : undefined,
     };
   } catch {
     return null;
   }
+};
+
+const formatPriorClaudeResults = (cards: CardRecord[]): string[] => {
+  const seen = new Set<number>();
+  const resultLines: string[] = [];
+
+  for (const entry of cards) {
+    if (seen.has(entry.id)) {
+      continue;
+    }
+    seen.add(entry.id);
+
+    const summary = entry.latestClaudeDispatch?.resultSummary?.trim();
+    if (summary === undefined || summary.length === 0) {
+      continue;
+    }
+
+    resultLines.push(`- ${entry.title}: ${summary}`);
+  }
+
+  return resultLines.slice(0, 5);
 };
 
 const DEFAULT_CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_CODE_BIN?.trim() || "claude";
@@ -91,6 +118,11 @@ export const buildClaudeCodePrompt = ({
     .filter((entry) => entry.id !== card.id)
     .slice(0, 3);
   const threadCards = threadBundle?.cards.filter((entry) => entry.card.id !== card.id) ?? [];
+  const priorClaudeResults = formatPriorClaudeResults([
+    card,
+    ...threadCards.map((entry) => entry.card),
+    ...siblingCards,
+  ]);
 
   return [
     "# driftpet -> Claude Code task",
@@ -136,6 +168,13 @@ export const buildClaudeCodePrompt = ({
       : [
         "## Recent sibling cards",
         ...siblingCards.map((entry, index) => `${index + 1}. ${entry.title} | ${entry.useFor}`),
+        "",
+      ]),
+    ...(priorClaudeResults.length === 0
+      ? []
+      : [
+        "## Prior Claude dispatch results",
+        ...priorClaudeResults,
         "",
       ]),
     ...(mode === "thread" && threadCards.length > 0

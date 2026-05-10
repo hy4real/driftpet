@@ -182,6 +182,36 @@ export const registerIpcHandlers = (
     }
   );
 
+  ipcMain.handle(
+    "card:capture-claude-dispatch-result",
+    async (_event, cardId: number, resultSummary: string): Promise<ClaudeDispatchMeta> => {
+      const summary = resultSummary.trim();
+      if (summary.length === 0) {
+        throw new Error("Claude dispatch result summary is empty.");
+      }
+
+      const card = getRecentCards().find((entry) => entry.id === cardId);
+      if (card === undefined) {
+        throw new Error(`card not found: ${cardId}`);
+      }
+
+      const prefKey = getClaudeDispatchPrefKey(cardId);
+      const current = parseClaudeDispatchMeta(getPref(prefKey));
+      if (current === null) {
+        throw new Error(`Claude dispatch not found: ${cardId}`);
+      }
+
+      const updated: ClaudeDispatchMeta = {
+        ...current,
+        status: "done",
+        resultSummary: summary,
+        resultCapturedAt: Date.now(),
+      };
+      setPref(prefKey, JSON.stringify(updated));
+      return updated;
+    }
+  );
+
   ipcMain.handle("app:get-status", async (): Promise<AppStatus> => {
     return getAppStatus();
   });
