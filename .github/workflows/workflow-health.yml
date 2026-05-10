@@ -1,4 +1,4 @@
-name: Workflow Health
+name: Repo Checks
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  workflow-health:
+  repo-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -24,8 +24,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run workflow refresh
-        run: npm run workflow:refresh
-
-      - name: Check workflow health
-        run: npm run workflow:check
+      - name: Run repo checks
+        run: npm run check:repo

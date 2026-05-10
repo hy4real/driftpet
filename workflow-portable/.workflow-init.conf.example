@@ -1,0 +1,38 @@
+# workflow-portable init.sh — unattended 模式配置示例
+#
+# 用法：
+#   cp workflow-portable/.workflow-init.conf.example .workflow-init.conf
+#   # 编辑 .workflow-init.conf
+#   bash workflow-portable/init.sh --unattended .workflow-init.conf
+#
+# 安全提示：本文件会被 bash source，行为等同于执行任意脚本。
+# 只 source 来自可信源的配置。
+
+# ---------------- 项目基本信息 ----------------
+PROJECT_NAME="myapp"
+PROJECT_TYPE="Web应用"
+PRIMARY_STACK="TypeScript 5 + Next.js 15"
+
+# ---------------- 验证与回滚 ----------------
+VERIFY_COMMANDS="pnpm test && pnpm typecheck"
+ROLLBACK="git reset --hard HEAD"
+CRITICAL_PATHS="src/, app/, prisma/"
+
+# ---------------- 接入选择 ----------------
+# LEVEL: 0=单 agent / 1=多线程 / 2=+QA / 3=+JSON
+LEVEL=0
+USE_SDD=y                    # y / n
+CREATE_FIRST_SPEC=n          # y / n（如果 y，必须填 FIRST_SPEC_NAME）
+FIRST_SPEC_NAME=""           # 例如 user-auth；仅 CREATE_FIRST_SPEC=y 时生效
+
+# ---------------- Constitution 关键内容 ----------------
+# 留空 → 保留 {{...}} 占位符让你后续手填
+PRINCIPLE_1_NAME=""          # 例如：数据最小化
+PRINCIPLE_2_NAME=""          # 例如：可观测优先
+PRINCIPLE_3_NAME=""          # 例如：失败即可见
+
+NON_NEGOTIABLE_1=""          # 例如：用户密码必须 bcrypt + salt，禁止明文
+NON_NEGOTIABLE_2=""          # 例如：所有外部 API 调用必须有超时和重试边界
+NON_NEGOTIABLE_3=""          # 例如：禁止在生产数据库直连情况下跑迁移
+
+TEST_COVERAGE="80"           # 单元测试覆盖率目标 %

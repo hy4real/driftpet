@@ -94,7 +94,7 @@ Status legend:
   - final delivery includes status + artifact reporting
 - Verification:
   - `npm run typecheck`
-  - `npm run test:workflow`
+  - `npm run check:repo`
   - any new targeted tests
 
 ## Execution Order

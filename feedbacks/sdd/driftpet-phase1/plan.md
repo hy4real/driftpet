@@ -251,6 +251,6 @@ Phase 1 verification should prove both promises separately.
 ### Baseline repo verification
 
 - `npm run typecheck`
-- `npm run test:workflow`
+- `npm run check:repo`
 - relevant Telegram/unit tests
 - any new targeted tests introduced by the runner or drag changes

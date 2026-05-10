@@ -1,7 +1,6 @@
 {
-  "task_id": "0507T001",
+  "task_id": "0510T001",
   "title": "Replace this title",
-  "task_type": "CODE_CHANGE",
   "intent": "Describe the user's intent in one sentence",
   "goal": "Describe the concrete, verifiable outcome",
   "scope": [
@@ -12,36 +11,34 @@
     "infra/",
     "unrelated modules"
   ],
-  "required_agent": "executor",
-  "mode": "solo | build | review | research",
   "acceptance": [
-    "List the checks that prove success"
+    "List the checks that prove success — each must be machine-verifiable"
   ],
   "risk_boundary": [
     "State what must not be changed",
     "State the blast-radius limit",
     "State when execution must stop and return BLOCKED"
   ],
-  "evidence_refs": [
-    "Optional paths, logs, or source links"
+  "verify": [
+    "command 1 with expected exit code",
+    "command 2 with expected output snippet"
   ],
-  "current_state": "ROUTE_OR_EXECUTE",
+  "rollback": "Describe the clean rollback point or say 'not needed'",
+  "executor": "executor-name",
   "external_status": "待执行",
-  "report_format": [
+  "report_format_required": [
     "执行线程",
     "任务ID",
     "状态",
-    "是否进行QA验收",
-    "QA说明",
     "files",
     "action",
     "verify",
     "done",
     "blockers",
-    "最小下一步",
-    "commit",
-    "提交信息"
+    "最小下一步"
   ],
-  "rollback_hint": "Describe the clean rollback point or say not needed",
+  "qa_required": false,
+  "qa_mode": "none",
+  "evidence_refs": [],
   "caused_by": "user_request"
 }

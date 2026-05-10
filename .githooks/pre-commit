@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
 
-printf '%s\n' '[workflow] running workflow health gate'
-npm run workflow:check
+printf '%s\n' '[workflow] running repo quality gate'
+npm run check:repo

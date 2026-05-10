@@ -3,23 +3,23 @@ import assert from "node:assert/strict"
 
 import { parseLoreCommitMessage, validateLoreCommitMessage } from "./validate-lore-commit.mjs"
 
-const validMessage = `Prevent workflow drift from bypassing local checks
+const validMessage = `Keep commit gates aligned with the current repo workflow
 
-The repo now enforces workflow health before commit and validates
+The repo now runs lightweight repo checks before commit and validates
 Lore trailers for commit hygiene.
 
 Confidence: high
 Scope-risk: narrow
-Tested: npm run workflow:check
+Tested: npm run check:repo
 `
 
 test("parseLoreCommitMessage extracts subject and trailers", () => {
   const parsed = parseLoreCommitMessage(validMessage)
 
-  assert.equal(parsed.subject, "Prevent workflow drift from bypassing local checks")
+  assert.equal(parsed.subject, "Keep commit gates aligned with the current repo workflow")
   assert.equal(parsed.trailers.get("Confidence"), "high")
   assert.equal(parsed.trailers.get("Scope-risk"), "narrow")
-  assert.equal(parsed.trailers.get("Tested"), "npm run workflow:check")
+  assert.equal(parsed.trailers.get("Tested"), "npm run check:repo")
 })
 
 test("validateLoreCommitMessage accepts valid lore commit message", () => {

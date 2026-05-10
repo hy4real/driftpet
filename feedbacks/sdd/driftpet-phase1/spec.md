@@ -96,7 +96,7 @@ Phase 1 is correct when the user can say all of the following are true:
 
 - Phase 1 is a spec-first effort; this document freezes intent before implementation planning.
 - The first delivery after this step is workflow plus `spec.md`, not product implementation.
-- Existing `.omx/` state and `workflow-fusion/` protocol surfaces remain in place; this spec does not replace them.
+- Existing repo workflow surfaces (`CLAUDE.md`, `constitution.md`, and `feedbacks/sdd/`) remain in place; this spec narrows one work packet inside them.
 - Scope must stay narrow enough that later `plan.md` and `tasks.md` can remain concrete.
 
 ## Evidence Behind This Spec

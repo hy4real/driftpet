@@ -94,25 +94,28 @@ DRIFTPET_EMBED_MODEL=qwen3-embedding:0.6b
 
 ## Workflow
 
-This repo's real execution source of truth stays in `.omx/`.
-The `workflow-fusion/` folder is adapted here as a thin protocol layer for structured task packets, fixed report shapes, and append-only task events.
+This repo no longer uses `omx` or the old `workflow-fusion` bridge runtime.
+
+Current workflow surfaces are:
+
+- `workflow-portable/` for reusable templates and adoption docs
+- `CLAUDE.md` for the repo-local execution contract
+- `constitution.md` for durable product and engineering constraints
+- `feedbacks/sdd/` for non-trivial `spec.md` / `plan.md` / `tasks.md` packets
 
 Use it like this:
 
 ```bash
 npm run hooks:install
-npm run workflow:refresh
-npm run workflow:status
-npm run workflow:check
+npm run check:repo
 ```
 
-`workflow:refresh` now exports the current overnight-loop Ralph task into `.workflow/runtime/`, runs the Workflow Fusion guards, runs repo verification, writes the latest structured report, and appends runtime events without replacing `.omx`.
+For new scoped work, start from `docs/sdd-workflow.md` and create or update a packet under `feedbacks/sdd/`.
+`npm run check:repo` runs the current lightweight repo gate: `typecheck` plus the Lore commit validation test.
 `npm run test:lore` covers Lore commit-message validation.
-`npm run test:workflow` covers the bridge's task/report/status shaping logic with zero-dependency Node tests.
-`npm run workflow:check` exits non-zero when the workflow projection is stale or blocked.
-`npm run hooks:install` points local git hooks at `.githooks/`, where pre-commit runs the workflow health gate.
+`npm run hooks:install` points local git hooks at `.githooks/`, where pre-commit runs the same repo gate.
 `.githooks/commit-msg` validates Lore commit format before a commit is accepted.
-Details are in `docs/workflow-fusion-adoption.md`.
+Template-level guidance lives in `workflow-portable/docs/adoption-guide.md` and `workflow-portable/spec-kit/README.md`.
 
 ## What the app currently does
 

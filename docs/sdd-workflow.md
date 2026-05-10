@@ -121,24 +121,27 @@ If a task is blocked, write:
 
 ## Boundary With Existing Repo Systems
 
-This repo already has two important systems:
+This repo already has four important workflow surfaces:
 
-1. `.omx/` for runtime state, plans, memory, and execution context
-2. `workflow-fusion/` plus `.workflow/runtime/` for structured projections, report guards, and append-only events
+1. `CLAUDE.md` for repo-level execution rules and delivery format
+2. `constitution.md` for durable product and engineering constraints
+3. `feedbacks/sdd/...` for task-local `spec.md` / `plan.md` / `tasks.md` packets
+4. `workflow-portable/` as the template source these repo files were derived from
 
-SDD does not replace either one.
+SDD does not replace them.
 
 Use them like this:
 
 - `feedbacks/sdd/...` is the human-readable requirement and execution packet
-- `.omx/` remains the execution source of truth during active work
-- `.workflow/runtime/` remains a machine-readable projection and report surface
+- `CLAUDE.md` constrains how work is executed and reported
+- `constitution.md` constrains product, technical, and quality decisions
+- `workflow-portable/` is the upstream template reference when the repo wants to refresh its workflow scaffolding
 
 Rule:
 
 - `spec.md`, `plan.md`, and `tasks.md` define what should happen
-- `.omx/` tracks what is happening
-- `.workflow/runtime/` records a structured mirror for guards and reports
+- code, tests, and delivery evidence show what happened
+- `CLAUDE.md` and `constitution.md` define what is allowed
 
 ## First-Phase Operating Rule
 

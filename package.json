@@ -37,16 +37,10 @@
     "test:window-state": "node --test --experimental-strip-types src/main/app/window-state.test.mjs",
     "test:clipboard-watcher": "node --test --experimental-strip-types src/main/clipboard/watcher.test.mjs",
     "probe:url-fallback": "node scripts/probe-url-fallback-digest.mjs",
+    "check:repo": "npm run typecheck && npm run test:lore",
     "test:lore": "node --test scripts/validate-lore-commit.test.mjs",
-    "test:workflow": "node --test scripts/workflow-fusion-bridge.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
-    "validate:lore:commit": "node scripts/validate-lore-commit.mjs .git/COMMIT_EDITMSG",
-    "workflow:sync": "node scripts/workflow-fusion-bridge.mjs sync",
-    "workflow:refresh": "node scripts/workflow-fusion-bridge.mjs refresh",
-    "workflow:status": "node scripts/workflow-fusion-bridge.mjs status",
-    "workflow:check": "node scripts/workflow-fusion-bridge.mjs check",
-    "workflow:guard:dispatch": "node workflow-fusion/scripts/response-guard.mjs --kind dispatch --file .workflow/runtime/reports/driftpet-overnight-loop-dispatch.md",
-    "workflow:guard:report": "node workflow-fusion/scripts/response-guard.mjs --kind report --file .workflow/runtime/reports/driftpet-overnight-loop-latest.md"
+    "validate:lore:commit": "node scripts/validate-lore-commit.mjs .git/COMMIT_EDITMSG"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
