@@ -126,7 +126,7 @@ test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {
   );
 });
 
-test("passesRelatedThreshold allows cross-language chaos matches with sufficient embedding", () => {
+test("passesRelatedThreshold rejects cross-language chaos matches without lexical support below the stronger floor", () => {
   const zhQuery = {
     source: "manual_chaos",
     title: "整理两数之和的哈希表解法",
@@ -143,6 +143,54 @@ test("passesRelatedThreshold allows cross-language chaos matches with sufficient
     candidate: enCandidate,
     lexical: 0,
     embedding: 0.5732,
+    finalScore: 0.52,
+    crossLanguage: true,
+  };
+
+  assert.equal(passesRelatedThreshold(zhQuery, entry), false);
+});
+
+test("passesRelatedThreshold allows cross-language chaos matches with very strong embedding", () => {
+  const zhQuery = {
+    source: "manual_chaos",
+    title: "整理两数之和的哈希表解法",
+    summaryForRetrieval: "整理两数之和的哈希表解法并用 Java 实现",
+  };
+
+  const enCandidate = {
+    ...chaosCandidate,
+    title: "Implement two-sum hash map in Java",
+    summaryForRetrieval: "implement two sum hash map in Java and return the matching indices",
+  };
+
+  const entry = {
+    candidate: enCandidate,
+    lexical: 0,
+    embedding: 0.63,
+    finalScore: 0.57,
+    crossLanguage: true,
+  };
+
+  assert.equal(passesRelatedThreshold(zhQuery, entry), true);
+});
+
+test("passesRelatedThreshold allows cross-language chaos matches with some shared terms", () => {
+  const zhQuery = {
+    source: "manual_chaos",
+    title: "整理 Java HashMap 解法",
+    summaryForRetrieval: "整理 Java HashMap 的两数之和解法",
+  };
+
+  const enCandidate = {
+    ...chaosCandidate,
+    title: "Implement Java HashMap solution",
+    summaryForRetrieval: "implement Java HashMap solution for two sum",
+  };
+
+  const entry = {
+    candidate: enCandidate,
+    lexical: 0.12,
+    embedding: 0.55,
     finalScore: 0.52,
     crossLanguage: true,
   };

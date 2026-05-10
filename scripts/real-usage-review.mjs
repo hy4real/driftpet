@@ -92,12 +92,19 @@ const qualityFlagsFor = (row, related) => {
   const useFor = row.use_for?.trim() ?? "";
   const tag = row.knowledge_tag?.trim() ?? "";
   const remark = row.pet_remark?.trim() ?? "";
+  const summary = row.summary_for_retrieval?.trim() ?? "";
 
   if (title.length === 0 || title.length > 80) {
     flags.push("title");
   }
+  if (title.length > 0 && summary.length > 0 && title === summary) {
+    flags.push("title-echoes-summary");
+  }
   if (useFor.length === 0 || useFor.length > 300) {
     flags.push("next-step");
+  }
+  if (/turn this into one next action/i.test(useFor)) {
+    flags.push("fallback-next-step");
   }
   if (/next concrete output|first five-minute step|下一条具体产出|第?一?个?五分钟动作/i.test(useFor)) {
     flags.push("generic-next-step");
@@ -107,6 +114,9 @@ const qualityFlagsFor = (row, related) => {
   }
   if (tag.length === 0 || tag.length > 40) {
     flags.push("tag");
+  }
+  if (/^(captured note|捕获笔记|captured article|捕获文章)$/i.test(tag)) {
+    flags.push("generic-tag");
   }
   if (remark.length === 0 || remark.length > 120) {
     flags.push("remark");
