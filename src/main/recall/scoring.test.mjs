@@ -125,3 +125,51 @@ test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {
     true
   );
 });
+
+test("passesRelatedThreshold allows cross-language chaos matches with sufficient embedding", () => {
+  const zhQuery = {
+    source: "manual_chaos",
+    title: "整理两数之和的哈希表解法",
+    summaryForRetrieval: "整理两数之和的哈希表解法并用 Java 实现",
+  };
+
+  const enCandidate = {
+    ...chaosCandidate,
+    title: "Implement hash-map solutions for LeetCode problems",
+    summaryForRetrieval: "implement hash map solutions for leetcode two sum and group anagrams",
+  };
+
+  const entry = {
+    candidate: enCandidate,
+    lexical: 0,
+    embedding: 0.5732,
+    finalScore: 0.52,
+    crossLanguage: true,
+  };
+
+  assert.equal(passesRelatedThreshold(zhQuery, entry), true);
+});
+
+test("passesRelatedThreshold rejects cross-language chaos matches with weak embedding", () => {
+  const zhQuery = {
+    source: "manual_chaos",
+    title: "写一段关于代码智能体的短论点",
+    summaryForRetrieval: "写一段关于代码智能体如何改变持续学习路径的短论点",
+  };
+
+  const enCandidate = {
+    ...chaosCandidate,
+    title: "Implement Group Anagrams using a sorted-string hash map key",
+    summaryForRetrieval: "implement group anagrams using sorted string hash map key and return grouped results",
+  };
+
+  const entry = {
+    candidate: enCandidate,
+    lexical: 0,
+    embedding: 0.39,
+    finalScore: 0.37,
+    crossLanguage: true,
+  };
+
+  assert.equal(passesRelatedThreshold(zhQuery, entry), false);
+});

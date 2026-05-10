@@ -162,7 +162,7 @@ export const resizeMainWindow = (
 ): void => {
   const currentBounds = window.getBounds();
   const display = screen.getDisplayMatching(currentBounds);
-  const nextBounds = calculateResizedBounds(currentBounds, { width, height }, display.workArea);
+  const nextBounds = calculateResizedBounds(currentBounds, { width, height }, display.bounds);
 
   if (windowKey !== undefined) {
     window.setHasShadow(windowKey !== "mini");

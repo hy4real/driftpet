@@ -21,7 +21,7 @@ export type RecallCandidateLike = {
 export const CHAOS_DUPLICATE_THRESHOLD = 0.92;
 export const CHAOS_SIMILAR_THRESHOLD = 0.68;
 export const CHAOS_MIN_FINAL_SCORE = 0.64;
-export const CHAOS_MIN_EMBEDDING = 0.58;
+export const CHAOS_MIN_EMBEDDING = 0.52;
 export const CHAOS_MIN_LEXICAL = 0.38;
 // Strong semantic match waives the lexical floor so cross-language and
 // cross-phrasing chaos cards that share the same underlying thread can still
@@ -158,6 +158,7 @@ export const passesRelatedThreshold = (
     lexical: number;
     embedding: number | null;
     finalScore: number;
+    crossLanguage?: boolean;
   }
 ): boolean => {
   if (isNearDuplicateChaosReset(query, entry.candidate, entry.lexical)) {
@@ -166,6 +167,10 @@ export const passesRelatedThreshold = (
 
   if (query.source === "manual_chaos" && entry.candidate.source === "manual_chaos") {
     if (entry.embedding !== null) {
+      if (entry.crossLanguage) {
+        return entry.embedding >= CHAOS_MIN_EMBEDDING;
+      }
+
       if (entry.embedding >= CHAOS_STRONG_EMBEDDING) {
         return entry.finalScore >= CHAOS_STRONG_MIN_FINAL_SCORE;
       }

@@ -18,12 +18,18 @@ type FindRelatedResult = {
 type RelatedQuery = {
   source: ItemSource;
   title: string;
+  knowledgeTag: string;
   summaryForRetrieval: string;
   rawUrl?: string | null;
 };
 
 const MAX_RELATED = 2;
 const MAX_CANDIDATES = 50;
+
+const buildEmbeddingText = (title: string, knowledgeTag: string | null, summaryForRetrieval: string): string => {
+  const tag = knowledgeTag ?? "";
+  return `${title} | ${tag} | ${summaryForRetrieval}`;
+};
 
 const buildReason = (summary: string, languageHint: string): string => {
   const snippet = summary.trim().replace(/\s+/g, " ").slice(0, 96);
@@ -103,23 +109,29 @@ export const findRelatedCards = async (
     .filter(isRecallEligible)
     .filter((candidate) => !isSameUrlReference(query, candidate))
     .filter((candidate) => !isCrossLanguageTelegramTextRecall(query, candidate));
+  const queryText = buildEmbeddingText(query.title, query.knowledgeTag, query.summaryForRetrieval);
   const queryEmbedding = canUseEmbeddings()
-    ? await generateEmbedding(query.summaryForRetrieval).catch(() => null)
+    ? await generateEmbedding(queryText).catch(() => null)
     : null;
 
   const scored = candidates.map((candidate) => {
-    const lexical = lexicalSimilarity(query.summaryForRetrieval, candidate.summaryForRetrieval);
+    const candidateText = buildEmbeddingText(candidate.title, candidate.knowledgeTag, candidate.summaryForRetrieval);
+    const lexical = lexicalSimilarity(queryText, candidateText);
     const embedding = queryEmbedding !== null && candidate.embedding !== null
       ? cosineSimilarity(queryEmbedding, candidate.embedding)
       : null;
     const recencyBoost = Math.max(0, 1 - (Date.now() - candidate.createdAt) / (1000 * 60 * 60 * 24 * 30)) * 0.05;
     const finalScore = (embedding !== null ? (embedding * 0.82) + (lexical * 0.18) : lexical) + recencyBoost;
+    const crossLanguage = query.source === "manual_chaos"
+      && candidate.source === "manual_chaos"
+      && detectOutputLanguage(query.title, query.summaryForRetrieval) !== detectOutputLanguage(candidate.title, candidate.summaryForRetrieval);
 
     return {
       candidate,
       lexical,
       embedding,
-      finalScore
+      finalScore,
+      crossLanguage
     };
   });
 

@@ -1321,3 +1321,123 @@ test("workbench collapse button takes the user straight back to mini", async () 
   cleanup();
   await cleanupBundle();
 });
+
+// --- G4: end-to-end remembered-thread validation ---
+
+test("G4: isolated continuity mode hides remembered thread across all window modes", async () => {
+  const saved = sampleStatus.pet.rememberedThread;
+  sampleStatus.pet.rememberedThread = null;
+
+  try {
+    const { App, cleanupBundle } = await buildAppModule();
+    const { cleanup, setWindowSizeCalls } = setupDom();
+    const container = document.getElementById("root");
+    assert.ok(container);
+
+    const root = ReactDOMClient.createRoot(container);
+
+    await act(async () => {
+      root.render(React.createElement(App));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Mini mode: no resume thread entry when rememberedThread is null.
+    assert.equal(
+      container.querySelector(".pet-mini-resume-thread"),
+      null,
+      "isolated mode must not show the mini resume thread entry"
+    );
+
+    // Open the nest — resume strip must also be absent.
+    await openNestWithContextMenu(container);
+    assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+    assert.equal(
+      container.querySelector(".pet-workbench-resume-strip"),
+      null,
+      "isolated mode must not show the expanded resume strip"
+    );
+
+    // Earlier-cards fold should still work independently of remembered thread.
+    const toggle = container.querySelector(".pet-workbench-history-toggle");
+    assert.ok(toggle, "earlier-cards toggle should still be present in isolated mode");
+
+    await act(async () => {
+      root.unmount();
+    });
+
+    cleanup();
+    await cleanupBundle();
+  } finally {
+    sampleStatus.pet.rememberedThread = saved;
+  }
+});
+
+test("G4: remembered thread card can be dispatched to Claude Code from the history drawer", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeCodeCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  // Open the expanded nest and the earlier-cards fold.
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const toggle = container.querySelector(".pet-workbench-history-toggle");
+  assert.ok(toggle);
+  await act(async () => {
+    toggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  // Click a history item to select it.
+  const items = container.querySelectorAll(".pet-workbench-history-item");
+  assert.ok(items.length > 0, "expected at least one history item");
+  await act(async () => {
+    items[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  // The selected card should be the remembered thread card.
+  const cardId = sampleStatus.pet.rememberedThread?.cardId;
+  assert.ok(cardId !== undefined, "remembered thread must have a cardId");
+
+  // Find and click the dispatch button for this card.
+  const dispatchButton = Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent?.includes("派给 Claude Code")
+  );
+  assert.ok(dispatchButton, "expected Claude Code dispatch button for the selected card");
+
+  await act(async () => {
+    dispatchButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  assert.deepEqual(
+    dispatchClaudeCodeCalls,
+    [cardId],
+    "dispatch should target the remembered thread card id"
+  );
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("G4: remembered thread status structure is valid", () => {
+  const thread = sampleStatus.pet.rememberedThread;
+  assert.ok(thread !== null, "rememberedThread must be populated in sample status");
+  assert.equal(typeof thread.cardId, "number", "rememberedThread.cardId must be a number");
+  assert.equal(typeof thread.title, "string", "rememberedThread.title must be a string");
+  assert.ok(thread.title.length > 0, "rememberedThread.title must be non-empty");
+  assert.equal(typeof thread.createdAt, "number", "rememberedThread.createdAt must be a number");
+});

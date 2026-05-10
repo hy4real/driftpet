@@ -319,6 +319,7 @@ export const ingestInputDetailed = async (input: IngestInput): Promise<IngestRes
       source: input.source,
       rawUrl: input.rawUrl ?? null,
       title: digestResult.digest.title,
+      knowledgeTag: digestResult.digest.knowledgeTag,
       summaryForRetrieval: digestResult.digest.summaryForRetrieval
     }, pending.itemId);
 

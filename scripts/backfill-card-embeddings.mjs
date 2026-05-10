@@ -6,6 +6,7 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const args = new Set(process.argv.slice(2));
 const apply = args.has("--apply");
+const force = args.has("--force");
 
 const electronScript = `
 const path = require("node:path");
@@ -18,17 +19,29 @@ const { canUseEmbeddings, generateEmbedding, getEmbeddingMissingReason } = requi
 const { getEmbeddingRuntimeConfig } = require(path.join(${JSON.stringify(repoRoot)}, "dist-electron/src/main/llm/config.js"));
 
 const APPLY = ${JSON.stringify(apply)};
+const FORCE = ${JSON.stringify(force)};
+
+const buildEmbeddingText = (title, knowledgeTag, summary) => {
+  const tag = knowledgeTag ?? "";
+  return title + " | " + tag + " | " + summary;
+};
 
 (async () => {
   const config = getEmbeddingRuntimeConfig();
   const usable = canUseEmbeddings();
 
   const db = getDatabase();
+
+  if (FORCE) {
+    db.prepare(\`DELETE FROM card_embeddings\`).run();
+  }
+
   const rows = db.prepare(\`
     SELECT
       cards.id AS card_id,
       cards.item_id AS item_id,
       cards.title AS title,
+      cards.knowledge_tag AS knowledge_tag,
       cards.summary_for_retrieval AS summary,
       cards.created_at AS created_at,
       items.source AS source,
@@ -42,6 +55,7 @@ const APPLY = ${JSON.stringify(apply)};
 
   const summary = {
     apply: APPLY,
+    force: FORCE,
     embeddingProvider: config.provider,
     embeddingModel: config.model,
     embeddingEndpoint: config.endpoint,
@@ -78,7 +92,8 @@ const APPLY = ${JSON.stringify(apply)};
     }
 
     try {
-      const vector = await generateEmbedding(row.summary);
+      const embeddingText = buildEmbeddingText(row.title, row.knowledge_tag, row.summary);
+      const vector = await generateEmbedding(embeddingText);
       if (!Array.isArray(vector) || vector.length === 0) {
         summary.results.push({ cardId: row.card_id, status: "failed", reason: "empty vector" });
         continue;
