@@ -131,6 +131,71 @@ const summarizeChaosThreadForStep = (value: string, limit: number): string => {
   return truncate(trimSentenceEnding(value), limit);
 };
 
+const isThreadDriftText = (value: string): boolean => {
+  const normalized = normalizeText(value);
+  const lower = normalized.toLowerCase();
+  return /\b(?:spiral(?:ing)?|drift(?:ed|ing)?|lost the thread|too many tabs|rabbit hole)\b/i.test(lower)
+    || /标签页|开.*标签|丢线|跑偏|飘了|分心/u.test(normalized);
+};
+
+const hasTabDrift = (value: string): boolean => {
+  const normalized = normalizeText(value);
+  return /\btabs?\b/i.test(normalized) || /标签页|标签/u.test(normalized);
+};
+
+const extractDeclaredThreadLabel = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  const patterns = language === "zh"
+    ? [
+      /(?:主线|真正(?:该|要)做的|现在(?:该|要)做的|当前任务)\s*(?:是|：|:)\s*([^。！？\n]+)/u,
+      /(?:而是|回到)\s*([^。！？\n]+)/u,
+      /(?:下一步|下一件事)\s*(?:是|：|:)\s*([^。！？\n]+)/u,
+    ]
+    : [
+      /\b(?:real (?:job|deliverable|task|work)|main (?:thread|line)|current task)\s+(?:is|:)\s+([^.!?\n]+)/i,
+      /\b(?:return to|go back to|back to)\s+([^.!?\n]+)/i,
+      /\b(?:next useful move|next step)\s+(?:is|:)\s+([^.!?\n]+)/i,
+    ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    const candidate = normalizeText(match?.[1] ?? "")
+      .replace(/^(to|把|先把|先|继续|立刻)\s*/iu, "")
+      .replace(/[，,;；:：\s]+$/u, "");
+    if (candidate.length > 0) {
+      return truncate(candidate, language === "zh" ? 48 : 60);
+    }
+  }
+
+  return null;
+};
+
+const buildThreadDriftTitle = (value: string, language: OutputLanguage): string => {
+  if (language === "zh") {
+    return hasTabDrift(value) ? "标签页漂移复位" : "回到当前主线";
+  }
+
+  return hasTabDrift(value) ? "Tab drift reset" : "Return to the current thread";
+};
+
+const buildThreadDriftUseFor = (
+  value: string,
+  language: OutputLanguage,
+  threadLabel: string
+): string => {
+  if (language === "zh") {
+    const action = hasTabDrift(value)
+      ? "关掉两个无关标签页"
+      : "先停下当前岔线";
+    return `${action}，写下“${summarizeChaosThreadForStep(threadLabel, 28)}”的第一条检查项，然后立刻做五分钟。`;
+  }
+
+  const action = hasTabDrift(value)
+    ? "Close two unrelated tabs"
+    : "Pause the side branch";
+  return `${action}, write the first checklist line for "${summarizeChaosThreadForStep(threadLabel, 40)}", and work on it for five minutes now.`;
+};
+
 const buildTelegramTextKnowledgeTag = (title: string, language: OutputLanguage): string => {
   const clauses = normalizeText(title)
     .split(/[，,:;：]/u)
@@ -154,6 +219,11 @@ const buildTelegramTextKnowledgeTag = (title: string, language: OutputLanguage):
 };
 
 const extractTelegramThreadLabel = (value: string, language: OutputLanguage): string => {
+  const declared = extractDeclaredThreadLabel(value, language);
+  if (declared !== null) {
+    return declared;
+  }
+
   const clauses = normalizeText(value)
     .split(/[。.!?！？\n，,:;：]/u)
     .map((clause) => normalizeText(clause))
@@ -321,14 +391,18 @@ const createUrlReferenceFallback = (input: DigestInput): DigestDraft => {
 const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
   const contentBasis = normalizeText(input.rawText);
   const language = detectOutputLanguage(input.rawText, input.extractedText, input.extractedTitle);
-  const title = extractTelegramThreadLabel(contentBasis, language);
+  const title = isThreadDriftText(contentBasis) && extractDeclaredThreadLabel(contentBasis, language) === null
+    ? buildThreadDriftTitle(contentBasis, language)
+    : extractTelegramThreadLabel(contentBasis, language);
   const knowledgeTag = buildTelegramTextKnowledgeTag(title, language);
   const thread = summarizeChaosThreadForStep(title, language === "zh" ? 28 : 40);
 
   if (language === "zh") {
     return {
       title,
-      useFor: `先围绕“${thread}”只做一个当前动作，别把这条信息扩成新分支。`,
+      useFor: isThreadDriftText(contentBasis)
+        ? buildThreadDriftUseFor(contentBasis, language, thread)
+        : `先围绕“${thread}”只做一个当前动作，别把这条信息扩成新分支。`,
       knowledgeTag,
       summaryForRetrieval: truncate(`${title} ${thread}`, 500),
       petRemark: "你已经意识到飘了，先把这一条收紧。"
@@ -337,7 +411,9 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
 
   return {
     title,
-    useFor: `Do only this next: ${thread}. Do not turn it into a broader redesign.`,
+    useFor: isThreadDriftText(contentBasis)
+      ? buildThreadDriftUseFor(contentBasis, language, thread)
+      : `Do only this next: ${thread}. Do not turn it into a broader redesign.`,
     knowledgeTag,
     summaryForRetrieval: truncate(`${title} ${thread}`, 500),
     petRemark: "You noticed the drift. Keep the next move small."
@@ -383,8 +459,19 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
 
 const createChaosResetFallback = (input: DigestInput): DigestDraft => {
   const contentBasis = normalizeText(input.rawText);
-  const mainLine = cleanChaosMainLine(contentBasis, "Pick one concrete deliverable for this thread.");
   const language = detectOutputLanguage(input.rawText);
+  const declaredThread = extractDeclaredThreadLabel(contentBasis, language);
+  const cleanedMainLine = cleanChaosMainLine(contentBasis, "Pick one concrete deliverable for this thread.");
+  const shouldUseGenericDriftTitle = isThreadDriftText(contentBasis)
+    && declaredThread === null
+    && (
+      cleanedMainLine === "Pick one concrete deliverable for this thread."
+      || cleanedMainLine === contentBasis
+    );
+  const mainLine = declaredThread
+    ?? (shouldUseGenericDriftTitle
+      ? buildThreadDriftTitle(contentBasis, language)
+      : cleanedMainLine);
 
   if (language === "zh") {
     const fallbackMainLine = "先定一个这条线现在要交付的具体东西。";
@@ -395,7 +482,9 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     const sideQuests = /https?:\/\//i.test(contentBasis)
       ? "先放下那些不能直接推进主交付的链接和标签页。"
       : "先放下所有不能直接推进当前交付的岔线。";
-    const nextStep = `关掉两个无关标签页，写下“${stepThread}”的第一条检查项，然后立刻做五分钟。`;
+    const nextStep = isThreadDriftText(contentBasis)
+      ? buildThreadDriftUseFor(contentBasis, language, stepThread)
+      : `关掉两个无关标签页，写下“${stepThread}”的第一条检查项，然后立刻做五分钟。`;
 
     return {
       title: resolvedMainLine,
@@ -410,7 +499,9 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     ? "Set aside the extra links and tabs that do not unblock the main deliverable."
     : "Set aside anything that does not move the current deliverable forward.";
   const stepThread = summarizeChaosThreadForStep(mainLine, 40);
-  const nextStep = `Close two unrelated tabs, write the first checklist line for "${stepThread}", and work on it for five minutes now.`;
+  const nextStep = isThreadDriftText(contentBasis)
+    ? buildThreadDriftUseFor(contentBasis, language, stepThread)
+    : `Close two unrelated tabs, write the first checklist line for "${stepThread}", and work on it for five minutes now.`;
 
   return {
     title: mainLine,
@@ -506,6 +597,41 @@ const coerceStringInLanguage = (
 ): string => {
   const candidate = coerceString(value, fallback, limit);
   return matchesOutputLanguage(language, candidate) ? candidate : truncate(fallback, limit);
+};
+
+const isGenericNextStep = (value: string): boolean => {
+  const normalized = normalizeText(value);
+  const lower = normalized.toLowerCase();
+  return normalized.length === 0
+    || /^turn this into one next action/i.test(normalized)
+    || /\b(?:review|read|summarize|analyze|explore|improve|optimize|continue working on|look into)\b/i.test(lower)
+    || /(?:下一步动作|具体产出|最小可交付|继续优化|继续完善|整理一下|分析一下|看一下|研究一下)/u.test(normalized);
+};
+
+const refineUseFor = (
+  candidate: string,
+  fallback: string,
+  input: DigestInput,
+  language: OutputLanguage
+): string => {
+  if (!isGenericNextStep(candidate)) {
+    return candidate;
+  }
+
+  const contentBasis = normalizeText(input.rawText);
+  if (isThreadDriftText(contentBasis)) {
+    const thread = extractDeclaredThreadLabel(contentBasis, language)
+      ?? buildThreadDriftTitle(contentBasis, language);
+    return buildThreadDriftUseFor(contentBasis, language, thread);
+  }
+
+  return fallback;
+};
+
+const extractFallbackNextStep = (fallbackUseFor: string, language: OutputLanguage): string => {
+  const marker = language === "zh" ? /下一步：\s*/u : /Next:\s*/i;
+  const parts = fallbackUseFor.split(marker);
+  return normalizeText(parts.at(1) ?? fallbackUseFor);
 };
 
 const finalizeKnowledgeTag = (
@@ -695,12 +821,18 @@ const generateChaosResetDraft = async (
       180,
       language
     );
+    const refinedNextStep = refineUseFor(
+      nextStep,
+      extractFallbackNextStep(fallback.useFor, language),
+      input,
+      language
+    );
 
     const digest: DigestDraft = {
       title: mainLine,
       useFor: language === "zh"
-        ? `先放下：${sideQuests}\n下一步：${nextStep}`
-        : `Set aside: ${sideQuests}\nNext: ${nextStep}`,
+        ? `先放下：${sideQuests}\n下一步：${refinedNextStep}`
+        : `Set aside: ${sideQuests}\nNext: ${refinedNextStep}`,
       knowledgeTag: coerceStringInLanguage(
         parsed.knowledgeTag,
         language === "zh" ? "线程复位" : "chaos reset",
@@ -782,7 +914,12 @@ export const generateDigestDraft = async (
         language
       )
       : coerceStringInLanguage(digestJson.title, fallback.title, 120, language);
-    const useFor = coerceStringInLanguage(digestJson.useFor, fallback.useFor, 260, language);
+    const useFor = refineUseFor(
+      coerceStringInLanguage(digestJson.useFor, fallback.useFor, 260, language),
+      fallback.useFor,
+      input,
+      language
+    );
     const knowledgeTag = finalizeKnowledgeTag(
       coerceStringInLanguage(digestJson.knowledgeTag, fallback.knowledgeTag, 80, language),
       fallback.knowledgeTag,

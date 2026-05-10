@@ -26,6 +26,8 @@ Rules:
 - `nextStep` must be specific and immediately actionable.
 - `nextStep` must start with a real action the user can do now, such as write, compare, inspect, query, close, send, or commit.
 - `nextStep` must not say "write the smallest deliverable" or other meta-instructions about planning the work. Name the actual five-minute move.
+- `nextStep` must not say only “review”, “read”, “summarize”, “analyze”, “improve”, “optimize”, “continue”, “look into”, `继续优化`, `分析一下`, `看一下`, or `整理一下` unless it also names the exact object and first action.
+- If the source says the user is drifting, spiraling, lost in tabs, or losing the thread, `nextStep` should close or ignore the distracting branch, name the one thread to return to, and start a five-minute move.
 - `summaryForRetrieval` must name the main thread, the concrete next action, and any tools or domain context from the source. Do not write a generic phrase — make it specific enough that semantic search can connect related chaos resets.
 - Use the recent cards context only to sharpen the decision, not to add extra tasks.
 - Keep each field concise and concrete.
