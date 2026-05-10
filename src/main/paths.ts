@@ -18,9 +18,16 @@ const resolveRepoRoot = (): string => {
     return explicit;
   }
 
-  const packagedAppRoot = resolvePackagedAppRoot();
-  if (packagedAppRoot !== null) {
-    return packagedAppRoot;
+  // Packaged app detection must come before CWD heuristic — when a user
+  // launches the .app from Finder while their terminal CWD is the repo,
+  // the CWD check would incorrectly win and point at the source tree.
+  const resourcesPath = process.resourcesPath;
+  if (
+    typeof resourcesPath === "string" &&
+    resourcesPath.length > 0 &&
+    fs.existsSync(path.join(resourcesPath, "app.asar"))
+  ) {
+    return path.join(resourcesPath, "app.asar");
   }
 
   const cwdPrompts = path.join(process.cwd(), "prompts");
@@ -81,7 +88,11 @@ export const getPromptsDir = (): string => {
 };
 
 export const getMigrationsDir = (): string => {
-  return path.join(getAppRoot(), "src/main/db/migrations");
+  const appRoot = getAppRoot();
+  if (isPackagedAppRoot(appRoot)) {
+    return path.join(appRoot, "dist-electron/migrations");
+  }
+  return path.join(appRoot, "src/main/db/migrations");
 };
 
 export const getRendererEntryPath = (): string => {

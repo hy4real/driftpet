@@ -14,6 +14,7 @@ data/pets/
 .omx/
 .workflow/
 release/
+DriftPet.app/
 .tmp/
 *.db-journal
 *.db-wal

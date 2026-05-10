@@ -11,7 +11,7 @@
     "dev:electron": "node scripts/dev-electron.mjs",
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && cp -r src/main/db/migrations dist-electron/migrations",
     "pack": "npm run build && electron-builder --mac",
     "pack:dir": "npm run build && electron-builder --mac --dir",
     "icon:generate": "node scripts/generate-icon.mjs",
