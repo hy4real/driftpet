@@ -57,7 +57,7 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
   }
 };
 
-const DEFAULT_CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_CODE_BIN?.trim() || "/Users/mac/.local/bin/claude";
+const DEFAULT_CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_CODE_BIN?.trim() || "claude";
 
 const shellQuote = (value: string): string => {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`;

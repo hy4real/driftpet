@@ -22,7 +22,8 @@ export type NoteRunnerResult = {
 
 const DEFAULT_VAULT_DIR = "/Users/mac/my-obsidian-vault";
 const VAULT_DIR = process.env.DRIFTPET_VAULT_DIR?.trim() || DEFAULT_VAULT_DIR;
-const CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_BIN?.trim() || "/Users/mac/.local/bin/claude";
+const CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_BIN?.trim() || "claude";
+const YT_DLP_BIN = process.env.DRIFTPET_YT_DLP_BIN?.trim() || "yt-dlp";
 const DEFAULT_CLAUDE_TIMEOUT_MS = 420_000;
 const VIDEO_METADATA_TIMEOUT_MS = 45_000;
 
@@ -315,9 +316,9 @@ const runYtDlpJson = async (url: string, useCookies: boolean): Promise<VideoMeta
 
   args.push(url);
 
-  const result = await spawnCommand("/opt/homebrew/bin/yt-dlp", args, VIDEO_METADATA_TIMEOUT_MS);
+  const result = await spawnCommand(YT_DLP_BIN, args, VIDEO_METADATA_TIMEOUT_MS);
   if (result.exitCode !== 0) {
-    const message = (result.stderr || result.stdout || `yt-dlp exited with code ${result.exitCode}`).trim();
+    const message = (result.stderr || result.stdout || `${YT_DLP_BIN} exited with code ${result.exitCode}`).trim();
     throw new Error(message);
   }
 
@@ -326,7 +327,7 @@ const runYtDlpJson = async (url: string, useCookies: boolean): Promise<VideoMeta
     .map((line) => line.trim())
     .find((line) => line.startsWith("{") && line.endsWith("}"));
   if (jsonLine === undefined) {
-    throw new Error("yt-dlp returned no metadata JSON.");
+    throw new Error(`${YT_DLP_BIN} returned no metadata JSON.`);
   }
 
   const payload = JSON.parse(jsonLine) as {

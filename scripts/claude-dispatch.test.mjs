@@ -50,7 +50,7 @@ test("buildClaudeLaunchCommand pipes the prompt file into claude stdin", async (
     assert.match(result.command, /cd '\/tmp\/driftpet-worktree' &&/);
     assert.match(result.command, /claude' --add-dir '\/tmp\/driftpet-worktree'/);
     assert.doesNotMatch(result.command, /\$\(cat /);
-    assert.equal(result.runner, "/Users/mac/.local/bin/claude");
+    assert.equal(result.runner, "claude");
   } finally {
     await cleanupBundle();
   }
