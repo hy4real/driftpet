@@ -62,7 +62,7 @@ const sampleStatus = {
       artifactPath: "/Users/mac/my-obsidian-vault/AI/Bilibili/【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md",
       created: true,
       cardId: 40,
-      cardTitle: "笔记已接住：【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！.md",
+      cardTitle: "【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！",
       processor: "video-to-note",
       extractionStage: "note_ingested",
       itemStatus: "digested",
@@ -751,7 +751,7 @@ test("status panel shows the latest Telegram processing result", async () => {
   });
 
   assert.match(container.textContent ?? "", /last update · 232043301/);
-  assert.match(container.textContent ?? "", /笔记已接住：/);
+  assert.match(container.textContent ?? "", /【闪客】大模型已死？上帝视角拆解三年 LLM 架构演进！/);
   assert.match(container.textContent ?? "", /https:\/\/b23\.tv\/Cmz4QJI/);
   assert.match(container.textContent ?? "", /result · 已生成或更新卡片/);
   assert.match(container.textContent ?? "", /AI\/Bilibili/);

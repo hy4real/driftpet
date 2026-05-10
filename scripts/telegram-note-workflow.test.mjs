@@ -22,14 +22,14 @@ test("buildDigestOverride returns deterministic card payload for note workflow",
     rawText: "https://example.com/post",
     extractedText: "Skill: article-to-note\n\nArtifact: /Users/mac/my-obsidian-vault/AI/Articles/foo.md",
     processor: "article-to-note",
-    workflowTitle: "笔记已接住：foo.md",
+    workflowTitle: "foo",
     workflowUseFor: "先看生成的笔记是否落在预期目录，再决定要不要继续做二次 ingest 或整理。",
     workflowKnowledgeTag: "article-to-note",
     workflowPetRemark: "链接我已经替你送进本地仓库了。"
   };
 
   assert.deepEqual(buildDigestOverride(enriched), {
-    title: "笔记已接住：foo.md",
+    title: "foo",
     useFor: "先看生成的笔记是否落在预期目录，再决定要不要继续做二次 ingest 或整理。",
     knowledgeTag: "article-to-note",
     summaryForRetrieval: "Skill: article-to-note\n\nArtifact: /Users/mac/my-obsidian-vault/AI/Articles/foo.md",
