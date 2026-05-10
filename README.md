@@ -87,6 +87,7 @@ DRIFTPET_EMBED_MODEL=qwen3-embedding:0.6b
 
 - If `TELEGRAM_BOT_TOKEN` is empty, driftpet still runs, but Telegram polling stays off.
 - If no LLM key is configured, driftpet still creates a simple local placeholder note and records the reason in `items.last_error`.
+- If you use note workflows against a non-default Obsidian vault, set `DRIFTPET_VAULT_DIR=/absolute/path/to/your/vault`.
 - Memory recall can use a different provider than the main note-making model.
 - For split setups, keep your relay key on `DRIFTPET_LLM_API_KEY` and put your separate OpenAI embeddings key on `DRIFTPET_EMBED_API_KEY`.
 - Synthetic verification items are kept separate from real items and are filtered out of normal related-memory recall.

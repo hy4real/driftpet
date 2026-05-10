@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-const VAULT_DIR = "/Users/mac/my-obsidian-vault";
+process.env.DRIFTPET_VAULT_DIR = "/tmp/driftpet-vault";
 
 const normalizeArtifactPath = (raw) => (
-  raw.startsWith("/") ? raw : `${VAULT_DIR}/${raw}`
+  raw.startsWith("/") || !/^AI\/(?:Articles|Bilibili|YouTube)\//.test(raw) ? raw : `${process.env.DRIFTPET_VAULT_DIR}/${raw}`
 );
 
 const inferArtifactPath = (output) => {
-  const candidates = Array.from(output.matchAll(/(?:\/Users\/mac\/my-obsidian-vault\/|AI\/)[^\n]*?\.md\b/g))
+  const candidates = Array.from(output.matchAll(/(?:\/[^\n]*?\.md\b|AI\/(?:Articles|Bilibili|YouTube)\/[^\n]*?\.md\b)/g))
     .map((match) => match[0].trim())
     .map((value) => normalizeArtifactPath(value.replace(/^"+|"+$/g, "")))
     .filter((candidate, index, all) => all.indexOf(candidate) === index);
@@ -25,7 +25,7 @@ const isBilibiliHost = (value) => {
 
 const resolveVideoOutputDir = (url) => {
   const platform = isBilibiliHost(url) ? "bilibili" : "youtube";
-  return `${VAULT_DIR}/${platform === "bilibili" ? "AI/Bilibili" : "AI/YouTube"}`;
+  return `${process.env.DRIFTPET_VAULT_DIR}/${platform === "bilibili" ? "AI/Bilibili" : "AI/YouTube"}`;
 };
 
 const parseArtifactPath = (output) => {
@@ -47,7 +47,7 @@ test("parseArtifactPath resolves absolute path", () => {
 });
 
 test("parseArtifactPath resolves vault-relative path", () => {
-  assert.equal(parseArtifactPath("ARTIFACT: AI/Articles/foo.md"), "/Users/mac/my-obsidian-vault/AI/Articles/foo.md");
+  assert.equal(parseArtifactPath("ARTIFACT: AI/Articles/foo.md"), "/tmp/driftpet-vault/AI/Articles/foo.md");
 });
 
 test("parseArtifactPath returns null when artifact line missing", () => {
@@ -57,20 +57,24 @@ test("parseArtifactPath returns null when artifact line missing", () => {
 test("parseArtifactPath infers vault file from plain output", () => {
   assert.equal(
     parseArtifactPath("写好了：AI/Bilibili/artifact-infer-test.md"),
-    "/Users/mac/my-obsidian-vault/AI/Bilibili/artifact-infer-test.md"
+    "/tmp/driftpet-vault/AI/Bilibili/artifact-infer-test.md"
   );
+});
+
+test("parseArtifactPath keeps non-vault relative artifacts untouched", () => {
+  assert.equal(parseArtifactPath("ARTIFACT: notes/foo.md"), "notes/foo.md");
 });
 
 test("resolveVideoOutputDir keeps bilibili.com under AI/Bilibili", () => {
   assert.equal(
     resolveVideoOutputDir("https://www.bilibili.com/video/BV1mxR9BiEm8/?share_source=copy_web"),
-    "/Users/mac/my-obsidian-vault/AI/Bilibili"
+    "/tmp/driftpet-vault/AI/Bilibili"
   );
 });
 
 test("resolveVideoOutputDir keeps b23 shortlinks under AI/Bilibili", () => {
   assert.equal(
     resolveVideoOutputDir("https://b23.tv/Cmz4QJI"),
-    "/Users/mac/my-obsidian-vault/AI/Bilibili"
+    "/tmp/driftpet-vault/AI/Bilibili"
   );
 });

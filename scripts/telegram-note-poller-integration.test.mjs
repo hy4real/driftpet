@@ -38,6 +38,7 @@ const path = require("node:path");
 process.env.DRIFTPET_APP_ROOT = ${JSON.stringify(repoRoot)};
 process.env.DRIFTPET_DATA_DIR = ${JSON.stringify(dataDir)};
 process.env.DRIFTPET_ENV_PATH = ${JSON.stringify(envPath)};
+process.env.DRIFTPET_VAULT_DIR = ${JSON.stringify(path.join(tmpRoot, "vault"))};
 process.env.DRIFTPET_CLAUDE_BIN = ${JSON.stringify(claudeBin)};
 process.env.DRIFTPET_LLM_PROVIDER = "anthropic";
 process.env.ANTHROPIC_API_KEY = "";

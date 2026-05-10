@@ -20,7 +20,8 @@ export type NoteRunnerResult = {
   lastError: string | null;
 };
 
-const VAULT_DIR = "/Users/mac/my-obsidian-vault";
+const DEFAULT_VAULT_DIR = "/Users/mac/my-obsidian-vault";
+const VAULT_DIR = process.env.DRIFTPET_VAULT_DIR?.trim() || DEFAULT_VAULT_DIR;
 const CLAUDE_BIN = process.env.DRIFTPET_CLAUDE_BIN?.trim() || "/Users/mac/.local/bin/claude";
 const DEFAULT_CLAUDE_TIMEOUT_MS = 420_000;
 const VIDEO_METADATA_TIMEOUT_MS = 45_000;
@@ -63,6 +64,10 @@ const resolveClaudeTimeoutMs = (): number => {
 
 const shellQuote = (value: string): string => {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+};
+
+const isVaultRelativeArtifact = (value: string): boolean => {
+  return /^AI\/(?:Articles|Bilibili|YouTube)\//.test(value);
 };
 
 const expandShortVideoUrl = async (url: string): Promise<string> => {
@@ -130,15 +135,19 @@ export const parseArtifactPath = (output: string): string | null => {
     return null;
   }
 
-  return path.isAbsolute(raw) ? raw : path.join(VAULT_DIR, raw);
+  return path.isAbsolute(raw) || !isVaultRelativeArtifact(raw)
+    ? raw
+    : path.join(VAULT_DIR, raw);
 };
 
 const normalizeArtifactPath = (raw: string): string => {
-  return path.isAbsolute(raw) ? raw : path.join(VAULT_DIR, raw);
+  return path.isAbsolute(raw) || !isVaultRelativeArtifact(raw)
+    ? raw
+    : path.join(VAULT_DIR, raw);
 };
 
 export const inferArtifactPath = (output: string): string | null => {
-  const candidates = Array.from(output.matchAll(/(?:\/Users\/mac\/my-obsidian-vault\/|AI\/)[^\n]*?\.md\b/g))
+  const candidates = Array.from(output.matchAll(/(?:\/[^\n]*?\.md\b|AI\/(?:Articles|Bilibili|YouTube)\/[^\n]*?\.md\b)/g))
     .map((match) => match[0].trim())
     .map((value) => normalizeArtifactPath(value.replace(/^"+|"+$/g, "")))
     .filter((candidate, index, all) => all.indexOf(candidate) === index);
