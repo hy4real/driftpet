@@ -20,6 +20,9 @@ cp .env.example .env
 ```
 
 2. Fill in the provider block you want.
+   If you plan to use Telegram capture, also set `TELEGRAM_BOT_TOKEN`.
+   If your Obsidian vault is not at `$HOME/my-obsidian-vault`, set `DRIFTPET_VAULT_DIR`.
+   If `claude` or `yt-dlp` are not on your `PATH`, set `DRIFTPET_CLAUDE_BIN`, `DRIFTPET_CLAUDE_CODE_BIN`, or `DRIFTPET_YT_DLP_BIN`.
 
 3. Install dependencies:
 
@@ -43,6 +46,28 @@ node scripts/overnight-goal.mjs
 
 ```bash
 ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron -e "const { getAppStatus } = require('./dist-electron/src/main/status/app-status.js'); getAppStatus().then((status)=>console.log(JSON.stringify(status, null, 2)));"
+```
+
+## Common config
+
+```env
+# Telegram phone inbox
+TELEGRAM_BOT_TOKEN=
+
+# Note workflow
+DRIFTPET_VAULT_DIR=/absolute/path/to/your/obsidian-vault
+DRIFTPET_CLAUDE_BIN=claude
+DRIFTPET_YT_DLP_BIN=yt-dlp
+DRIFTPET_CLAUDE_TIMEOUT_MS=420000
+ALIYUN_API_KEY=
+
+# Claude Code dispatch from the app
+DRIFTPET_CLAUDE_CODE_BIN=claude
+DRIFTPET_CLAUDE_CODE_TERMINAL_APP=Ghostty
+DRIFTPET_CLAUDE_CODE_CWD=/absolute/path/to/this/repo
+
+# Optional local capture toggle
+DRIFTPET_CLIPBOARD_OFFER=on
 ```
 
 ## Provider options
@@ -87,8 +112,10 @@ DRIFTPET_EMBED_MODEL=qwen3-embedding:0.6b
 
 - If `TELEGRAM_BOT_TOKEN` is empty, driftpet still runs, but Telegram polling stays off.
 - If no LLM key is configured, driftpet still creates a simple local placeholder note and records the reason in `items.last_error`.
-- If you use note workflows against a non-default Obsidian vault, set `DRIFTPET_VAULT_DIR=/absolute/path/to/your/vault`.
+- If you use note workflows against a non-default Obsidian vault, set `DRIFTPET_VAULT_DIR=/absolute/path/to/your/vault`. When unset, driftpet defaults to `$HOME/my-obsidian-vault`.
 - If `claude` or `yt-dlp` are not on your `PATH`, point driftpet at them with `DRIFTPET_CLAUDE_BIN`, `DRIFTPET_CLAUDE_CODE_BIN`, or `DRIFTPET_YT_DLP_BIN`.
+- Claude Code dispatch uses saved in-app settings first, then falls back to `DRIFTPET_CLAUDE_CODE_TERMINAL_APP` and `DRIFTPET_CLAUDE_CODE_CWD`.
+- Video fallback notes can mention missing ASR support when `ALIYUN_API_KEY` is unset.
 - Memory recall can use a different provider than the main note-making model.
 - For split setups, keep your relay key on `DRIFTPET_LLM_API_KEY` and put your separate OpenAI embeddings key on `DRIFTPET_EMBED_API_KEY`.
 - Synthetic verification items are kept separate from real items and are filtered out of normal related-memory recall.
