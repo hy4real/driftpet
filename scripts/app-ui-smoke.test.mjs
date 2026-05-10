@@ -282,6 +282,7 @@ const setupDom = () => {
   const moveWindowByCalls = [];
   const dispatchClaudeCodeCalls = [];
   const dispatchClaudeThreadCalls = [];
+  const updateClaudeDispatchStatusCalls = [];
   const deleteCardCalls = [];
   const claudeDispatchSettingWrites = [];
   let latestClaudeDispatch = null;
@@ -355,6 +356,17 @@ const setupDom = () => {
       };
       return latestClaudeDispatch;
     },
+    updateClaudeDispatchStatus: async (cardId, status) => {
+      updateClaudeDispatchStatusCalls.push([cardId, status]);
+      if (latestClaudeDispatch === null) {
+        throw new Error(`Claude dispatch not found: ${cardId}`);
+      }
+      latestClaudeDispatch = {
+        ...latestClaudeDispatch,
+        status,
+      };
+      return latestClaudeDispatch;
+    },
     setPetHourlyBudget: async () => 3,
     setWindowSize: async (windowSize) => {
       setWindowSizeCalls.push(windowSize);
@@ -391,6 +403,7 @@ const setupDom = () => {
     moveWindowByCalls,
     dispatchClaudeCodeCalls,
     dispatchClaudeThreadCalls,
+    updateClaudeDispatchStatusCalls,
     deleteCardCalls,
     claudeDispatchSettingWrites,
     emitClipboardOffer: (offer) => {
@@ -772,7 +785,62 @@ test("history drawer can dispatch a card to Claude Code", async () => {
 
   assert.deepEqual(dispatchClaudeCodeCalls, [sampleCard.id], "expected dispatch to receive the selected card id");
   assert.match(container.textContent ?? "", /已派给 Claude Code：claude-test/, "expected in-panel dispatch feedback");
-  assert.match(container.textContent ?? "", /Claude 已启动/, "expected latest dispatch state to stay visible on the card");
+  assert.match(container.textContent ?? "", /单卡已派发/, "expected latest dispatch state to stay visible on the card");
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("history drawer can mark a launched Claude dispatch done", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeCodeCalls, updateClaudeDispatchStatusCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  assert.ok(logToggle, "expected show log button");
+
+  await act(async () => {
+    logToggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const dispatchButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("派给 Claude Code"));
+  assert.ok(dispatchButton, "expected Claude Code dispatch button");
+
+  await act(async () => {
+    dispatchButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeCodeCalls, [sampleCard.id], "expected dispatch to receive the selected card id");
+  assert.match(container.textContent ?? "", /单卡已派发/);
+
+  const markDoneButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("标记完成"));
+  assert.ok(markDoneButton, "expected mark-done action for launched dispatch");
+
+  await act(async () => {
+    markDoneButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(updateClaudeDispatchStatusCalls, [[sampleCard.id, "done"]], "expected status update to mark the selected card done");
+  assert.match(container.textContent ?? "", /单卡已完成/, "expected done dispatch state to stay visible");
+  assert.doesNotMatch(container.textContent ?? "", /收起记录/, "done dispatch should no longer show close-loop actions");
 
   await act(async () => {
     root.unmount();
@@ -840,6 +908,57 @@ test("workbench can dispatch the whole active thread to Claude Code", async () =
   assert.deepEqual(dispatchClaudeThreadCalls, [sampleCard.id], "expected whole-thread dispatch to use the anchor card id");
   assert.deepEqual(dispatchClaudeCodeCalls, [], "thread dispatch must not fall back to single-card dispatch");
   assert.match(container.textContent ?? "", /整条线已派给 Claude Code：claude-test/);
+  assert.match(container.textContent ?? "", /整条线已派发/);
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
+});
+
+test("workbench can dismiss the visible whole-thread dispatch record", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, dispatchClaudeThreadCalls, updateClaudeDispatchStatusCalls, setWindowSizeCalls } = setupDom();
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+
+  await openNestWithContextMenu(container);
+  assert.deepEqual(setWindowSizeCalls, ["expanded"]);
+
+  const dispatchThreadButton = Array.from(container.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("派给 Claude Code（整条线）")
+  );
+  assert.ok(dispatchThreadButton, "expected thread dispatch button");
+
+  await act(async () => {
+    dispatchThreadButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(dispatchClaudeThreadCalls, [sampleCard.id], "expected whole-thread dispatch to use the anchor card id");
+  assert.match(container.textContent ?? "", /整条线已派发/);
+
+  const dismissButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("收起记录"));
+  assert.ok(dismissButton, "expected dismiss action for launched thread dispatch");
+
+  await act(async () => {
+    dismissButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.deepEqual(updateClaudeDispatchStatusCalls, [[sampleCard.id, "dismissed"]], "expected status update to dismiss the selected thread dispatch");
+  assert.doesNotMatch(container.textContent ?? "", /整条线已派发/, "dismissed dispatch should not keep the thread status note visible");
+  assert.match(container.textContent ?? "", /Claude 派发记录已收起。/, "expected transient feedback after dismissing");
 
   await act(async () => {
     root.unmount();

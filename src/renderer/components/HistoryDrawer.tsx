@@ -1,4 +1,6 @@
 import type { CardRecord } from "../../main/types/card";
+import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
+import { getClaudeDispatchStatusView } from "../claude-dispatch-view";
 
 type ClaudeDispatchFeedback = {
   cardId: number;
@@ -11,26 +13,13 @@ type HistoryDrawerProps = {
   isOpen: boolean;
   dispatchingCardId: number | null;
   deletingCardId: number | null;
+  updatingDispatchCardId: number | null;
   claudeDispatchFeedback: ClaudeDispatchFeedback | null;
   onClose: () => void;
   onDeleteCard: (card: CardRecord) => void;
   onDispatchClaudeCode: (card: CardRecord) => void;
+  onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
   onSelectCard: (card: CardRecord) => void;
-};
-
-const dispatchStatusLabel = (card: CardRecord): string | null => {
-  const dispatch = card.latestClaudeDispatch;
-  if (dispatch === undefined || dispatch === null) {
-    return null;
-  }
-
-  if (dispatch.status === "failed") {
-    return `Claude 派发失败：${dispatch.error ?? "检查终端配置"}`;
-  }
-
-  return dispatch.createdAt > 0
-    ? `Claude 已启动 · ${new Date(dispatch.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-    : "Claude 已启动";
 };
 
 const memoryAgeLabel = (index: number): string => {
@@ -49,10 +38,12 @@ export function HistoryDrawer({
   isOpen,
   dispatchingCardId,
   deletingCardId,
+  updatingDispatchCardId,
   claudeDispatchFeedback,
   onClose,
   onDeleteCard,
   onDispatchClaudeCode,
+  onUpdateClaudeDispatchStatus,
   onSelectCard
 }: HistoryDrawerProps) {
   return (
@@ -109,14 +100,48 @@ export function HistoryDrawer({
                     {deletingCardId === card.id ? "删除中..." : "删除"}
                   </button>
                 </div>
-                {dispatchStatusLabel(card) !== null ? (
-                  <p
-                    className={`history-card-dispatch-note history-card-dispatch-note-${card.latestClaudeDispatch?.status === "failed" ? "error" : "success"}`}
-                    role="status"
-                  >
-                    {dispatchStatusLabel(card)}
-                  </p>
-                ) : null}
+                {(() => {
+                  const dispatch = card.latestClaudeDispatch;
+                  const dispatchView = getClaudeDispatchStatusView(dispatch);
+                  if (dispatch === undefined || dispatch === null || dispatchView === null) {
+                    return null;
+                  }
+
+                  const showActions = dispatch.status === "launched";
+                  const actionsDisabled = dispatchingCardId !== null
+                    || deletingCardId !== null
+                    || updatingDispatchCardId !== null;
+
+                  return (
+                    <div
+                      className={`history-card-dispatch-note history-card-dispatch-note-${dispatchView.tone}`}
+                      role="status"
+                    >
+                      <span>{dispatchView.label}</span>
+                      {dispatchView.detail !== null ? <small>{dispatchView.detail}</small> : null}
+                      {showActions ? (
+                        <div className="history-card-dispatch-actions">
+                          <button
+                            className="ghost-button history-card-dispatch-action"
+                            disabled={actionsDisabled}
+                            onClick={() => onUpdateClaudeDispatchStatus(card, "done")}
+                            type="button"
+                          >
+                            {updatingDispatchCardId === card.id ? "更新中..." : "标记完成"}
+                          </button>
+                          <button
+                            className="ghost-button history-card-dispatch-action"
+                            disabled={actionsDisabled}
+                            onClick={() => onUpdateClaudeDispatchStatus(card, "dismissed")}
+                            type="button"
+                          >
+                            收起记录
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
                 {claudeDispatchFeedback?.cardId === card.id ? (
                   <p
                     className={`history-card-dispatch-note history-card-dispatch-note-${claudeDispatchFeedback.tone}`}

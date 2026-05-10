@@ -2,10 +2,10 @@ import { BrowserWindow, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } fr
 import { deleteCardById, getRecentCards } from "../src/main/db/cards";
 import { getPref, setPref } from "../src/main/db/prefs";
 import { ingestChaosReset } from "../src/main/ingest/ingest";
-import { launchClaudeCodeTask, getClaudeDispatchPrefKey } from "../src/main/claude/dispatch";
+import { launchClaudeCodeTask, getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../src/main/claude/dispatch";
 import { getClaudeDispatchSettings, setClaudeDispatchSettings } from "../src/main/claude/settings";
 import type { CardRecord } from "../src/main/types/card";
-import type { ClaudeDispatchMeta } from "../src/main/types/claude";
+import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/types/claude";
 import { setPetHourlyBudget } from "../src/main/pet/runtime";
 import type { AppStatus } from "../src/main/types/status";
 import { getAppStatus } from "../src/main/status/app-status";
@@ -154,6 +154,33 @@ export const registerIpcHandlers = (
       throw error;
     }
   });
+
+  ipcMain.handle(
+    "card:update-claude-dispatch-status",
+    async (_event, cardId: number, status: ClaudeDispatchUserStatus): Promise<ClaudeDispatchMeta> => {
+      if (status !== "done" && status !== "dismissed") {
+        throw new Error(`unsupported Claude dispatch status: ${String(status)}`);
+      }
+
+      const card = getRecentCards().find((entry) => entry.id === cardId);
+      if (card === undefined) {
+        throw new Error(`card not found: ${cardId}`);
+      }
+
+      const prefKey = getClaudeDispatchPrefKey(cardId);
+      const current = parseClaudeDispatchMeta(getPref(prefKey));
+      if (current === null) {
+        throw new Error(`Claude dispatch not found: ${cardId}`);
+      }
+
+      const updated: ClaudeDispatchMeta = {
+        ...current,
+        status,
+      };
+      setPref(prefKey, JSON.stringify(updated));
+      return updated;
+    }
+  );
 
   ipcMain.handle("app:get-status", async (): Promise<AppStatus> => {
     return getAppStatus();

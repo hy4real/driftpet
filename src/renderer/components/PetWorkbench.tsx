@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { CardRecord } from "../../main/types/card";
+import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
 import type { RememberedThread } from "../../main/types/status";
 import type { ThreadBundle } from "../../main/types/thread";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
+import { getClaudeDispatchStatusView } from "../claude-dispatch-view";
 import { PetSkinPanel } from "./PetSkinPanel";
 
 type ResetTemplate = {
@@ -20,6 +22,8 @@ type PetWorkbenchProps = {
   rememberedThreadCard: CardRecord | null;
   activeThreadBundle: ThreadBundle | null;
   recentCards: CardRecord[];
+  dispatchingCardId: number | null;
+  updatingDispatchCardId: number | null;
   onChaosTextChange: (value: string) => void;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -29,6 +33,7 @@ type PetWorkbenchProps = {
   onResurfaceRememberedThread: () => void;
   onSelectRecentCard: (card: CardRecord) => void;
   onDispatchClaudeThread: (card: CardRecord) => void;
+  onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
 };
 
 const previewClipboardText = (raw: string, maxLength = 72): string => {
@@ -49,6 +54,8 @@ export function PetWorkbench({
   rememberedThreadCard,
   activeThreadBundle,
   recentCards,
+  dispatchingCardId,
+  updatingDispatchCardId,
   onChaosTextChange,
   onAcceptClipboardOffer,
   onDismissClipboardOffer,
@@ -57,10 +64,15 @@ export function PetWorkbench({
   onToggleHistory,
   onResurfaceRememberedThread,
   onSelectRecentCard,
-  onDispatchClaudeThread
+  onDispatchClaudeThread,
+  onUpdateClaudeDispatchStatus
 }: PetWorkbenchProps) {
   const [showSkinPanel, setShowSkinPanel] = useState(false);
   const [historyFoldOpen, setHistoryFoldOpen] = useState(false);
+  const threadAnchorCard = activeThreadBundle?.cards[0]?.card ?? null;
+  const threadDispatchView = getClaudeDispatchStatusView(threadAnchorCard?.latestClaudeDispatch);
+  const threadDispatch = threadAnchorCard?.latestClaudeDispatch ?? null;
+  const threadStatusActionsDisabled = dispatchingCardId !== null || updatingDispatchCardId !== null;
 
   if (showSkinPanel) {
     return (
@@ -125,14 +137,47 @@ export function PetWorkbench({
               <button
                 type="button"
                 className="pet-button pet-button-strong"
-                onClick={() => onDispatchClaudeThread(activeThreadBundle.cards[0].card)}
+                disabled={threadAnchorCard === null || dispatchingCardId !== null}
+                onClick={() => {
+                  if (threadAnchorCard !== null) {
+                    onDispatchClaudeThread(threadAnchorCard);
+                  }
+                }}
               >
-                派给 Claude Code（整条线）
+                {threadAnchorCard !== null && dispatchingCardId === threadAnchorCard.id
+                  ? "正在派发..."
+                  : "派给 Claude Code（整条线）"}
               </button>
             </div>
             <p className="pet-workbench-thread-copy">
               先沿着这条线往下做，不用每次都从孤立卡片重新起步。
             </p>
+            {threadAnchorCard !== null && threadDispatch !== null && threadDispatchView !== null ? (
+              <div className={`pet-workbench-thread-dispatch pet-workbench-thread-dispatch-${threadDispatchView.tone}`} role="status">
+                <span>{threadDispatchView.label}</span>
+                {threadDispatchView.detail !== null ? <small>{threadDispatchView.detail}</small> : null}
+                {threadDispatch.status === "launched" ? (
+                  <div className="pet-workbench-thread-dispatch-actions">
+                    <button
+                      type="button"
+                      className="ghost-button pet-workbench-thread-dispatch-action"
+                      disabled={threadStatusActionsDisabled}
+                      onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "done")}
+                    >
+                      {updatingDispatchCardId === threadAnchorCard.id ? "更新中..." : "标记完成"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button pet-workbench-thread-dispatch-action"
+                      disabled={threadStatusActionsDisabled}
+                      onClick={() => onUpdateClaudeDispatchStatus(threadAnchorCard, "dismissed")}
+                    >
+                      收起记录
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <ul className="pet-workbench-thread-list">
               {activeThreadBundle.cards.map((entry) => (
                 <li key={entry.card.id}>

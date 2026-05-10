@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { CardRecord } from "../src/main/types/card";
 import type { ClipboardOffer } from "../src/main/clipboard/watcher";
 import type { AppStatus } from "../src/main/types/status";
-import type { ClaudeDispatchMeta } from "../src/main/types/claude";
+import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/types/claude";
 
 type CardCreatedListener = (card: CardRecord) => void;
 type ClipboardOfferListener = (offer: ClipboardOffer) => void;
@@ -30,6 +30,7 @@ const api = {
   ingestChaosReset: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:chaos-reset", rawText),
   dispatchClaudeCode: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-code", cardId),
   dispatchClaudeThread: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-thread", cardId),
+  updateClaudeDispatchStatus: (cardId: number, status: ClaudeDispatchUserStatus): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:update-claude-dispatch-status", cardId, status),
   setPetHourlyBudget: (value: number): Promise<number> => ipcRenderer.invoke("pet:set-hourly-budget", value),
   setWindowSize: (windowSize: "mini" | "compact" | "expanded"): Promise<void> => ipcRenderer.invoke("pet:set-window-size", windowSize),
   setMiniBubbleVisible: (visible: boolean): Promise<void> => ipcRenderer.invoke("pet:set-mini-bubble-visible", visible),

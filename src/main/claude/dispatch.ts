@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import type { CardRecord } from "../types/card";
 import type { RememberedThread } from "../types/status";
-import type { ClaudeDispatchMeta, ClaudeDispatchMode } from "../types/claude";
+import type { ClaudeDispatchMeta, ClaudeDispatchMode, ClaudeDispatchStatus } from "../types/claude";
 import type { ThreadBundle } from "../types/thread";
 import { getDataDir } from "../paths";
 import { getClaudeDispatchSettings, type ClaudeDispatchSettings } from "./settings";
@@ -20,6 +20,14 @@ export type ClaudeDispatchResult = ClaudeDispatchMeta;
 
 export const getClaudeDispatchPrefKey = (cardId: number): string => {
   return `claude_dispatch_card_${cardId}`;
+};
+
+export const normalizeClaudeDispatchStatus = (value: unknown): ClaudeDispatchStatus => {
+  if (value === "failed" || value === "done" || value === "dismissed") {
+    return value;
+  }
+
+  return "launched";
 };
 
 export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta | null => {
@@ -53,7 +61,7 @@ export const parseClaudeDispatchMeta = (raw: string | null): ClaudeDispatchMeta 
       runner: parsed.runner,
       cwd: parsed.cwd,
       createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : 0,
-      status: parsed.status === "failed" ? "failed" : "launched",
+      status: normalizeClaudeDispatchStatus(parsed.status),
       mode: parsed.mode === "thread" ? "thread" : "card",
       error: typeof parsed.error === "string" ? parsed.error : undefined,
     };

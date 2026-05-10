@@ -78,7 +78,7 @@ test("buildTerminalLaunch uses open --args for Ghostty on macOS", async () => {
   }
 });
 
-test("parseClaudeDispatchMeta preserves failed status and backfills legacy launched records", async () => {
+test("parseClaudeDispatchMeta preserves known statuses and backfills legacy launched records", async () => {
   const { parseClaudeDispatchMeta, cleanupBundle } = await buildDispatchModule();
 
   try {
@@ -116,6 +116,52 @@ test("parseClaudeDispatchMeta preserves failed status and backfills legacy launc
       mode: "card",
       error: "Terminal automation denied",
     });
+
+    assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
+      command: "cmd",
+      promptPath: "/tmp/prompt.md",
+      runner: "claude",
+      cwd: "/repo",
+      createdAt: 1778320000001,
+      status: "done",
+      mode: "thread",
+    })), {
+      command: "cmd",
+      promptPath: "/tmp/prompt.md",
+      runner: "claude",
+      cwd: "/repo",
+      createdAt: 1778320000001,
+      status: "done",
+      mode: "thread",
+      error: undefined,
+    });
+
+    assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
+      command: "cmd",
+      promptPath: "/tmp/prompt.md",
+      runner: "claude",
+      cwd: "/repo",
+      createdAt: 1778320000002,
+      status: "dismissed",
+      mode: "card",
+    })), {
+      command: "cmd",
+      promptPath: "/tmp/prompt.md",
+      runner: "claude",
+      cwd: "/repo",
+      createdAt: 1778320000002,
+      status: "dismissed",
+      mode: "card",
+      error: undefined,
+    });
+
+    assert.deepEqual(parseClaudeDispatchMeta(JSON.stringify({
+      command: "cmd",
+      promptPath: "/tmp/prompt.md",
+      runner: "claude",
+      cwd: "/repo",
+      status: "unknown",
+    })).status, "launched");
 
     assert.equal(parseClaudeDispatchMeta("{broken"), null);
   } finally {

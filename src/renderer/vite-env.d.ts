@@ -3,7 +3,7 @@
 import type { CardRecord } from "../main/types/card";
 import type { ClipboardOffer } from "../main/clipboard/watcher";
 import type { AppStatus } from "../main/types/status";
-import type { ClaudeDispatchMeta } from "../main/types/claude";
+import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../main/types/claude";
 
 type PetInfo = {
   slug: string;
@@ -29,6 +29,7 @@ declare global {
       ingestChaosReset: (rawText: string) => Promise<CardRecord>;
       dispatchClaudeCode: (cardId: number) => Promise<ClaudeDispatchMeta>;
       dispatchClaudeThread: (cardId: number) => Promise<ClaudeDispatchMeta>;
+      updateClaudeDispatchStatus: (cardId: number, status: ClaudeDispatchUserStatus) => Promise<ClaudeDispatchMeta>;
       setPetHourlyBudget: (value: number) => Promise<number>;
       setWindowSize: (windowSize: "mini" | "compact" | "expanded") => Promise<void>;
       setMiniBubbleVisible: (visible: boolean) => Promise<void>;

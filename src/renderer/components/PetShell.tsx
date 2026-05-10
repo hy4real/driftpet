@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CardRecord } from "../../main/types/card";
+import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import type { RememberedThread } from "../../main/types/status";
 import type { ThreadBundle } from "../../main/types/thread";
@@ -48,10 +49,13 @@ type PetShellProps = {
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
   activeThreadBundle: ThreadBundle | null;
+  dispatchingCardId: number | null;
+  updatingDispatchCardId: number | null;
   onResurfaceRememberedThread: () => void;
   recentCards: CardRecord[];
   onSelectRecentCard: (card: CardRecord) => void;
   onDispatchClaudeThread: (card: CardRecord) => void;
+  onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
@@ -132,10 +136,13 @@ export function PetShell({
   rememberedThread,
   rememberedThreadCard,
   activeThreadBundle,
+  dispatchingCardId,
+  updatingDispatchCardId,
   onResurfaceRememberedThread,
   recentCards,
   onSelectRecentCard,
   onDispatchClaudeThread,
+  onUpdateClaudeDispatchStatus,
   clipboardOffer,
   onAcceptClipboardOffer,
   onDismissClipboardOffer
@@ -532,10 +539,13 @@ export function PetShell({
               rememberedThread={rememberedThread}
               rememberedThreadCard={rememberedThreadCard}
               activeThreadBundle={activeThreadBundle}
+              dispatchingCardId={dispatchingCardId}
+              updatingDispatchCardId={updatingDispatchCardId}
               onResurfaceRememberedThread={onResurfaceRememberedThread}
               recentCards={recentCards}
               onSelectRecentCard={onSelectRecentCard}
               onDispatchClaudeThread={onDispatchClaudeThread}
+              onUpdateClaudeDispatchStatus={onUpdateClaudeDispatchStatus}
             />
           ) : (
             <PetControls

@@ -557,6 +557,7 @@ textarea:disabled {
 
 .history-card-actions {
   display: flex;
+  gap: var(--space-2);
   justify-content: flex-end;
 }
 
@@ -569,9 +570,18 @@ textarea:disabled {
 }
 
 .history-card-dispatch-note {
+  display: grid;
+  gap: var(--space-1);
   margin: 0;
   font-size: var(--font-caption);
   line-height: 1.45;
+}
+
+.history-card-dispatch-note small {
+  color: var(--text-2);
+  font-size: var(--font-caption);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .history-card-dispatch-note-success {
@@ -580,6 +590,20 @@ textarea:disabled {
 
 .history-card-dispatch-note-error {
   color: rgba(255, 205, 205, 0.92);
+}
+
+.history-card-dispatch-actions,
+.pet-workbench-thread-dispatch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.history-card-dispatch-action,
+.pet-workbench-thread-dispatch-action {
+  min-height: 26px;
+  padding: 4px 9px;
+  font-size: var(--font-caption);
 }
 
 .pet-shell {
@@ -1496,6 +1520,33 @@ textarea:disabled {
   color: var(--text-1);
   font-size: var(--font-body);
   line-height: 1.45;
+}
+
+.pet-workbench-thread-dispatch {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: var(--font-caption);
+  line-height: 1.4;
+}
+
+.pet-workbench-thread-dispatch small {
+  color: var(--text-2);
+  font-size: var(--font-caption);
+  overflow-wrap: anywhere;
+}
+
+.pet-workbench-thread-dispatch-success {
+  color: rgba(199, 244, 239, 0.9);
+  border-color: rgba(92, 195, 191, 0.18);
+}
+
+.pet-workbench-thread-dispatch-error {
+  color: rgba(255, 205, 205, 0.92);
+  border-color: rgba(255, 145, 104, 0.24);
 }
 
 .pet-workbench-thread-list {
