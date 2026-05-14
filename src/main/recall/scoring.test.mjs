@@ -102,7 +102,7 @@ test("passesRelatedThreshold still requires lexical floor for mid-strength embed
   assert.equal(passesRelatedThreshold(chaosQuery, entry), false);
 });
 
-test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {
+test("passesRelatedThreshold rejects weak archive-like non-chaos embedding matches", () => {
   const entry = {
     candidate: {
       ...chaosCandidate,
@@ -122,7 +122,103 @@ test("passesRelatedThreshold keeps non-chaos thresholds unchanged", () => {
       },
       entry
     ),
+    false
+  );
+});
+
+test("passesRelatedThreshold allows non-chaos embedding matches with lexical support", () => {
+  const entry = {
+    candidate: {
+      ...chaosCandidate,
+      source: "tg_text",
+    },
+    lexical: 0.28,
+    embedding: 0.58,
+    finalScore: 0.57,
+  };
+
+  assert.equal(
+    passesRelatedThreshold(
+      {
+        source: "tg_text",
+        title: "Retune recall for driftpet Telegram text",
+        summaryForRetrieval: "retune driftpet recall so Telegram text only restores the current thread",
+      },
+      entry
+    ),
     true
+  );
+});
+
+test("passesRelatedThreshold rejects mid-strength non-chaos embedding without lexical support", () => {
+  const entry = {
+    candidate: {
+      ...chaosCandidate,
+      source: "tg_text",
+    },
+    lexical: 0.04,
+    embedding: 0.58,
+    finalScore: 0.57,
+  };
+
+  assert.equal(
+    passesRelatedThreshold(
+      {
+        source: "tg_text",
+        title: "Retune recall for driftpet Telegram text",
+        summaryForRetrieval: "retune driftpet recall so Telegram text only restores the current thread",
+      },
+      entry
+    ),
+    false
+  );
+});
+
+test("passesRelatedThreshold allows very strong non-chaos embedding matches without lexical support", () => {
+  const entry = {
+    candidate: {
+      ...chaosCandidate,
+      source: "tg_url",
+    },
+    lexical: 0.04,
+    embedding: 0.7,
+    finalScore: 0.59,
+  };
+
+  assert.equal(
+    passesRelatedThreshold(
+      {
+        source: "tg_url",
+        title: "Local-first attention memory",
+        summaryForRetrieval: "preserve the current working memory thread after interruption",
+      },
+      entry
+    ),
+    true
+  );
+});
+
+test("passesRelatedThreshold rejects lexical-only non-chaos matches below thread-strength floor", () => {
+  const entry = {
+    candidate: {
+      ...chaosCandidate,
+      source: "tg_text",
+    },
+    lexical: 0.28,
+    embedding: null,
+    finalScore: 0.35,
+  };
+
+  assert.equal(
+    passesRelatedThreshold(
+      {
+        source: "tg_text",
+        title: "Read this article",
+        summaryForRetrieval: "read this article and decide whether to apply it",
+      },
+      entry
+    ),
+    false
   );
 });
 

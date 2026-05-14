@@ -30,8 +30,13 @@ export const CHAOS_MIN_LEXICAL = 0.38;
 // recall each other.
 export const CHAOS_STRONG_EMBEDDING = 0.7;
 export const CHAOS_STRONG_MIN_FINAL_SCORE = 0.55;
-export const EMBEDDING_THRESHOLD = 0.44;
-export const LEXICAL_ONLY_THRESHOLD = 0.24;
+export const NON_CHAOS_MIN_FINAL_SCORE = 0.56;
+export const NON_CHAOS_MIN_EMBEDDING = 0.54;
+export const NON_CHAOS_MIN_LEXICAL = 0.22;
+export const NON_CHAOS_STRONG_EMBEDDING = 0.68;
+export const NON_CHAOS_STRONG_MIN_FINAL_SCORE = 0.58;
+export const LEXICAL_ONLY_THRESHOLD = 0.36;
+export const LEXICAL_ONLY_MIN_LEXICAL = 0.32;
 
 export const normalizeComparableText = (value: string): string => {
   return value
@@ -187,8 +192,14 @@ export const passesRelatedThreshold = (
   }
 
   if (entry.embedding !== null) {
-    return entry.finalScore >= EMBEDDING_THRESHOLD && entry.embedding >= 0.38;
+    if (entry.embedding >= NON_CHAOS_STRONG_EMBEDDING) {
+      return entry.finalScore >= NON_CHAOS_STRONG_MIN_FINAL_SCORE;
+    }
+
+    return entry.finalScore >= NON_CHAOS_MIN_FINAL_SCORE
+      && entry.embedding >= NON_CHAOS_MIN_EMBEDDING
+      && entry.lexical >= NON_CHAOS_MIN_LEXICAL;
   }
 
-  return entry.finalScore >= LEXICAL_ONLY_THRESHOLD && entry.lexical >= 0.2;
+  return entry.finalScore >= LEXICAL_ONLY_THRESHOLD && entry.lexical >= LEXICAL_ONLY_MIN_LEXICAL;
 };
