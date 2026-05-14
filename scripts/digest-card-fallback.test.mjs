@@ -222,3 +222,38 @@ test("telegram text fallback frames high-signal notes as guarded working memory"
     }
   }
 });
+
+test("telegram text fallback keeps first-action clause over reference caveat", async () => {
+  const { generateDigestDraft, cleanupBundle } = await buildDigestModule();
+  const previousEnv = new Map(LLM_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+  for (const key of LLM_ENV_KEYS) {
+    delete process.env[key];
+  }
+
+  try {
+    const result = await generateDigestDraft(
+      {
+        source: "tg_text",
+        rawText: "Use the article only as reference. Tighten the current driftpet text card first, and do not expand into a broader redesign tonight.",
+      },
+      []
+    );
+
+    assert.match(result.digest.title, /Tighten the current driftpet text card/i);
+    assert.equal(result.digest.knowledgeTag, "Tighten the current driftpet");
+    assert.match(result.digest.threadCache.chasing, /Tighten the current driftpet text card/i);
+    assert.equal(result.digest.threadCache.nextMove, "Tighten the current driftpet text card");
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /^,/);
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /broader redesign/i);
+  } finally {
+    await cleanupBundle();
+    for (const [key, value] of previousEnv.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});

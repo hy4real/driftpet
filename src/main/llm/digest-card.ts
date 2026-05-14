@@ -248,35 +248,85 @@ const extractRuledOut = (value: string, language: OutputLanguage): string | null
   return null;
 };
 
-const extractNextMoveFromText = (value: string, fallback: string, language: OutputLanguage): string => {
+const isNegatedNextMove = (value: string, language: OutputLanguage): boolean => {
+  return language === "zh"
+    ? /^(?:别|不要|不用|先别|别再)/u.test(value)
+    : /^(?:do not|don't|avoid|stop|not\b|no\s+)/i.test(value);
+};
+
+const cleanNextMoveCandidate = (value: string, language: OutputLanguage): string | null => {
   const normalized = normalizeText(value);
-  const patterns = language === "zh"
+  const cleaned = language === "zh"
+    ? normalized
+      .replace(/^[，,;；:：\s]+/u, "")
+      .replace(/^(?:把|先把|先|继续|立刻|马上)\s*/u, "")
+      .replace(/[，,;；:：\s]+$/u, "")
+      .trim()
+    : normalized
+      .replace(/^[,;:\s]+/u, "")
+      .replace(/(?:,|;)\s*(?:and\s+)?(?:do not|don't|avoid|stop|not)\b.*$/iu, "")
+      .replace(/(?:,|;)\s*(?:and\s+)?then\b.*$/iu, "")
+      .replace(/^first\s*(?:,|:|-)?\s*/iu, "")
+      .replace(/\s*\bfirst\b\s*$/iu, "")
+      .replace(/^(?:to|then|and|please|now)\s+/iu, "")
+      .replace(/^[,;:\s]+/u, "")
+      .replace(/[,;:\s]+$/u, "")
+      .trim();
+
+  const candidate = nullableText(cleaned);
+  if (candidate === null || isNegatedNextMove(candidate, language)) {
+    return null;
+  }
+
+  return candidate;
+};
+
+const extractNextMoveCandidateFromText = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  const markerPatterns = language === "zh"
     ? [
       /(?:下一步|下一手|接下来)\s*(?:是|：|:)?\s*([^。！？\n]+)/u,
       /(?:先|立刻|马上)(?!\s*(?:别|不要|不用|别再))\s*([^。！？\n]+)/u,
     ]
     : [
-      /\b(?:next step|next move|next useful move|first)\s*(?:is|:)?\s*([^.!?\n]+)/i,
+      /\b(?:next step|next move|next useful move)\s*(?:is|:)?\s*([^.!?\n]+)/i,
     ];
 
-  for (const pattern of patterns) {
+  for (const pattern of markerPatterns) {
     const match = pattern.exec(normalized);
-    const rawCandidate = normalizeText(match?.[1] ?? "")
-      .replace(/^(to|把|先把|先|继续|立刻|马上)\s*/iu, "");
-    const candidate = nullableText(rawCandidate);
+    const candidate = cleanNextMoveCandidate(match?.[1] ?? "", language);
     if (candidate !== null) {
-      return truncate(candidate, language === "zh" ? 100 : 140);
+      return candidate;
     }
   }
 
-  return truncate(fallback, language === "zh" ? 120 : 180);
+  if (language !== "zh") {
+    const firstAtStart = /(?:^|[.!?\n])\s*first\s*(?:,|:|-)?\s*([^.!?\n]+)/iu.exec(normalized);
+    const firstCandidate = cleanNextMoveCandidate(firstAtStart?.[1] ?? "", language);
+    if (firstCandidate !== null) {
+      return firstCandidate;
+    }
+
+    const firstMarkedClause = normalized
+      .split(/[.!?\n,;]+/u)
+      .map((clause) => normalizeText(clause))
+      .find((clause) => /^first\b/iu.test(clause) || /\bfirst\b$/iu.test(clause));
+    const clauseCandidate = cleanNextMoveCandidate(firstMarkedClause ?? "", language);
+    if (clauseCandidate !== null) {
+      return clauseCandidate;
+    }
+  }
+
+  return null;
+};
+
+const extractNextMoveFromText = (value: string, fallback: string, language: OutputLanguage): string => {
+  const candidate = extractNextMoveCandidateFromText(value, language);
+  return truncate(candidate ?? fallback, language === "zh" ? 120 : 180);
 };
 
 const hasExplicitNextMove = (value: string, language: OutputLanguage): boolean => {
-  const normalized = normalizeText(value);
-  return language === "zh"
-    ? /(?:下一步|下一手|接下来|立刻|马上|先(?!\s*(?:别|不要|不用|别再)))\s*(?:是|：|:)?\s*[^。！？\n]+/u.test(normalized)
-    : /\b(?:next step|next move|next useful move|first)\s*(?:is|:)?\s*[^.!?\n]+/i.test(normalized);
+  return extractNextMoveCandidateFromText(value, language) !== null;
 };
 
 const buildThreadCache = (input: {
@@ -361,12 +411,12 @@ const buildTelegramTextKnowledgeTag = (title: string, language: OutputLanguage):
     return truncate(cleaned.length > 0 ? cleaned : selected, 18).replace(/\.\.\.$/, "");
   }
 
-  return truncate(
-    selected
-      .replace(/^(pause|return to|go back to|stop|do not)\s+/i, "")
-      .trim() || selected,
-    24
-  ).replace(/\.\.\.$/, "");
+  const cleaned = selected
+    .replace(/^(pause|return to|go back to|stop|do not)\s+/i, "")
+    .trim() || selected;
+  const words = cleaned.split(/\s+/u);
+  const tag = words.slice(0, 4).join(" ");
+  return tag.length > 0 ? tag : cleaned;
 };
 
 const extractTelegramThreadLabel = (value: string, language: OutputLanguage): string => {
@@ -386,6 +436,11 @@ const extractTelegramThreadLabel = (value: string, language: OutputLanguage): st
       .replace(/^(今晚|现在|先|先把|把|别再|不要再|回到|立刻|暂停)\s*/u, "")
       .trim();
     return truncate(zh.length > 0 ? zh : selected, 48);
+  }
+
+  const nextMove = extractNextMoveCandidateFromText(value, language);
+  if (nextMove !== null) {
+    return truncate(nextMove, 60);
   }
 
   const english = selected
