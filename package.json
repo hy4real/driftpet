@@ -19,6 +19,7 @@
     "probe:chaos-recall": "node scripts/probe-manual-chaos-recall.mjs",
     "probe:chaos-recall-batch": "node scripts/probe-chaos-recall-batch.mjs",
     "probe:chaos-llm-batch": "node scripts/probe-chaos-llm-batch.mjs",
+    "probe:thread-cache": "npm run build:electron && node scripts/probe-thread-cache.mjs",
     "probe:telegram-mixed-batch": "node scripts/probe-telegram-mixed-batch.mjs",
     "probe:telegram-text-batch": "node scripts/probe-telegram-text-batch.mjs",
     "probe:url-llm-batch": "node scripts/probe-url-llm-batch.mjs",

@@ -57,6 +57,12 @@ node scripts/overnight-goal.mjs
 ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron -e "const { getAppStatus } = require('./dist-electron/src/main/status/app-status.js'); getAppStatus().then((status)=>console.log(JSON.stringify(status, null, 2)));"
 ```
 
+7. Thread-cache calibration probe:
+
+```bash
+npm run probe:thread-cache
+```
+
 ## Common config
 
 ```env

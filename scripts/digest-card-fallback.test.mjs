@@ -135,12 +135,46 @@ test("manual chaos fallback names declared thread when recovering from tab drift
 
     assert.match(result.digest.title, /pick one branch and close the rest/i);
     assert.match(result.digest.useFor, /^Set aside: /);
-    assert.match(result.digest.useFor, /Close two unrelated tabs/);
-    assert.match(result.digest.useFor, /let driftpet guard/);
     assert.match(result.digest.useFor, /pick one branch and close the rest/i);
+    assert.doesNotMatch(result.digest.useFor, /Close two unrelated tabs/);
     assert.doesNotMatch(result.digest.useFor, /Turn this into one next action/i);
     assert.match(result.digest.threadCache.chasing, /pick one branch and close the rest/i);
     assert.match(result.digest.threadCache.nextMove, /pick one branch and close the rest/i);
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /^to /i);
+  } finally {
+    await cleanupBundle();
+    for (const [key, value] of previousEnv.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test("manual chaos fallback preserves explicit next move in thread cache", async () => {
+  const { generateDigestDraft, cleanupBundle } = await buildDigestModule();
+  const previousEnv = new Map(LLM_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+  for (const key of LLM_ENV_KEYS) {
+    delete process.env[key];
+  }
+
+  try {
+    const result = await generateDigestDraft(
+      {
+        source: "manual_chaos",
+        rawText: "主线是验证 Thread Cache v1 是否真的守住工作记忆。我怀疑问题不是 URL extraction，而是 nextMove 太像摘要。别再扩展到桌面 app 识别，先跑三条真实样本，标出哪一格丢了。",
+      },
+      []
+    );
+
+    assert.match(result.digest.threadCache.chasing, /验证 Thread Cache v1/);
+    assert.match(result.digest.threadCache.workingJudgment ?? "", /不是 URL extraction/);
+    assert.match(result.digest.threadCache.ruledOut ?? "", /不是 URL extraction/);
+    assert.match(result.digest.threadCache.nextMove, /跑三条真实样本/);
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /关掉两个无关标签页/);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {

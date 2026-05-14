@@ -252,7 +252,8 @@ const extractNextMoveFromText = (value: string, fallback: string, language: Outp
   const normalized = normalizeText(value);
   const patterns = language === "zh"
     ? [
-      /(?:下一步|下一手|接下来|先)\s*(?:是|：|:)?\s*([^。！？\n]+)/u,
+      /(?:下一步|下一手|接下来)\s*(?:是|：|:)?\s*([^。！？\n]+)/u,
+      /(?:先|立刻|马上)(?!\s*(?:别|不要|不用|别再))\s*([^。！？\n]+)/u,
     ]
     : [
       /\b(?:next step|next move|next useful move|first)\s*(?:is|:)?\s*([^.!?\n]+)/i,
@@ -260,13 +261,22 @@ const extractNextMoveFromText = (value: string, fallback: string, language: Outp
 
   for (const pattern of patterns) {
     const match = pattern.exec(normalized);
-    const candidate = nullableText(match?.[1] ?? "");
+    const rawCandidate = normalizeText(match?.[1] ?? "")
+      .replace(/^(to|把|先把|先|继续|立刻|马上)\s*/iu, "");
+    const candidate = nullableText(rawCandidate);
     if (candidate !== null) {
       return truncate(candidate, language === "zh" ? 100 : 140);
     }
   }
 
   return truncate(fallback, language === "zh" ? 120 : 180);
+};
+
+const hasExplicitNextMove = (value: string, language: OutputLanguage): boolean => {
+  const normalized = normalizeText(value);
+  return language === "zh"
+    ? /(?:下一步|下一手|接下来|立刻|马上|先(?!\s*(?:别|不要|不用|别再)))\s*(?:是|：|:)?\s*[^。！？\n]+/u.test(normalized)
+    : /\b(?:next step|next move|next useful move|first)\s*(?:is|:)?\s*[^.!?\n]+/i.test(normalized);
 };
 
 const buildThreadCache = (input: {
@@ -673,9 +683,12 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     const sideQuests = /https?:\/\//i.test(contentBasis)
       ? "先放下那些不能直接推进这条工作记忆的链接和标签页。"
       : "先放下所有不能直接推进当前工作记忆的岔线。";
-    const nextStep = isThreadDriftText(contentBasis)
+    const fallbackNextStep = isThreadDriftText(contentBasis)
       ? buildThreadDriftUseFor(contentBasis, language, stepThread)
       : `关掉两个无关标签页，让 driftpet 先守住“${stepThread}”，写下第一条检查项，然后立刻做五分钟。`;
+    const nextStep = hasExplicitNextMove(contentBasis, language)
+      ? extractNextMoveFromText(contentBasis, fallbackNextStep, language)
+      : fallbackNextStep;
 
     return {
       title: resolvedMainLine,
@@ -697,9 +710,12 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     ? "Set aside the extra links and tabs that do not unblock this working-memory thread."
     : "Set aside anything that does not move the current working-memory thread forward.";
   const stepThread = summarizeChaosThreadForStep(mainLine, 40);
-  const nextStep = isThreadDriftText(contentBasis)
+  const fallbackNextStep = isThreadDriftText(contentBasis)
     ? buildThreadDriftUseFor(contentBasis, language, stepThread)
     : `Close two unrelated tabs, let driftpet guard "${stepThread}", write the first checklist line, and work on it for five minutes now.`;
+  const nextStep = hasExplicitNextMove(contentBasis, language)
+    ? extractNextMoveFromText(contentBasis, fallbackNextStep, language)
+    : fallbackNextStep;
 
   return {
     title: mainLine,

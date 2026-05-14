@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const reportsDir = path.join(root, "reports");
+const reportsDir = process.env.DRIFTPET_REPORTS_DIR?.trim() || path.join(root, "reports");
 const dataDir = process.env.DRIFTPET_DATA_DIR?.trim() || path.join(root, "data");
 const dbPath = process.env.DRIFTPET_DB_PATH?.trim() || path.join(dataDir, "app.db");
 
@@ -86,6 +86,46 @@ const parseRelated = (value) => {
   }
 };
 
+const parseThreadCache = (value) => {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed) ||
+      typeof parsed.chasing !== "string" ||
+      parsed.chasing.trim().length === 0 ||
+      typeof parsed.nextMove !== "string" ||
+      parsed.nextMove.trim().length === 0
+    ) {
+      return null;
+    }
+
+    return {
+      chasing: parsed.chasing.trim(),
+      workingJudgment: typeof parsed.workingJudgment === "string" && parsed.workingJudgment.trim().length > 0
+        ? parsed.workingJudgment.trim()
+        : null,
+      ruledOut: typeof parsed.ruledOut === "string" && parsed.ruledOut.trim().length > 0
+        ? parsed.ruledOut.trim()
+        : null,
+      nextMove: parsed.nextMove.trim(),
+      sideThread: typeof parsed.sideThread === "string" && parsed.sideThread.trim().length > 0
+        ? parsed.sideThread.trim()
+        : null,
+      expiresWhen: typeof parsed.expiresWhen === "string" && parsed.expiresWhen.trim().length > 0
+        ? parsed.expiresWhen.trim()
+        : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const qualityFlagsFor = (row, related) => {
   const flags = [];
   const title = row.title?.trim() ?? "";
@@ -93,6 +133,8 @@ const qualityFlagsFor = (row, related) => {
   const tag = row.knowledge_tag?.trim() ?? "";
   const remark = row.pet_remark?.trim() ?? "";
   const summary = row.summary_for_retrieval?.trim() ?? "";
+  const rawText = row.raw_text?.trim() ?? "";
+  const threadCache = parseThreadCache(row.thread_cache_json);
 
   if (title.length === 0 || title.length > 80) {
     flags.push("title");
@@ -124,13 +166,51 @@ const qualityFlagsFor = (row, related) => {
   if (row.source === "manual_chaos" && related.length > 2) {
     flags.push("noisy-recall");
   }
+  if (threadCache === null && !/ping|轻量 ping|link retry|链接待重试/i.test(tag)) {
+    flags.push("missing-thread-cache");
+  }
+  if (threadCache !== null) {
+    if (threadCache.chasing.length > 120 || threadCache.chasing === summary) {
+      flags.push("thread-cache-chasing");
+    }
+    if (isGenericNextStep(threadCache.nextMove)) {
+      flags.push("thread-cache-next-move");
+    }
+    if (
+      rawText.length > 0 &&
+      /(?:我(?:怀疑|猜|觉得|判断)|I suspect|I think|probably|likely)/i.test(rawText) &&
+      threadCache.workingJudgment === null
+    ) {
+      flags.push("missing-working-judgment");
+    }
+    if (
+      rawText.length > 0 &&
+      /(?:不是|并不是|别再|不要再|先别|不用|do not|don't|not|avoid|set aside|ruled out)/i.test(rawText) &&
+      threadCache.ruledOut === null
+    ) {
+      flags.push("missing-ruled-out");
+    }
+  }
 
   return flags;
+};
+
+const isGenericNextStep = (value) => {
+  const normalized = String(value ?? "").trim().replace(/\s+/g, " ");
+  return normalized.length === 0
+    || /^turn this into one next action/i.test(normalized)
+    || /\b(?:review|read|summarize|analyze|explore|improve|optimize|continue working on|look into)\b/i.test(normalized)
+    || /(?:下一步动作|具体产出|最小可交付|继续优化|继续完善|整理一下|分析一下|看一下|研究一下)/u.test(normalized);
 };
 
 const reviewTemplate = (flags) => ({
   titleSpecific: "",
   nextStepActionable: "",
+  cacheChasingSpecific: "",
+  cacheJudgmentPreserved: "",
+  cacheRuledOutPreserved: "",
+  cacheNextMoveActionable: "",
+  cacheSideThreadUseful: "",
   recallUseful: "",
   resumeHelpful: "",
   failureBucket: flags.join(", "),
@@ -158,6 +238,7 @@ const sql = `
     cards.use_for,
     cards.knowledge_tag,
     cards.summary_for_retrieval,
+    cards.thread_cache_json,
     cards.related_card_ids,
     cards.pet_remark,
     cards.created_at
@@ -189,6 +270,7 @@ const jsonPath = path.join(reportsDir, `${basename}.json`);
 
 const cards = rows.map((row, index) => {
   const related = parseRelated(row.related_card_ids);
+  const threadCache = parseThreadCache(row.thread_cache_json);
   const flags = qualityFlagsFor(row, related);
 
   return {
@@ -203,6 +285,7 @@ const cards = rows.map((row, index) => {
     useFor: row.use_for ?? "",
     knowledgeTag: row.knowledge_tag ?? "",
     petRemark: row.pet_remark ?? "",
+    threadCache,
     related,
     relatedCount: related.length,
     rawUrl: row.raw_url,
@@ -249,6 +332,11 @@ const markdown = [
   "",
   "- `Title specific`: does the title name the concrete thread/deliverable?",
   "- `Next step actionable`: can you do it in the next five minutes?",
+  "- `Cache chasing specific`: does `threadCache.chasing` name the real unstable work thread?",
+  "- `Cache judgment preserved`: did it keep the user's temporary judgment or suspicion when present?",
+  "- `Cache ruled-out preserved`: did it keep the path the user said not to retry?",
+  "- `Cache next move actionable`: can `threadCache.nextMove` be done immediately?",
+  "- `Cache side thread useful`: is the deferred branch real, not generic filler?",
   "- `Recall useful`: did related memory genuinely help resume the thread?",
   "- `Resume helpful`: would this card help you return after interruption?",
   "",
@@ -265,6 +353,19 @@ const markdown = [
     "",
     `**Next step:** ${card.useFor || "(none)"}`,
     "",
+    "**Thread cache:**",
+    "",
+    card.threadCache === null
+      ? "- none"
+      : [
+        `- Chasing: ${card.threadCache.chasing}`,
+        `- Working judgment: ${card.threadCache.workingJudgment ?? "(none)"}`,
+        `- Ruled out: ${card.threadCache.ruledOut ?? "(none)"}`,
+        `- Next move: ${card.threadCache.nextMove}`,
+        `- Side thread: ${card.threadCache.sideThread ?? "(none)"}`,
+        `- Expires when: ${card.threadCache.expiresWhen ?? "(none)"}`,
+      ].join("\n"),
+    "",
     `**Pet remark:** ${card.petRemark || "(none)"}`,
     "",
     "**Related recall:**",
@@ -277,6 +378,11 @@ const markdown = [
     "| --- | --- |",
     "| Title specific |  |",
     "| Next step actionable |  |",
+    "| Cache chasing specific |  |",
+    "| Cache judgment preserved |  |",
+    "| Cache ruled-out preserved |  |",
+    "| Cache next move actionable |  |",
+    "| Cache side thread useful |  |",
     "| Recall useful |  |",
     "| Resume helpful |  |",
     "| Failure bucket |  |",
