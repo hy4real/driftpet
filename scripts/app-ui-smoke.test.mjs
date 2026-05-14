@@ -744,6 +744,48 @@ test("mini resume thread opens the remembered card directly", async () => {
   await cleanupBundle();
 });
 
+test("mini remembered thread marks stale lines as cold", async () => {
+  const savedRememberedThread = sampleStatus.pet.rememberedThread;
+  const savedCreatedAt = sampleCard.createdAt;
+  sampleCard.createdAt = Date.now() - 25 * 60 * 60 * 1000;
+  sampleStatus.pet.rememberedThread = {
+    cardId: sampleCard.id,
+    title: sampleCard.title,
+    createdAt: sampleCard.createdAt,
+  };
+
+  try {
+    const { App, cleanupBundle } = await buildAppModule();
+    const { cleanup } = setupDom();
+    const container = document.getElementById("root");
+    assert.ok(container);
+
+    const root = ReactDOMClient.createRoot(container);
+
+    await act(async () => {
+      root.render(React.createElement(App));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const resumeThread = container.querySelector(".pet-mini-resume-thread");
+    assert.ok(resumeThread, "expected mini mode to expose the stale remembered thread");
+    assert.match(resumeThread.textContent ?? "", /可放下/);
+    assert.match(resumeThread.textContent ?? "", /冷掉条件/);
+    assert.match(resumeThread.textContent ?? "", /when the product/);
+
+    await act(async () => {
+      root.unmount();
+    });
+
+    cleanup();
+    await cleanupBundle();
+  } finally {
+    sampleCard.createdAt = savedCreatedAt;
+    sampleStatus.pet.rememberedThread = savedRememberedThread;
+  }
+});
+
 test("nest panel exposes history drawer", async () => {
   const { App, cleanupBundle } = await buildAppModule();
   const { cleanup, setWindowSizeCalls } = setupDom();

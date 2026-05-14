@@ -88,6 +88,39 @@ const clampPresenceTitle = (value: string, maxLength = 28): string => {
   return `${value.slice(0, maxLength - 1)}…`;
 };
 
+type GuardedThreadAgeState = "fresh" | "cooling" | "cold";
+
+const THREAD_COOLING_AFTER_MS = 2 * 60 * 60 * 1000;
+const THREAD_COLD_AFTER_MS = 24 * 60 * 60 * 1000;
+
+const getGuardedThreadAgeState = (createdAt: number | null, now: number): GuardedThreadAgeState => {
+  if (createdAt === null) {
+    return "fresh";
+  }
+
+  const ageMs = Math.max(0, now - createdAt);
+  if (ageMs >= THREAD_COLD_AFTER_MS) {
+    return "cold";
+  }
+  if (ageMs >= THREAD_COOLING_AFTER_MS) {
+    return "cooling";
+  }
+
+  return "fresh";
+};
+
+const guardedThreadVerbByAge: Record<GuardedThreadAgeState, string> = {
+  fresh: "正在追",
+  cooling: "线变冷",
+  cold: "可放下"
+};
+
+const guardedThreadActionPrefixByAge: Record<GuardedThreadAgeState, string> = {
+  fresh: "下一手",
+  cooling: "趁热接",
+  cold: "先判定"
+};
+
 const getGuardedThreadTitle = (card: CardRecord | null, thread: RememberedThread | null): string | null => {
   if (card?.threadCache !== null && card?.threadCache !== undefined) {
     return card.threadCache.chasing;
@@ -98,6 +131,34 @@ const getGuardedThreadTitle = (card: CardRecord | null, thread: RememberedThread
 
 const getGuardedThreadNextMove = (card: CardRecord | null): string | null => {
   return card?.threadCache?.nextMove ?? null;
+};
+
+const getGuardedThreadExpiresWhen = (card: CardRecord | null): string | null => {
+  return card?.threadCache?.expiresWhen ?? null;
+};
+
+const formatGuardedThreadActionLabel = (
+  ageState: GuardedThreadAgeState,
+  nextMove: string | null,
+  expiresWhen: string | null,
+  maxLength: number
+): string => {
+  if (ageState === "cold" && expiresWhen !== null) {
+    return `冷掉条件：${clampPresenceTitle(expiresWhen, maxLength)}`;
+  }
+
+  if (nextMove !== null) {
+    return `${guardedThreadActionPrefixByAge[ageState]}：${clampPresenceTitle(nextMove, maxLength)}`;
+  }
+
+  if (ageState === "cooling") {
+    return "这条线有点冷";
+  }
+  if (ageState === "cold") {
+    return "可以放下或接回";
+  }
+
+  return "点击接回这条线";
 };
 
 const resetTemplates = [
@@ -324,19 +385,22 @@ export function PetShell({
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
   const guardedThreadTitle = getGuardedThreadTitle(rememberedThreadCard, rememberedThread);
   const guardedThreadNextMove = getGuardedThreadNextMove(rememberedThreadCard);
+  const guardedThreadExpiresWhen = getGuardedThreadExpiresWhen(rememberedThreadCard);
+  const guardedThreadAgeState = getGuardedThreadAgeState(rememberedThread?.createdAt ?? null, now);
+  const guardedThreadVerb = guardedThreadVerbByAge[guardedThreadAgeState];
   const presenceTitle = memoryActive && guardedThreadTitle !== null
-    ? `正在追：${clampPresenceTitle(guardedThreadTitle)}`
+    ? `${guardedThreadVerb}：${clampPresenceTitle(guardedThreadTitle)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
   const presenceLabel = memoryActive ? "工作记忆" : moodLabel;
-  const presenceActionLabel = memoryActive && guardedThreadNextMove !== null
-    ? `下一手：${clampPresenceTitle(guardedThreadNextMove, 18)}`
+  const presenceActionLabel = memoryActive
+    ? formatGuardedThreadActionLabel(guardedThreadAgeState, guardedThreadNextMove, guardedThreadExpiresWhen, 18)
     : "点击接回这条线";
   const miniRememberedTitle = guardedThreadTitle === null
     ? null
-    : `正在追：${clampPresenceTitle(guardedThreadTitle, 18)}`;
-  const miniRememberedNextMove = guardedThreadNextMove === null
-    ? null
-    : `下一手：${clampPresenceTitle(guardedThreadNextMove, 18)}`;
+    : `${guardedThreadVerb}：${clampPresenceTitle(guardedThreadTitle, 18)}`;
+  const miniRememberedNextMove = memoryActive
+    ? formatGuardedThreadActionLabel(guardedThreadAgeState, guardedThreadNextMove, guardedThreadExpiresWhen, 18)
+    : null;
   const liveStatusLabel = dragging
     ? runDirection === "left"
       ? "往左跑，我跟着你。"
