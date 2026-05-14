@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { CardRecord } from "../types/card";
+import type { CardRecord, ThreadCache } from "../types/card";
 import { getDatabase } from "../db/client";
 import { getRecentCards, mapCardRow } from "../db/cards";
 import type { CardRow } from "../db/cards";
@@ -11,6 +11,15 @@ import { normalizeText } from "../utils/text";
 
 type ExistingItemRow = {
   id: number;
+};
+
+type DigestPayload = {
+  title: string;
+  useFor: string;
+  knowledgeTag: string;
+  summaryForRetrieval: string;
+  threadCache?: ThreadCache | null;
+  petRemark: string;
 };
 
 const buildContentHash = (value: string): string => {
@@ -27,6 +36,7 @@ const findCardByItemId = (itemId: number): CardRecord | null => {
       use_for,
       knowledge_tag,
       summary_for_retrieval,
+      thread_cache_json,
       related_card_ids,
       pet_remark,
       created_at
@@ -53,13 +63,7 @@ export type IngestInput = {
   artifactPath?: string | null;
   processor?: string | null;
   itemStatus?: ItemStatus;
-  digestOverride?: {
-    title: string;
-    useFor: string;
-    knowledgeTag: string;
-    summaryForRetrieval: string;
-    petRemark: string;
-  };
+  digestOverride?: DigestPayload;
 };
 
 const buildItemIdentity = (input: IngestInput, normalizedText: string): string => {
@@ -190,7 +194,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
 const finalizeCard = (
   itemId: number,
   payload: IngestInput,
-  digest: Awaited<ReturnType<typeof generateDigestDraft>>["digest"],
+  digest: DigestPayload,
   combinedError: string | null,
   related: CardRecord["related"],
   queryEmbedding: number[] | null
@@ -211,16 +215,20 @@ const finalizeCard = (
         use_for,
         knowledge_tag,
         summary_for_retrieval,
+        thread_cache_json,
         related_card_ids,
         pet_remark,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       itemId,
       digest.title,
       digest.useFor,
       digest.knowledgeTag,
       digest.summaryForRetrieval,
+      digest.threadCache === undefined || digest.threadCache === null
+        ? null
+        : JSON.stringify(digest.threadCache),
       JSON.stringify(related),
       digest.petRemark,
       createdAt
@@ -256,6 +264,7 @@ const finalizeCard = (
 
     return {
       ...digest,
+      threadCache: digest.threadCache ?? null,
       itemId,
       related,
       createdAt,

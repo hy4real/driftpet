@@ -32,6 +32,8 @@ const { getDatabase } = require(path.join(${JSON.stringify(repoRoot)}, "dist-ele
 
   const cardCount = db.prepare("SELECT COUNT(*) AS n FROM cards").get().n;
   const itemCount = db.prepare("SELECT COUNT(*) AS n FROM items WHERE source = 'manual_chaos'").get().n;
+  const storedThreadCacheJson = db.prepare("SELECT thread_cache_json FROM cards WHERE id = ?").get(third.id).thread_cache_json;
+  const storedThreadCache = JSON.parse(storedThreadCacheJson);
 
   console.log(JSON.stringify({
     firstCardId: first.id,
@@ -41,7 +43,9 @@ const { getDatabase } = require(path.join(${JSON.stringify(repoRoot)}, "dist-ele
     secondItemId: second.itemId,
     thirdItemId: third.itemId,
     cardCount,
-    itemCount
+    itemCount,
+    thirdThreadCache: third.threadCache,
+    storedThreadCache
   }));
 })().catch((error) => {
   console.error(error && error.stack || error);
@@ -81,6 +85,8 @@ test("manual_chaos paste-spam collapses inside the 90s window and reopens after 
     assert.notEqual(result.thirdItemId, result.firstItemId, "after the window expires, a new item row should be created");
     assert.equal(result.cardCount, 2, "expected exactly two cards: one collapsed pair plus the post-window fresh moment");
     assert.equal(result.itemCount, 2, "expected exactly two manual_chaos items for the same reason");
+    assert.equal(result.thirdThreadCache.chasing, result.storedThreadCache.chasing, "thread cache should round-trip through SQLite");
+    assert.match(result.thirdThreadCache.nextMove, /driftpet guard|守住/, "thread cache should preserve a concrete resume move");
   } finally {
     await fs.rm(tmpRoot, { recursive: true, force: true });
   }

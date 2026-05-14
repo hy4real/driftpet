@@ -11,13 +11,23 @@ Required schema:
   "title": "short concrete label for the work thread, max 120 chars",
   "useFor": "1-2 concrete sentences about how to resume this thread next",
   "knowledgeTag": "one short knowledge label or phrase",
-  "summaryForRetrieval": "a retrieval-friendly working-memory summary that preserves the question being chased, temporary judgment, ruled-out path, next action, and concrete entities when present — 2-4 sentences, detailed enough that two cards about the same live thread will score high in semantic search"
+  "summaryForRetrieval": "a retrieval-friendly working-memory summary that preserves the question being chased, temporary judgment, ruled-out path, next action, and concrete entities when present — 2-4 sentences, detailed enough that two cards about the same live thread will score high in semantic search",
+  "threadCache": {
+    "chasing": "the current question, bug, decision, or work thread being guarded",
+    "workingJudgment": "the user's tentative suspicion, hypothesis, or current judgment, or null",
+    "ruledOut": "what the user should not retry or should ignore without new evidence, or null",
+    "nextMove": "the smallest concrete action to resume this thread",
+    "sideThread": "useful but deferred side branch, or null",
+    "expiresWhen": "when this cache should be dropped or stop asking for attention, or null"
+  }
 }
 
 Rules:
 - Do not write a generic summary.
 - Treat the card as a thread cache, not as an article digest or task-list item.
 - Preserve unfinished working memory: the current question, tentative judgment, ruled-out path, next move, and deferred side branch whenever the source provides them.
+- `threadCache` is required for high-signal work inputs. Use null only inside optional fields when the source does not contain that part.
+- `threadCache.nextMove` must match the concrete resume action implied by `useFor`.
 - Match the requested output language.
 - Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `useFor` must produce a next move, not a content recap.

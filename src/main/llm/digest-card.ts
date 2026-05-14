@@ -1,4 +1,4 @@
-import type { CardRecord } from "../types/card";
+import type { CardRecord, ThreadCache } from "../types/card";
 import type { ItemSource, UrlExtractionStage } from "../types/item";
 import { canUseLlm, getLlmMissingReason, sendTextPrompt } from "./client";
 import { detectOutputLanguage, matchesOutputLanguage, type OutputLanguage } from "./language";
@@ -29,6 +29,7 @@ type DigestJson = {
   useFor?: unknown;
   knowledgeTag?: unknown;
   summaryForRetrieval?: unknown;
+  threadCache?: unknown;
 };
 
 type ChaosResetJson = {
@@ -37,6 +38,7 @@ type ChaosResetJson = {
   nextStep?: unknown;
   summaryForRetrieval?: unknown;
   knowledgeTag?: unknown;
+  threadCache?: unknown;
 };
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
@@ -127,6 +129,11 @@ const trimSentenceEnding = (value: string): string => {
   return value.trim().replace(/[。.!?！？]+$/u, "");
 };
 
+const nullableText = (value: string): string | null => {
+  const normalized = normalizeText(value);
+  return normalized.length > 0 ? normalized : null;
+};
+
 const summarizeChaosThreadForStep = (value: string, limit: number): string => {
   return truncate(trimSentenceEnding(value), limit);
 };
@@ -194,6 +201,140 @@ const buildThreadDriftUseFor = (
     ? "Close two unrelated tabs"
     : "Pause the side branch";
   return `${action}, let driftpet guard "${summarizeChaosThreadForStep(threadLabel, 40)}", write the first checklist line, and work on it for five minutes now.`;
+};
+
+const extractTentativeJudgment = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  const patterns = language === "zh"
+    ? [
+      /(?:我(?:怀疑|猜|觉得|判断)|可能|大概率)([^。！？\n]+)/u,
+      /(?:不是|并不是)([^。！？\n]+)/u,
+    ]
+    : [
+      /\b(?:I suspect|I think|I believe|my hunch is|probably|likely)\b([^.!?\n]+)/i,
+      /\b(?:not|isn't|wasn't)\b([^.!?\n]+)/i,
+    ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    const candidate = nullableText(match?.[0] ?? "");
+    if (candidate !== null) {
+      return truncate(candidate, language === "zh" ? 72 : 120);
+    }
+  }
+
+  return null;
+};
+
+const extractRuledOut = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  const patterns = language === "zh"
+    ? [
+      /(?:不是|并不是|别再|不要再|先别|不用)([^。！？\n]+)/u,
+      /(?:排除|放下|别碰)([^。！？\n]+)/u,
+    ]
+    : [
+      /\b(?:not|isn't|wasn't|do not|don't|stop|avoid|set aside|ruled out)\b([^.!?\n]+)/i,
+    ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    const candidate = nullableText(match?.[0] ?? "");
+    if (candidate !== null) {
+      return truncate(candidate, language === "zh" ? 72 : 120);
+    }
+  }
+
+  return null;
+};
+
+const extractNextMoveFromText = (value: string, fallback: string, language: OutputLanguage): string => {
+  const normalized = normalizeText(value);
+  const patterns = language === "zh"
+    ? [
+      /(?:下一步|下一手|接下来|先)\s*(?:是|：|:)?\s*([^。！？\n]+)/u,
+    ]
+    : [
+      /\b(?:next step|next move|next useful move|first)\s*(?:is|:)?\s*([^.!?\n]+)/i,
+    ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    const candidate = nullableText(match?.[1] ?? "");
+    if (candidate !== null) {
+      return truncate(candidate, language === "zh" ? 100 : 140);
+    }
+  }
+
+  return truncate(fallback, language === "zh" ? 120 : 180);
+};
+
+const buildThreadCache = (input: {
+  sourceText: string;
+  title: string;
+  nextMove: string;
+  sideThread?: string | null;
+  language: OutputLanguage;
+  expiresWhen?: string | null;
+}): ThreadCache => {
+  return {
+    chasing: truncate(input.title, input.language === "zh" ? 72 : 120),
+    workingJudgment: extractTentativeJudgment(input.sourceText, input.language),
+    ruledOut: extractRuledOut(input.sourceText, input.language),
+    nextMove: truncate(input.nextMove, input.language === "zh" ? 120 : 180),
+    sideThread: input.sideThread ?? null,
+    expiresWhen: input.expiresWhen ?? (input.language === "zh" ? "这条线冷掉或已经沉淀后" : "when this thread is cold or settled")
+  };
+};
+
+const getRecord = (value: unknown): Record<string, unknown> | null => {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+};
+
+const coerceOptionalCacheString = (
+  value: unknown,
+  fallback: string | null,
+  limit: number,
+  language: OutputLanguage
+): string | null => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = normalizeText(value);
+  if (normalized.length === 0) {
+    return fallback;
+  }
+
+  return matchesOutputLanguage(language, normalized)
+    ? truncate(normalized, limit)
+    : fallback;
+};
+
+const coerceThreadCache = (
+  value: unknown,
+  fallback: ThreadCache,
+  language: OutputLanguage
+): ThreadCache => {
+  const record = getRecord(value);
+  if (record === null) {
+    return fallback;
+  }
+
+  return {
+    chasing: coerceStringInLanguage(record.chasing, fallback.chasing, 120, language),
+    workingJudgment: coerceOptionalCacheString(record.workingJudgment, fallback.workingJudgment, 160, language),
+    ruledOut: coerceOptionalCacheString(record.ruledOut, fallback.ruledOut, 160, language),
+    nextMove: coerceStringInLanguage(record.nextMove, fallback.nextMove, 180, language),
+    sideThread: coerceOptionalCacheString(record.sideThread, fallback.sideThread, 160, language),
+    expiresWhen: coerceOptionalCacheString(record.expiresWhen, fallback.expiresWhen, 120, language)
+  };
 };
 
 const buildTelegramTextKnowledgeTag = (title: string, language: OutputLanguage): string => {
@@ -293,6 +434,7 @@ const createLowSignalDigest = (input: DigestInput): DigestDraft => {
       useFor: "把它当成连通性测试或轻量提醒。确认 Telegram 通路正常后，回到更高信号的主线。",
       knowledgeTag: "Telegram ping",
       summaryForRetrieval: `低信号 Telegram ping：${label}`,
+      threadCache: null,
       petRemark: "轻轻响了一下，记下就继续。"
     };
   }
@@ -302,6 +444,7 @@ const createLowSignalDigest = (input: DigestInput): DigestDraft => {
     useFor: "Treat this as a ping or smoke input. Confirm the Telegram lane works, then move back to a higher-signal thread.",
     knowledgeTag: "Telegram ping",
     summaryForRetrieval: `Low-signal Telegram ping: ${label}`,
+    threadCache: null,
     petRemark: "Tiny ping landed. File it and keep moving."
   };
 };
@@ -337,6 +480,7 @@ const createUrlFailureDigest = (input: DigestInput): DigestDraft => {
         `链接抓取未成功：${label}。这次没有提取到正文，不应把它当成已经读过的文章内容。`,
         500
       ),
+      threadCache: null,
       petRemark: "先承认这次没抓到正文，别把链接壳当成已经消化过。"
     };
   }
@@ -349,6 +493,7 @@ const createUrlFailureDigest = (input: DigestInput): DigestDraft => {
       `URL capture incomplete: ${label}. No article text was extracted, so this should not be treated as already-read content.`,
       500
     ),
+    threadCache: null,
     petRemark: "Call it what it is: a link shell, not a digested article."
   };
 };
@@ -370,20 +515,36 @@ const createUrlReferenceFallback = (input: DigestInput): DigestDraft => {
   const summary = truncate(`${title} ${contentBasis}`, 500);
 
   if (language === "zh") {
+    const useFor = "把它当成按需参考，不要现在整篇消化。只提取一个能直接推进当前任务的事实、步骤或例子，然后关掉页面。";
     return {
       title,
-      useFor: "把它当成按需参考，不要现在整篇消化。只提取一个能直接推进当前任务的事实、步骤或例子，然后关掉页面。",
+      useFor,
       knowledgeTag: "捕获文章",
       summaryForRetrieval: truncate(`按需参考：${summary}。这条缓存只保存能推进当前工作线的事实、步骤或例子，不把整篇文章变成新任务。`, 500),
+      threadCache: buildThreadCache({
+        sourceText: contentBasis,
+        title,
+        nextMove: useFor,
+        sideThread: "不要把整篇文章变成新任务。",
+        language
+      }),
       petRemark: "拿走你要的那一小段，别住进这篇文章里。"
     };
   }
 
+  const useFor = "Treat this as on-demand reference, not something to fully consume right now. Pull one fact, step, or example that directly unblocks the current task, then close the tab.";
   return {
     title,
-    useFor: "Treat this as on-demand reference, not something to fully consume right now. Pull one fact, step, or example that directly unblocks the current task, then close the tab.",
+    useFor,
     knowledgeTag: "captured article",
     summaryForRetrieval: truncate(`On-demand reference: ${summary}. This cache preserves only the fact, step, or example that can move the current work thread forward, not the whole article as a new task.`, 500),
+    threadCache: buildThreadCache({
+      sourceText: contentBasis,
+      title,
+      nextMove: useFor,
+      sideThread: "Do not turn the whole article into a new task.",
+      language
+    }),
     petRemark: "Take the bit you need and get back out."
   };
 };
@@ -398,24 +559,40 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
   const thread = summarizeChaosThreadForStep(title, language === "zh" ? 28 : 40);
 
   if (language === "zh") {
+    const useFor = isThreadDriftText(contentBasis)
+      ? buildThreadDriftUseFor(contentBasis, language, thread)
+      : `让 driftpet 先守住“${thread}”，只做一个当前动作，别把这条信息扩成新分支。`;
     return {
       title,
-      useFor: isThreadDriftText(contentBasis)
-        ? buildThreadDriftUseFor(contentBasis, language, thread)
-        : `让 driftpet 先守住“${thread}”，只做一个当前动作，别把这条信息扩成新分支。`,
+      useFor,
       knowledgeTag,
       summaryForRetrieval: truncate(`工作记忆缓存：${title}。当前守住的线是“${thread}”，下一步只围绕这条线做一个动作，避免扩成新分支。`, 500),
+      threadCache: buildThreadCache({
+        sourceText: contentBasis,
+        title,
+        nextMove: extractNextMoveFromText(contentBasis, useFor, language),
+        sideThread: "别把这条信息扩成新分支。",
+        language
+      }),
       petRemark: "这根线我先叼着，你只做下一小步。"
     };
   }
 
+  const useFor = isThreadDriftText(contentBasis)
+    ? buildThreadDriftUseFor(contentBasis, language, thread)
+    : `Let driftpet guard "${thread}". Do only this next move, and do not turn it into a broader redesign.`;
   return {
     title,
-    useFor: isThreadDriftText(contentBasis)
-      ? buildThreadDriftUseFor(contentBasis, language, thread)
-      : `Let driftpet guard "${thread}". Do only this next move, and do not turn it into a broader redesign.`,
+    useFor,
     knowledgeTag,
     summaryForRetrieval: truncate(`Working-memory cache: ${title}. The guarded thread is "${thread}", and the next move should stay on this line instead of becoming a broader branch.`, 500),
+    threadCache: buildThreadCache({
+      sourceText: contentBasis,
+      title,
+      nextMove: extractNextMoveFromText(contentBasis, useFor, language),
+      sideThread: "Do not turn this into a broader redesign.",
+      language
+    }),
     petRemark: "I will hold this thread; you take the next small move."
   };
 };
@@ -439,20 +616,34 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
   const knowledgeTag = language === "zh" ? "捕获文章" : "captured article";
 
   if (language === "zh") {
+    const useFor = `先把这条工作记忆交给 driftpet 守住，再做一个下一步动作：${useFragment}${contentBasis.length > 160 ? "..." : ""}`;
     return {
       title,
-      useFor: `先把这条工作记忆交给 driftpet 守住，再做一个下一步动作：${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
+      useFor,
       knowledgeTag,
       summaryForRetrieval: truncate(`工作记忆缓存：${contentBasis}`, 500),
+      threadCache: buildThreadCache({
+        sourceText: contentBasis,
+        title,
+        nextMove: extractNextMoveFromText(contentBasis, useFor, language),
+        language
+      }),
       petRemark: "我先守着这根线，你把下一步做小。"
     };
   }
 
+  const useFor = `Let driftpet guard this working-memory thread, then turn it into one next action: ${useFragment}${contentBasis.length > 160 ? "..." : ""}`;
   return {
     title,
-    useFor: `Let driftpet guard this working-memory thread, then turn it into one next action: ${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
+    useFor,
     knowledgeTag,
     summaryForRetrieval: truncate(`Working-memory cache: ${contentBasis}`, 500),
+    threadCache: buildThreadCache({
+      sourceText: contentBasis,
+      title,
+      nextMove: extractNextMoveFromText(contentBasis, useFor, language),
+      language
+    }),
     petRemark: "I will guard the thread; keep the next move small."
   };
 };
@@ -491,6 +682,13 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
       useFor: `先放下：${sideQuests}\n下一步：${nextStep}`,
       knowledgeTag: "工作记忆守线",
       summaryForRetrieval: truncate(`工作记忆缓存：${resolvedMainLine}。暂时排除或放下：${sideQuests} 下一步：${nextStep}`, 500),
+      threadCache: buildThreadCache({
+        sourceText: contentBasis,
+        title: resolvedMainLine,
+        nextMove: nextStep,
+        sideThread: sideQuests,
+        language
+      }),
       petRemark: "这根线我先守着，你别再开新岔路。"
     };
   }
@@ -508,6 +706,13 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     useFor: `Set aside: ${sideQuests}\nNext: ${nextStep}`,
     knowledgeTag: "thread cache",
     summaryForRetrieval: truncate(`Working-memory cache: ${mainLine}. Set aside or rule out: ${sideQuests} Next: ${nextStep}`, 500),
+    threadCache: buildThreadCache({
+      sourceText: contentBasis,
+      title: mainLine,
+      nextMove: nextStep,
+      sideThread: sideQuests,
+      language
+    }),
     petRemark: "I will guard this thread; stop opening side doors."
   };
 };
@@ -845,6 +1050,17 @@ const generateChaosResetDraft = async (
         500,
         language
       ),
+      threadCache: coerceThreadCache(
+        parsed.threadCache,
+        fallback.threadCache ?? buildThreadCache({
+          sourceText: input.rawText,
+          title: mainLine,
+          nextMove: refinedNextStep,
+          sideThread: sideQuests,
+          language
+        }),
+        language
+      ),
       petRemark: fallback.petRemark
     };
 
@@ -936,6 +1152,16 @@ export const generateDigestDraft = async (
         digestJson.summaryForRetrieval,
         fallback.summaryForRetrieval,
         500,
+        language
+      ),
+      threadCache: coerceThreadCache(
+        digestJson.threadCache,
+        fallback.threadCache ?? buildThreadCache({
+          sourceText: normalizeText(input.extractedText ?? input.rawText),
+          title,
+          nextMove: useFor,
+          language
+        }),
         language
       ),
       petRemark: fallback.petRemark

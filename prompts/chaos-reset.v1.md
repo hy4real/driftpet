@@ -12,13 +12,23 @@ Required schema:
   "sideQuests": "one sentence naming what is distracting, ruled out, or can be closed for now",
   "nextStep": "one concrete next step that can start immediately",
   "summaryForRetrieval": "a retrieval-friendly summary that names the guarded thread, temporary judgment, ruled-out path, specific next action, and any tools or context from sideQuests — 2-4 sentences, concrete enough that semantic search can match related thread caches",
-  "knowledgeTag": "short reusable label"
+  "knowledgeTag": "short reusable label",
+  "threadCache": {
+    "chasing": "the current question, bug, decision, or work thread being guarded",
+    "workingJudgment": "the user's tentative suspicion, hypothesis, or current judgment, or null",
+    "ruledOut": "what the user should not retry or should ignore without new evidence, or null",
+    "nextMove": "the smallest concrete action to resume this thread",
+    "sideThread": "useful but deferred side branch, or null",
+    "expiresWhen": "when this cache should be dropped or stop asking for attention, or null"
+  }
 }
 
 Rules:
 - Do not summarize everything.
 - This is a thread cache, not a polished task plan or generic reflection.
 - Preserve tentative thinking when present: suspicions, rejected explanations, abandoned branches, and the next experiment.
+- `threadCache` is required. Use null only inside optional fields when the source does not contain that part.
+- `threadCache.nextMove` must match `nextStep`.
 - Match the requested output language.
 - Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `mainLine` must name the real deliverable or thread being guarded, not a mood.

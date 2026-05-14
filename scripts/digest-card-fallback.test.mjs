@@ -64,6 +64,9 @@ test("manual chaos fallback uses a concrete first action instead of meta deliver
     assert.doesNotMatch(result.digest.useFor, /smallest deliverable/i);
     assert.match(result.digest.knowledgeTag, /thread cache/i);
     assert.match(result.digest.summaryForRetrieval, /Working-memory cache/);
+    assert.equal(result.digest.threadCache.chasing, "Need to finish the launch checklist");
+    assert.match(result.digest.threadCache.nextMove, /Close two unrelated tabs/);
+    assert.match(result.digest.threadCache.sideThread ?? "", /extra links|anything that does not move|working-memory thread/i);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {
@@ -99,6 +102,8 @@ test("telegram drift fallback turns tab spiral into a concrete reset action", as
     assert.match(result.digest.useFor, /let driftpet guard/);
     assert.match(result.digest.useFor, /work on it for five minutes now/);
     assert.doesNotMatch(result.digest.useFor, /Turn this into one next action/i);
+    assert.equal(result.digest.threadCache.chasing, "Tab drift reset");
+    assert.match(result.digest.threadCache.nextMove, /Close two unrelated tabs/);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {
@@ -134,6 +139,8 @@ test("manual chaos fallback names declared thread when recovering from tab drift
     assert.match(result.digest.useFor, /let driftpet guard/);
     assert.match(result.digest.useFor, /pick one branch and close the rest/i);
     assert.doesNotMatch(result.digest.useFor, /Turn this into one next action/i);
+    assert.match(result.digest.threadCache.chasing, /pick one branch and close the rest/i);
+    assert.match(result.digest.threadCache.nextMove, /pick one branch and close the rest/i);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {
@@ -167,6 +174,9 @@ test("telegram text fallback frames high-signal notes as guarded working memory"
     assert.match(result.digest.summaryForRetrieval, /Working-memory cache/);
     assert.match(result.digest.summaryForRetrieval, /guarded thread/i);
     assert.doesNotMatch(result.digest.knowledgeTag.toLowerCase(), /captured note/);
+    assert.match(result.digest.threadCache.workingJudgment ?? "", /not URL extraction/i);
+    assert.match(result.digest.threadCache.ruledOut ?? "", /not URL extraction/i);
+    assert.match(result.digest.threadCache.nextMove, /run two locale URLs/i);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {

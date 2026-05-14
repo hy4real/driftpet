@@ -6,6 +6,15 @@ export type RelatedCardRef = {
   reason: string;
 };
 
+export type ThreadCache = {
+  chasing: string;
+  workingJudgment: string | null;
+  ruledOut: string | null;
+  nextMove: string;
+  sideThread: string | null;
+  expiresWhen: string | null;
+};
+
 export type CardRecord = {
   id: number;
   itemId: number;
@@ -13,6 +22,7 @@ export type CardRecord = {
   useFor: string;
   knowledgeTag: string;
   summaryForRetrieval: string;
+  threadCache: ThreadCache | null;
   related: RelatedCardRef[];
   petRemark: string;
   createdAt: number;

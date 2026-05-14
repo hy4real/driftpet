@@ -1,5 +1,5 @@
 import type { ItemOrigin, UrlExtractionStage } from "./item";
-import type { RelatedCardRef } from "./card";
+import type { RelatedCardRef, ThreadCache } from "./card";
 import type { ClaudeDispatchMeta } from "./claude";
 import type { TelegramPollerLifecycle } from "../telegram/poller-runtime";
 
@@ -23,6 +23,7 @@ export type LatestCaptureCardStatus = {
   useFor: string;
   knowledgeTag: string;
   petRemark: string;
+  threadCache: ThreadCache | null;
   related: RelatedCardRef[];
   latestClaudeDispatch: ClaudeDispatchMeta | null;
 };

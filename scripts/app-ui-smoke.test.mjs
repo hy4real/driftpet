@@ -24,6 +24,14 @@ const sampleCard = {
   useFor: "Return to the core desk pet loop and stop widening the shell.",
   knowledgeTag: "thread reset",
   summaryForRetrieval: "ship product work stop polishing infra",
+  threadCache: {
+    chasing: "Ship product work instead of polishing infra",
+    workingJudgment: "The product loop matters more than infrastructure polish right now.",
+    ruledOut: "Do not widen the shell before the desk pet loop is stable.",
+    nextMove: "Return to the core desk pet loop and stop widening the shell.",
+    sideThread: "Keep infrastructure polish as a deferred branch.",
+    expiresWhen: "when the product loop is shipped",
+  },
   related: [
     {
       cardId: 18,
@@ -42,6 +50,7 @@ const sampleThreadCard = {
   useFor: "Keep the portability cleanup narrow and get back to feature work.",
   knowledgeTag: "thread reset",
   summaryForRetrieval: "trim portability cleanup and get back to feature work",
+  threadCache: null,
   related: [],
   petRemark: "Still part of the same line.",
   createdAt: sampleCard.createdAt - 1000,
@@ -54,6 +63,7 @@ const sampleBacklinkCard = {
   useFor: "Show continuity in the UI before inventing new storage.",
   knowledgeTag: "thread mode",
   summaryForRetrieval: "show continuity in the ui before inventing new storage",
+  threadCache: null,
   related: [
     {
       cardId: sampleCard.id,
@@ -164,6 +174,7 @@ const sampleStatus = {
         useFor: sampleCard.useFor,
         knowledgeTag: sampleCard.knowledgeTag,
         petRemark: sampleCard.petRemark,
+        threadCache: sampleCard.threadCache,
         related: sampleCard.related,
       },
     },
@@ -1656,6 +1667,10 @@ test("compact mode renders a full resume thread card with next-step body", async
   assert.ok(resumeTitle, "expected the resume card to render the thread title");
   assert.equal(resumeTitle.textContent, sampleCard.title);
   assert.ok(resumeCard.querySelector(".pet-resume-card-row"), "expected the resume card to render at least the next-step row");
+  assert.match(resumeCard.textContent ?? "", /正在追/);
+  assert.match(resumeCard.textContent ?? "", /临时判断/);
+  assert.match(resumeCard.textContent ?? "", /别再走/);
+  assert.match(resumeCard.textContent ?? "", /Do not widen the shell/);
   assert.ok(resumeCard.querySelector(".pet-resume-card-primary"), "expected a primary resume action");
   assert.ok(resumeCard.querySelector(".pet-resume-card-secondary"), "expected a secondary collapse action");
 

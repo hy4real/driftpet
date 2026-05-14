@@ -1,4 +1,5 @@
 import { getDatabase } from "../db/client";
+import { parseRelated, parseThreadCache } from "../db/cards";
 import { getPref } from "../db/prefs";
 import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
 import { getClaudeDispatchSettings } from "../claude/settings";
@@ -13,7 +14,6 @@ import {
 } from "../telegram/poller-prefs";
 import type { AppStatus, LatestItemStatus, RememberedThread, StatusLevel } from "../types/status";
 import type { ClaudeDispatchMeta } from "../types/claude";
-import type { RelatedCardRef } from "../types/card";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
 import { normalizeText, truncate } from "../utils/text";
 
@@ -46,6 +46,7 @@ type LatestItemRow = {
   use_for: string | null;
   knowledge_tag: string | null;
   pet_remark: string | null;
+  thread_cache_json: string | null;
   related_card_ids: string | null;
 };
 
@@ -68,18 +69,6 @@ const formatStatusTime = (value: number | null): string | null => {
 const formatRemainingMinutes = (value: number): string => {
   const minutes = Math.max(1, Math.ceil(value / MINUTE_MS));
   return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-};
-
-const parseRelated = (value: string | null): RelatedCardRef[] => {
-  if (value === null || value.length === 0) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(value) as RelatedCardRef[];
-  } catch {
-    return [];
-  }
 };
 
 const inferExtractionStage = (row: LatestItemRow): UrlExtractionStage => {
@@ -177,6 +166,7 @@ const buildLatestItem = (row: LatestItemRow | undefined): LatestItemStatus | nul
         useFor: row.use_for,
         knowledgeTag: row.knowledge_tag,
         petRemark: row.pet_remark,
+        threadCache: parseThreadCache(row.thread_cache_json),
         related: parseRelated(row.related_card_ids),
         latestClaudeDispatch: getLatestClaudeDispatch(row.card_id)
       }
@@ -223,6 +213,7 @@ const getLatestItem = (): LatestItemStatus | null => {
       cards.use_for AS use_for,
       cards.knowledge_tag AS knowledge_tag,
       cards.pet_remark AS pet_remark,
+      cards.thread_cache_json AS thread_cache_json,
       cards.related_card_ids AS related_card_ids
     FROM items
     LEFT JOIN cards ON cards.item_id = items.id
@@ -292,6 +283,7 @@ const getLatestRealItem = (): LatestItemStatus | null => {
       cards.use_for AS use_for,
       cards.knowledge_tag AS knowledge_tag,
       cards.pet_remark AS pet_remark,
+      cards.thread_cache_json AS thread_cache_json,
       cards.related_card_ids AS related_card_ids
     FROM items
     LEFT JOIN cards ON cards.item_id = items.id

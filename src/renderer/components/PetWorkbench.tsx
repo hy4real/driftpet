@@ -242,7 +242,7 @@ export function PetWorkbench({
                   >
                     <strong>{entry.card.title}</strong>
                     <span>{entry.card.knowledgeTag}</span>
-                    <p>{entry.card.useFor}</p>
+                    <p>{entry.card.threadCache?.nextMove ?? entry.card.useFor}</p>
                   </button>
                 </li>
               ))}
@@ -333,7 +333,7 @@ export function PetWorkbench({
                       onClick={() => onSelectRecentCard(card)}
                     >
                       <strong>{card.title}</strong>
-                      <span>{card.knowledgeTag}</span>
+                      <span>{card.threadCache?.chasing ?? card.knowledgeTag}</span>
                     </button>
                   </li>
                 ))}

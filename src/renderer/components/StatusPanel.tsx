@@ -245,9 +245,16 @@ export function StatusPanel({ isOpen, status, onClose, onRefresh }: StatusPanelP
                   </div>
 
                   <div className="capture-block">
-                    <span className="bubble-label">可以先这样</span>
-                    <p>{summarize(status.storage.latestItem.card.useFor, 180)}</p>
+                    <span className="bubble-label">接线下一手</span>
+                    <p>{summarize(status.storage.latestItem.card.threadCache?.nextMove ?? status.storage.latestItem.card.useFor, 180)}</p>
                   </div>
+
+                  {status.storage.latestItem.card.threadCache !== null ? (
+                    <div className="capture-block">
+                      <span className="bubble-label">正在追</span>
+                      <p>{summarize(status.storage.latestItem.card.threadCache.chasing, 180)}</p>
+                    </div>
+                  ) : null}
 
                   <div className="capture-block">
                     <span className="bubble-label">driftpet 悄悄说</span>
