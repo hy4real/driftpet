@@ -1,6 +1,6 @@
 import { getDatabase } from "../db/client";
 import { parseRelated, parseThreadCache } from "../db/cards";
-import { getPref } from "../db/prefs";
+import { getPref, setPref } from "../db/prefs";
 import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
 import { getClaudeDispatchSettings } from "../claude/settings";
 import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
@@ -231,10 +231,27 @@ type RememberedThreadRow = {
 };
 
 const REMEMBERED_THREAD_EXCLUDED_TAGS = ["Telegram ping", "链接待重试", "link retry"];
+const RELEASED_REMEMBERED_THREAD_PREF = "released_remembered_thread_card_id";
+const RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF = "released_remembered_thread_created_at";
+
+export const releaseRememberedThread = (cardId: number): void => {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT created_at AS createdAt
+    FROM cards
+    WHERE id = ?
+    LIMIT 1
+  `).get(cardId) as { createdAt: number } | undefined;
+
+  setPref(RELEASED_REMEMBERED_THREAD_PREF, String(cardId));
+  setPref(RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF, String(row?.createdAt ?? Date.now()));
+};
 
 const getRememberedThread = (): RememberedThread | null => {
   const db = getDatabase();
   const placeholders = REMEMBERED_THREAD_EXCLUDED_TAGS.map(() => "?").join(", ");
+  const releasedCreatedAt = Number(getPref(RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF) ?? "0");
+  const hasReleaseWatermark = Number.isFinite(releasedCreatedAt) && releasedCreatedAt > 0;
   const row = db.prepare(`
     SELECT
       cards.id AS card_id,
@@ -244,9 +261,13 @@ const getRememberedThread = (): RememberedThread | null => {
     INNER JOIN cards ON cards.item_id = items.id
     WHERE items.origin = 'real'
       AND cards.knowledge_tag NOT IN (${placeholders})
+      ${hasReleaseWatermark ? "AND cards.created_at > ?" : ""}
     ORDER BY cards.created_at DESC
     LIMIT 1
-  `).get(...REMEMBERED_THREAD_EXCLUDED_TAGS) as RememberedThreadRow | undefined;
+  `).get(
+    ...REMEMBERED_THREAD_EXCLUDED_TAGS,
+    ...(hasReleaseWatermark ? [releasedCreatedAt] : [])
+  ) as RememberedThreadRow | undefined;
 
   if (row === undefined) {
     return null;

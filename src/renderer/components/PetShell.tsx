@@ -78,6 +78,7 @@ type PetShellProps = {
   clipboardOffer: ClipboardOffer | null;
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
+  onReleaseRememberedThread: (card: CardRecord) => void;
 };
 
 const clampPresenceTitle = (value: string, maxLength = 28): string => {
@@ -241,7 +242,8 @@ export function PetShell({
   onCaptureClaudeDispatchResult,
   clipboardOffer,
   onAcceptClipboardOffer,
-  onDismissClipboardOffer
+  onDismissClipboardOffer,
+  onReleaseRememberedThread
 }: PetShellProps) {
   const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -666,7 +668,10 @@ export function PetShell({
         <ResumeThreadCard
           card={rememberedThreadCard}
           onResume={onResurfaceRememberedThread}
-          onCollapse={() => setCollapsedResumeCardId(rememberedThreadCard.id)}
+          onRelease={() => {
+            setCollapsedResumeCardId(rememberedThreadCard.id);
+            onReleaseRememberedThread(rememberedThreadCard);
+          }}
         />
       ) : null}
 

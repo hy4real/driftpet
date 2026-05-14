@@ -42,6 +42,7 @@ const api = {
   showDemo: (): Promise<CardRecord> => ipcRenderer.invoke("pet:show-demo"),
   listRecentCards: (): Promise<CardRecord[]> => ipcRenderer.invoke("cards:list-recent"),
   deleteCard: (cardId: number): Promise<boolean> => ipcRenderer.invoke("cards:delete", cardId),
+  releaseRememberedThread: (cardId: number): Promise<void> => ipcRenderer.invoke("pet:release-remembered-thread", cardId),
   getStatus: (): Promise<AppStatus> => ipcRenderer.invoke("app:get-status"),
   getClaudeDispatchSettings: (): Promise<ClaudeDispatchSettings> => ipcRenderer.invoke("claude:get-dispatch-settings"),
   setClaudeDispatchSettings: (settings: ClaudeDispatchSettings): Promise<ClaudeDispatchSettings> => ipcRenderer.invoke("claude:set-dispatch-settings", settings),

@@ -8,7 +8,7 @@ import type { CardRecord } from "../src/main/types/card";
 import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/types/claude";
 import { setPetHourlyBudget } from "../src/main/pet/runtime";
 import type { AppStatus } from "../src/main/types/status";
-import { getAppStatus } from "../src/main/status/app-status";
+import { getAppStatus, releaseRememberedThread } from "../src/main/status/app-status";
 import { buildThreadBundle } from "../src/shared/thread-bundle";
 import { moveMainWindowBy, resizeMainWindow } from "../src/main/app/windows";
 import {
@@ -78,6 +78,10 @@ export const registerIpcHandlers = (
 
   ipcMain.handle("cards:delete", async (_event, cardId: number): Promise<boolean> => {
     return deleteCardById(cardId);
+  });
+
+  ipcMain.handle("pet:release-remembered-thread", async (_event, cardId: number): Promise<void> => {
+    releaseRememberedThread(cardId);
   });
 
   ipcMain.handle("card:dispatch-claude-code", async (_event, cardId: number): Promise<ClaudeDispatchMeta> => {

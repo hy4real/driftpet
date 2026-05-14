@@ -296,8 +296,10 @@ const setupDom = () => {
   const updateClaudeDispatchStatusCalls = [];
   const captureClaudeDispatchResultCalls = [];
   const deleteCardCalls = [];
+  const releaseRememberedThreadCalls = [];
   const claudeDispatchSettingWrites = [];
   let latestClaudeDispatch = null;
+  let releasedRememberedThreadCardId = null;
   let claudeDispatchSettings = {
     terminalApp: "Ghostty",
     workingDirectory: sampleRepoDir,
@@ -334,7 +336,19 @@ const setupDom = () => {
       deleteCardCalls.push(cardId);
       return true;
     },
-    getStatus: async () => sampleStatus,
+    releaseRememberedThread: async (cardId) => {
+      releaseRememberedThreadCalls.push(cardId);
+      releasedRememberedThreadCardId = cardId;
+    },
+    getStatus: async () => ({
+      ...sampleStatus,
+      pet: {
+        ...sampleStatus.pet,
+        rememberedThread: sampleStatus.pet.rememberedThread?.cardId === releasedRememberedThreadCardId
+          ? null
+          : sampleStatus.pet.rememberedThread,
+      },
+    }),
     getClaudeDispatchSettings: async () => claudeDispatchSettings,
     setClaudeDispatchSettings: async (settings) => {
       claudeDispatchSettingWrites.push(settings);
@@ -433,6 +447,7 @@ const setupDom = () => {
     updateClaudeDispatchStatusCalls,
     captureClaudeDispatchResultCalls,
     deleteCardCalls,
+    releaseRememberedThreadCalls,
     claudeDispatchSettingWrites,
     emitClipboardOffer: (offer) => {
       if (clipboardOfferEmitter !== null) {
@@ -1682,7 +1697,7 @@ test("workbench panel keeps a visible border and shadow on light backgrounds", a
 
 test("compact mode renders a full resume thread card with next-step body", async () => {
   const { App, cleanupBundle } = await buildAppModule();
-  const { cleanup } = setupDom();
+  const { cleanup, releaseRememberedThreadCalls } = setupDom();
   const container = document.getElementById("root");
   assert.ok(container);
 
@@ -1727,20 +1742,19 @@ test("compact mode renders a full resume thread card with next-step body", async
   const presenceMemoryButton = container.querySelector(".pet-presence-card[data-memory-active=\"true\"], .pet-presence-card .pet-presence-memory");
   assert.equal(presenceMemoryButton, null, "expected the presence memory hint to step aside while the resume card is on screen");
 
-  // Collapsing the resume card should remove it for this thread id.
+  // Releasing the resume card should stop guarding it without deleting it.
   const collapseButton = resumeCard.querySelector(".pet-resume-card-secondary");
+  assert.match(collapseButton.textContent ?? "", /放下这条/);
 
   await act(async () => {
     collapseButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-  assert.equal(container.querySelector(".pet-resume-card"), null, "expected the resume card to disappear after collapse");
-  const presence = container.querySelector(".pet-presence-card");
-  assert.ok(presence, "expected presence card to return after collapsing the full resume card");
-  assert.match(presence.textContent ?? "", /正在追/);
-  assert.match(presence.textContent ?? "", /下一手/);
-  assert.match(presence.textContent ?? "", /Ship product work/);
-  assert.match(presence.textContent ?? "", /Return to the cor/);
+  assert.equal(container.querySelector(".pet-resume-card"), null, "expected the resume card to disappear after release");
+  assert.equal(container.querySelector(".pet-mini-resume-thread"), null, "released thread should not immediately return as guarded memory");
+  assert.deepEqual(releaseRememberedThreadCalls, [sampleCard.id], "release should persist the remembered thread card id");
+  assert.match(container.textContent ?? "", /Ship product work instead of polishing infra/, "released card should remain available in history");
 
   await act(async () => {
     root.unmount();

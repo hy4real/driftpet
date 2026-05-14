@@ -34,6 +34,7 @@
     "test:dev-electron": "node --test scripts/dev-electron.test.mjs",
     "test:related": "npm run build:electron && node --test scripts/related-language-recall.test.mjs",
     "test:ingest-dedup": "npm run build:electron && node --test scripts/ingest-chaos-dedup.test.mjs",
+    "test:remembered-release": "npm run build:electron && node --test scripts/remembered-thread-release.test.mjs",
     "test:ui-smoke": "node --test scripts/app-ui-smoke.test.mjs",
     "test:window-state": "node --test --experimental-strip-types src/main/app/window-state.test.mjs",
     "test:clipboard-watcher": "node --test --experimental-strip-types src/main/clipboard/watcher.test.mjs",

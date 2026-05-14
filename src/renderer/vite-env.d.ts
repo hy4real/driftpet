@@ -39,6 +39,7 @@ declare global {
       showDemo: () => Promise<CardRecord>;
       listRecentCards: () => Promise<CardRecord[]>;
       deleteCard: (cardId: number) => Promise<boolean>;
+      releaseRememberedThread: (cardId: number) => Promise<void>;
       getStatus: () => Promise<AppStatus>;
       getClaudeDispatchSettings: () => Promise<ClaudeDispatchSettings>;
       setClaudeDispatchSettings: (settings: ClaudeDispatchSettings) => Promise<ClaudeDispatchSettings>;

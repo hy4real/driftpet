@@ -4,10 +4,10 @@ import { parseUseFor } from "./parse-use-for";
 type ResumeThreadCardProps = {
   card: CardRecord;
   onResume: () => void;
-  onCollapse: () => void;
+  onRelease: () => void;
 };
 
-export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCardProps) {
+export function ResumeThreadCard({ card, onResume, onRelease }: ResumeThreadCardProps) {
   const parsed = parseUseFor(card.useFor);
   const showSetAside = parsed.setAside !== null && parsed.setAside.length > 0;
   const showNextStep = parsed.nextStep.length > 0;
@@ -102,10 +102,10 @@ export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCar
         </button>
         <button
           className="pet-resume-card-secondary"
-          onClick={onCollapse}
+          onClick={onRelease}
           type="button"
         >
-          收起
+          放下这条
         </button>
       </footer>
     </article>

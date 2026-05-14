@@ -2,6 +2,7 @@ export const IPC_CHANNELS = {
   showDemo: "pet:show-demo",
   listRecentCards: "cards:list-recent",
   deleteCard: "cards:delete",
+  releaseRememberedThread: "pet:release-remembered-thread",
   ingestChaosReset: "ingest:chaos-reset",
   setPetHourlyBudget: "pet:set-hourly-budget",
   setWindowSize: "pet:set-window-size",

@@ -390,6 +390,24 @@ export default function App() {
     }
   };
 
+  const releaseRememberedThread = async (card: CardRecord) => {
+    if (deletingCardId !== null) {
+      return;
+    }
+
+    try {
+      await window.driftpet.releaseRememberedThread(card.id);
+      setActiveCard((current) => current?.id === card.id ? null : current);
+      setPendingCard((current) => current?.id === card.id ? null : current);
+      const nextStatus = await window.driftpet.getStatus();
+      setStatus(nextStatus);
+      showPetNote("这条线先放下了，卡片还在历史里。", 3200);
+    } catch (error) {
+      console.error("[driftpet] remembered thread release failed:", error);
+      showPetNote("放下失败了。再试一次。", 4200);
+    }
+  };
+
   const updateClaudeDispatchStatus = async (card: CardRecord, nextStatus: ClaudeDispatchUserStatus) => {
     if (isDispatchingCardId !== null || updatingDispatchCardId !== null || capturingDispatchResultCardId !== null || deletingCardId !== null) {
       return;
@@ -649,6 +667,7 @@ export default function App() {
           clipboardOffer={clipboardOffer}
           onAcceptClipboardOffer={acceptClipboardOffer}
           onDismissClipboardOffer={dismissClipboardOffer}
+          onReleaseRememberedThread={releaseRememberedThread}
         />
       </section>
     </main>
