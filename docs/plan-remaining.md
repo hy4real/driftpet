@@ -8,22 +8,25 @@ The original V1 loop still matters, but the next phase should judge every change
 
 ## Next
 
-1. Thread-cache real usage pass
-   Feed real Telegram / local chaos inputs and inspect whether each card preserves the unstable middle state: the question being chased, temporary judgment, ruled-out path, next move, and deferred side thread. Mark any card that only summarizes the input as insufficient.
-
-2. Prompt and cache-shape retuning
-   Adjust the chaos-reset wording, high-signal Telegram text handling, and digest-card fields toward a `thread cache` shape instead of a generic summary shape.
-
-3. Pet-state binding pass
-   Review where the pet visually says it is waiting, guarding, cooling, sleeping, or releasing a thread. Prefer pet behavior that carries memory state over pet behavior that is only decorative.
-
-4. Recall threshold retuning
+1. Recall threshold retuning
    Tune related-memory recall so it appears only when it can restore or strengthen the current working-memory thread. Empty recall is better than weak archive-like recall.
 
-5. Mixed Telegram batch observation
+2. Mixed Telegram batch observation
    Keep running small real batches through the actual poller path and watch for vague titles, generic next moves, weak knowledge tags, or low-value recall across both text and URL captures.
 
+3. Manual pet-state visual pass
+   Recheck the desktop surface after the guarding, cooling, and release bindings. The visual pass should confirm that the pet reads as carrying memory state, not just showing card metadata.
+
 ## Recently closed
+
+1. Thread-cache real usage calibration
+   Done for the first product-sharpening pass. Real and local chaos samples now expose `chasing`, `working_judgment`, `ruled_out`, `next_move`, `side_thread`, and `expires_when`, with a probe script for continued calibration.
+
+2. Prompt and cache-shape retuning
+   Done for the current cache shape. Digest output now carries a guarded `thread_cache` next to the existing card fields instead of replacing stable history.
+
+3. Pet-state binding and release
+   Done for the first behavior pass. Mini and compact pet surfaces now bind presence to the guarded thread cache, show fresh / cooling / cold age, and let the user put down a guarded thread without deleting it from history.
 
 4. Report refresh
    Done for the current product shape. Keep rerunning it after major behavior changes so the generated morning brief stays honest.
