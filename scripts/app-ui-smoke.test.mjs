@@ -559,7 +559,12 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   assert.equal(container.querySelector(".mini-card"), null, "mini mode should not show a mini card");
   assert.equal(container.querySelector(".mini-pet-toast"), null, "mini mode should not show a mini toast");
   assert.equal(container.querySelector(".bubble-panel"), null, "mini mode should not show the main bubble");
-  assert.equal(container.querySelector(".pet-mini-resume-thread")?.textContent.includes("正在守着的线"), true, "mini mode may show the remembered-thread resume entry");
+  const miniResume = container.querySelector(".pet-mini-resume-thread");
+  assert.ok(miniResume, "mini mode may show the remembered-thread resume entry");
+  assert.match(miniResume.textContent ?? "", /正在追/);
+  assert.match(miniResume.textContent ?? "", /下一手/);
+  assert.match(miniResume.textContent ?? "", /Ship product work/);
+  assert.match(miniResume.textContent ?? "", /Return to the cor/);
 
   await clickAvatar(container);
 
@@ -715,8 +720,10 @@ test("mini resume thread opens the remembered card directly", async () => {
 
   const resumeThread = container.querySelector(".pet-mini-resume-thread");
   assert.ok(resumeThread, "expected mini mode to expose the remembered thread");
-  assert.match(resumeThread.textContent ?? "", /正在守着的线/);
-  assert.match(resumeThread.textContent ?? "", /继续/);
+  assert.match(resumeThread.textContent ?? "", /正在追/);
+  assert.match(resumeThread.textContent ?? "", /下一手/);
+  assert.match(resumeThread.textContent ?? "", /Ship product work/);
+  assert.match(resumeThread.textContent ?? "", /Return to the cor/);
 
   await act(async () => {
     resumeThread.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1686,6 +1693,12 @@ test("compact mode renders a full resume thread card with next-step body", async
   });
 
   assert.equal(container.querySelector(".pet-resume-card"), null, "expected the resume card to disappear after collapse");
+  const presence = container.querySelector(".pet-presence-card");
+  assert.ok(presence, "expected presence card to return after collapsing the full resume card");
+  assert.match(presence.textContent ?? "", /正在追/);
+  assert.match(presence.textContent ?? "", /下一手/);
+  assert.match(presence.textContent ?? "", /Ship product work/);
+  assert.match(presence.textContent ?? "", /Return to the cor/);
 
   await act(async () => {
     root.unmount();

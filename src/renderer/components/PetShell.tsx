@@ -88,6 +88,18 @@ const clampPresenceTitle = (value: string, maxLength = 28): string => {
   return `${value.slice(0, maxLength - 1)}…`;
 };
 
+const getGuardedThreadTitle = (card: CardRecord | null, thread: RememberedThread | null): string | null => {
+  if (card?.threadCache !== null && card?.threadCache !== undefined) {
+    return card.threadCache.chasing;
+  }
+
+  return thread?.title ?? null;
+};
+
+const getGuardedThreadNextMove = (card: CardRecord | null): string | null => {
+  return card?.threadCache?.nextMove ?? null;
+};
+
 const resetTemplates = [
   {
     label: "东西太多",
@@ -310,13 +322,21 @@ export function PetShell({
   // so the same thread does not echo in two places at once.
   const memoryActive = canShowRememberedThread && !showResumeCard;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
-  const presenceTitle = memoryActive && rememberedThread !== null
-    ? `正在守着的线：${clampPresenceTitle(rememberedThread.title)}`
+  const guardedThreadTitle = getGuardedThreadTitle(rememberedThreadCard, rememberedThread);
+  const guardedThreadNextMove = getGuardedThreadNextMove(rememberedThreadCard);
+  const presenceTitle = memoryActive && guardedThreadTitle !== null
+    ? `正在追：${clampPresenceTitle(guardedThreadTitle)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
   const presenceLabel = memoryActive ? "工作记忆" : moodLabel;
-  const miniRememberedTitle = rememberedThread === null
+  const presenceActionLabel = memoryActive && guardedThreadNextMove !== null
+    ? `下一手：${clampPresenceTitle(guardedThreadNextMove, 18)}`
+    : "点击接回这条线";
+  const miniRememberedTitle = guardedThreadTitle === null
     ? null
-    : `继续：${clampPresenceTitle(rememberedThread.title, 18)}`;
+    : `正在追：${clampPresenceTitle(guardedThreadTitle, 18)}`;
+  const miniRememberedNextMove = guardedThreadNextMove === null
+    ? null
+    : `下一手：${clampPresenceTitle(guardedThreadNextMove, 18)}`;
   const liveStatusLabel = dragging
     ? runDirection === "left"
       ? "往左跑，我跟着你。"
@@ -526,7 +546,7 @@ export function PetShell({
           onClick={onResurfaceRememberedThread}
           type="button"
         >
-          <span>正在守着的线</span>
+          <span>{miniRememberedNextMove ?? "正在守着的线"}</span>
           <strong>{miniRememberedTitle}</strong>
         </button>
       ) : null}
@@ -568,7 +588,7 @@ export function PetShell({
 
           {!isMini ? (
             <PetPresence
-              actionLabel="点击接回这条线"
+              actionLabel={presenceActionLabel}
               label={presenceLabel}
               memoryActive={memoryActive}
               title={presenceTitle}
