@@ -1,6 +1,17 @@
 export type PetUiState = "idle" | "happy" | "curious" | "carrying" | "tired" | "sleepy" | "thinking";
 export type PetExpression = "idle" | "run-right" | "run-left" | "waving" | "jumping" | "failed" | "waiting" | "running" | "review";
 
+type PetUiContext = {
+  activeCardTitle: string | null;
+  isExpanded: boolean;
+  isAsync: boolean;
+  hasPendingCard: boolean;
+  petHourlyBudget: number;
+  petShownThisHour: number;
+  dragging: boolean;
+  hovered: boolean;
+};
+
 export type ExpressionTrigger = {
   expression: PetExpression;
   startedAt: number;
@@ -28,22 +39,33 @@ export const resolveExpression = (
 export const getPetUiState = ({
   activeCardTitle,
   isExpanded,
+  isAsync,
+  hasPendingCard,
   petHourlyBudget,
-  petShownThisHour
-}: {
-  activeCardTitle: string | null;
-  isExpanded: boolean;
-  petHourlyBudget: number;
-  petShownThisHour: number;
-}): PetUiState => {
+  petShownThisHour,
+  dragging,
+  hovered,
+}: PetUiContext): PetUiState => {
+  if (dragging) {
+    return "curious";
+  }
   if (isExpanded) {
     return "thinking";
+  }
+  if (isAsync) {
+    return "thinking";
+  }
+  if (hasPendingCard) {
+    return "happy";
   }
   if (activeCardTitle !== null) {
     return "carrying";
   }
   if (petShownThisHour >= petHourlyBudget) {
     return "tired";
+  }
+  if (hovered) {
+    return "curious";
   }
 
   return "idle";

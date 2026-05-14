@@ -110,6 +110,7 @@ export const createMainWindow = (): BrowserWindow => {
   const windowState = readWindowState();
 
   const window = new BrowserWindow({
+    show: false,
     width: windowState.width,
     height: windowState.height,
     minWidth: MIN_WINDOW_WIDTH,
@@ -124,11 +125,27 @@ export const createMainWindow = (): BrowserWindow => {
     fullscreenable: false,
     hasShadow: false,
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: process.env.DRIFTPET_HIDE_DOCK === "1",
     acceptFirstMouse: true,
     webPreferences: {
       preload: getPreloadEntryPath()
     }
+  });
+
+  revealMainWindow(window);
+
+  window.once("ready-to-show", () => {
+    revealMainWindow(window);
+  });
+
+  window.webContents.once("did-finish-load", () => {
+    revealMainWindow(window);
+  });
+
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(
+      `[driftpet] renderer failed to load (${errorCode}): ${errorDescription} ${validatedURL}`
+    );
   });
 
   window.on("move", () => {
@@ -151,6 +168,37 @@ export const createMainWindow = (): BrowserWindow => {
   }
 
   return window;
+};
+
+export const revealMainWindow = (
+  window: BrowserWindow,
+  options: { focus?: boolean } = {}
+): void => {
+  if (window.isDestroyed()) {
+    return;
+  }
+
+  if (window.isMinimized()) {
+    window.restore();
+  }
+
+  if (process.platform === "darwin") {
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    window.setAlwaysOnTop(true, "pop-up-menu");
+    window.setSkipTaskbar(process.env.DRIFTPET_HIDE_DOCK === "1");
+  }
+
+  if (options.focus === true) {
+    window.show();
+    window.focus();
+    if (process.platform === "darwin") {
+      app.focus({ steal: true });
+    }
+  } else {
+    window.showInactive();
+  }
+
+  window.moveTop();
 };
 
 export const resizeMainWindow = (

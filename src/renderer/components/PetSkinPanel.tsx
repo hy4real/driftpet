@@ -8,6 +8,7 @@ type InstalledPet = {
   slug: string;
   displayName: string;
   isBuiltin: boolean;
+  source: "builtin" | "driftpet" | "codex" | "petdex";
 };
 
 type ClaudeDispatchSettings = {
@@ -81,6 +82,19 @@ export function PetSkinPanel({ onClose }: PetSkinPanelProps) {
     } finally {
       setSavingSettings(false);
     }
+  };
+
+  const renderPetSource = (pet: InstalledPet): string => {
+    if (pet.isBuiltin) {
+      return "内置";
+    }
+    if (pet.source === "codex") {
+      return "Codex";
+    }
+    if (pet.source === "petdex") {
+      return "Petdex";
+    }
+    return "本地";
   };
 
   return (
@@ -166,7 +180,7 @@ export function PetSkinPanel({ onClose }: PetSkinPanelProps) {
       <section className="pet-settings-group">
         <div className="pet-settings-copy">
           <h3>桌宠</h3>
-          <p>切换当前桌宠，或安装新的 petdex 角色。</p>
+          <p>切换当前桌宠，或安装新的 petdex 角色。命令、链接和 slug 都可以直接贴进来，安装后也会同步到本机 `~/.codex/pets`。</p>
         </div>
 
         <div className="pet-skin-list">
@@ -178,7 +192,7 @@ export function PetSkinPanel({ onClose }: PetSkinPanelProps) {
               type="button"
             >
               <span className="pet-skin-name">{pet.displayName}</span>
-              {pet.isBuiltin ? <span className="pet-skin-badge">内置</span> : null}
+              <span className="pet-skin-badge">{renderPetSource(pet)}</span>
             </button>
           ))}
         </div>
@@ -193,7 +207,7 @@ export function PetSkinPanel({ onClose }: PetSkinPanelProps) {
                 void handleInstall();
               }
             }}
-            placeholder="粘贴 petdex 链接或 slug"
+            placeholder="粘贴 npx petdex install ...、petdex 链接或 slug"
             value={installInput}
           />
           <button

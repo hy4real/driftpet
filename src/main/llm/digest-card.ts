@@ -187,13 +187,13 @@ const buildThreadDriftUseFor = (
     const action = hasTabDrift(value)
       ? "关掉两个无关标签页"
       : "先停下当前岔线";
-    return `${action}，写下“${summarizeChaosThreadForStep(threadLabel, 28)}”的第一条检查项，然后立刻做五分钟。`;
+    return `${action}，让 driftpet 先守住“${summarizeChaosThreadForStep(threadLabel, 28)}”，写下第一条检查项，然后立刻做五分钟。`;
   }
 
   const action = hasTabDrift(value)
     ? "Close two unrelated tabs"
     : "Pause the side branch";
-  return `${action}, write the first checklist line for "${summarizeChaosThreadForStep(threadLabel, 40)}", and work on it for five minutes now.`;
+  return `${action}, let driftpet guard "${summarizeChaosThreadForStep(threadLabel, 40)}", write the first checklist line, and work on it for five minutes now.`;
 };
 
 const buildTelegramTextKnowledgeTag = (title: string, language: OutputLanguage): string => {
@@ -374,7 +374,7 @@ const createUrlReferenceFallback = (input: DigestInput): DigestDraft => {
       title,
       useFor: "把它当成按需参考，不要现在整篇消化。只提取一个能直接推进当前任务的事实、步骤或例子，然后关掉页面。",
       knowledgeTag: "捕获文章",
-      summaryForRetrieval: summary,
+      summaryForRetrieval: truncate(`按需参考：${summary}。这条缓存只保存能推进当前工作线的事实、步骤或例子，不把整篇文章变成新任务。`, 500),
       petRemark: "拿走你要的那一小段，别住进这篇文章里。"
     };
   }
@@ -383,7 +383,7 @@ const createUrlReferenceFallback = (input: DigestInput): DigestDraft => {
     title,
     useFor: "Treat this as on-demand reference, not something to fully consume right now. Pull one fact, step, or example that directly unblocks the current task, then close the tab.",
     knowledgeTag: "captured article",
-    summaryForRetrieval: summary,
+    summaryForRetrieval: truncate(`On-demand reference: ${summary}. This cache preserves only the fact, step, or example that can move the current work thread forward, not the whole article as a new task.`, 500),
     petRemark: "Take the bit you need and get back out."
   };
 };
@@ -402,10 +402,10 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
       title,
       useFor: isThreadDriftText(contentBasis)
         ? buildThreadDriftUseFor(contentBasis, language, thread)
-        : `先围绕“${thread}”只做一个当前动作，别把这条信息扩成新分支。`,
+        : `让 driftpet 先守住“${thread}”，只做一个当前动作，别把这条信息扩成新分支。`,
       knowledgeTag,
-      summaryForRetrieval: truncate(`${title} ${thread}`, 500),
-      petRemark: "你已经意识到飘了，先把这一条收紧。"
+      summaryForRetrieval: truncate(`工作记忆缓存：${title}。当前守住的线是“${thread}”，下一步只围绕这条线做一个动作，避免扩成新分支。`, 500),
+      petRemark: "这根线我先叼着，你只做下一小步。"
     };
   }
 
@@ -413,10 +413,10 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
     title,
     useFor: isThreadDriftText(contentBasis)
       ? buildThreadDriftUseFor(contentBasis, language, thread)
-      : `Do only this next: ${thread}. Do not turn it into a broader redesign.`,
+      : `Let driftpet guard "${thread}". Do only this next move, and do not turn it into a broader redesign.`,
     knowledgeTag,
-    summaryForRetrieval: truncate(`${title} ${thread}`, 500),
-    petRemark: "You noticed the drift. Keep the next move small."
+    summaryForRetrieval: truncate(`Working-memory cache: ${title}. The guarded thread is "${thread}", and the next move should stay on this line instead of becoming a broader branch.`, 500),
+    petRemark: "I will hold this thread; you take the next small move."
   };
 };
 
@@ -441,19 +441,19 @@ const createFallbackDigest = (input: DigestInput): DigestDraft => {
   if (language === "zh") {
     return {
       title,
-      useFor: `把它压成一个下一步动作：${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
+      useFor: `先把这条工作记忆交给 driftpet 守住，再做一个下一步动作：${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
       knowledgeTag,
-      summaryForRetrieval: truncate(contentBasis, 500),
-      petRemark: "你已经意识到飘了，下一步先做小一点。"
+      summaryForRetrieval: truncate(`工作记忆缓存：${contentBasis}`, 500),
+      petRemark: "我先守着这根线，你把下一步做小。"
     };
   }
 
   return {
     title,
-    useFor: `Turn this into one next action: ${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
+    useFor: `Let driftpet guard this working-memory thread, then turn it into one next action: ${useFragment}${contentBasis.length > 160 ? "..." : ""}`,
     knowledgeTag,
-    summaryForRetrieval: truncate(contentBasis, 500),
-    petRemark: "You noticed the drift. Keep the next move small."
+    summaryForRetrieval: truncate(`Working-memory cache: ${contentBasis}`, 500),
+    petRemark: "I will guard the thread; keep the next move small."
   };
 };
 
@@ -480,35 +480,35 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
       : mainLine;
     const stepThread = summarizeChaosThreadForStep(resolvedMainLine, 28);
     const sideQuests = /https?:\/\//i.test(contentBasis)
-      ? "先放下那些不能直接推进主交付的链接和标签页。"
-      : "先放下所有不能直接推进当前交付的岔线。";
+      ? "先放下那些不能直接推进这条工作记忆的链接和标签页。"
+      : "先放下所有不能直接推进当前工作记忆的岔线。";
     const nextStep = isThreadDriftText(contentBasis)
       ? buildThreadDriftUseFor(contentBasis, language, stepThread)
-      : `关掉两个无关标签页，写下“${stepThread}”的第一条检查项，然后立刻做五分钟。`;
+      : `关掉两个无关标签页，让 driftpet 先守住“${stepThread}”，写下第一条检查项，然后立刻做五分钟。`;
 
     return {
       title: resolvedMainLine,
       useFor: `先放下：${sideQuests}\n下一步：${nextStep}`,
-      knowledgeTag: "线程复位",
-      summaryForRetrieval: truncate(`${resolvedMainLine} ${sideQuests} ${nextStep}`, 500),
-      petRemark: "你又飘了。先拎住一根线。"
+      knowledgeTag: "工作记忆守线",
+      summaryForRetrieval: truncate(`工作记忆缓存：${resolvedMainLine}。暂时排除或放下：${sideQuests} 下一步：${nextStep}`, 500),
+      petRemark: "这根线我先守着，你别再开新岔路。"
     };
   }
 
   const sideQuests = /https?:\/\//i.test(contentBasis)
-    ? "Set aside the extra links and tabs that do not unblock the main deliverable."
-    : "Set aside anything that does not move the current deliverable forward.";
+    ? "Set aside the extra links and tabs that do not unblock this working-memory thread."
+    : "Set aside anything that does not move the current working-memory thread forward.";
   const stepThread = summarizeChaosThreadForStep(mainLine, 40);
   const nextStep = isThreadDriftText(contentBasis)
     ? buildThreadDriftUseFor(contentBasis, language, stepThread)
-    : `Close two unrelated tabs, write the first checklist line for "${stepThread}", and work on it for five minutes now.`;
+    : `Close two unrelated tabs, let driftpet guard "${stepThread}", write the first checklist line, and work on it for five minutes now.`;
 
   return {
     title: mainLine,
     useFor: `Set aside: ${sideQuests}\nNext: ${nextStep}`,
-    knowledgeTag: "chaos reset",
-    summaryForRetrieval: truncate(`${mainLine} ${sideQuests} ${nextStep}`, 500),
-    petRemark: "You drifted. Pull one thread and keep it."
+    knowledgeTag: "thread cache",
+    summaryForRetrieval: truncate(`Working-memory cache: ${mainLine}. Set aside or rule out: ${sideQuests} Next: ${nextStep}`, 500),
+    petRemark: "I will guard this thread; stop opening side doors."
   };
 };
 
@@ -808,8 +808,8 @@ const generateChaosResetDraft = async (
     const sideQuests = coerceStringInLanguage(
       parsed.sideQuests,
       language === "zh"
-        ? "先放下所有不能直接推进当前交付的岔线。"
-        : "Set aside anything that does not move the current deliverable forward.",
+        ? "先放下所有不能直接推进当前工作记忆的岔线。"
+        : "Set aside anything that does not move the current working-memory thread forward.",
       180,
       language
     );
@@ -835,7 +835,7 @@ const generateChaosResetDraft = async (
         : `Set aside: ${sideQuests}\nNext: ${refinedNextStep}`,
       knowledgeTag: coerceStringInLanguage(
         parsed.knowledgeTag,
-        language === "zh" ? "线程复位" : "chaos reset",
+        language === "zh" ? "工作记忆守线" : "thread cache",
         80,
         language
       ),

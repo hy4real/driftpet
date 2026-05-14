@@ -7,11 +7,29 @@ import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/t
 type CardCreatedListener = (card: CardRecord) => void;
 type ClipboardOfferListener = (offer: ClipboardOffer) => void;
 type PetActiveChangedListener = (assets: { slug: string; spritesheetPath: string }) => void;
+type PetdexRuntimeStateListener = (state: PetdexRuntimeState) => void;
+type PetdexRuntimeBubbleListener = (bubble: PetdexRuntimeBubble) => void;
+
+type PetdexRuntimeState = {
+  expression: "idle" | "running" | "waiting" | "waving" | "jumping" | "failed" | "review";
+  durationMs: number | null;
+  updatedAt: number | null;
+  counter: number | null;
+  agentSource: string | null;
+};
+
+type PetdexRuntimeBubble = {
+  text: string;
+  agentSource: string | null;
+  updatedAt: number | null;
+  counter: number | null;
+};
 
 type PetInfo = {
   slug: string;
   displayName: string;
   isBuiltin: boolean;
+  source: "builtin" | "driftpet" | "codex" | "petdex";
 };
 
 type ClaudeDispatchSettings = {
@@ -73,6 +91,28 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("pet:active-changed", wrapped);
+    };
+  },
+  onPetdexRuntimeState: (listener: PetdexRuntimeStateListener): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: PetdexRuntimeState) => {
+      listener(state);
+    };
+
+    ipcRenderer.on("petdex:runtime-state", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("petdex:runtime-state", wrapped);
+    };
+  },
+  onPetdexBubble: (listener: PetdexRuntimeBubbleListener): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, bubble: PetdexRuntimeBubble) => {
+      listener(bubble);
+    };
+
+    ipcRenderer.on("petdex:bubble", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("petdex:bubble", wrapped);
     };
   }
 };

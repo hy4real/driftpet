@@ -83,6 +83,36 @@ export const getDataDir = (): string => {
   return path.join(appRoot, "data");
 };
 
+export const getCodexHomeDir = (): string => {
+  const explicit = process.env.CODEX_HOME;
+  if (explicit !== undefined && explicit.length > 0) {
+    return explicit;
+  }
+
+  return path.join(os.homedir(), ".codex");
+};
+
+export const getCodexPetsDir = (): string => {
+  return path.join(getCodexHomeDir(), "pets");
+};
+
+export const getPetdexHomeDir = (): string => {
+  const explicit = process.env.PETDEX_HOME;
+  if (explicit !== undefined && explicit.length > 0) {
+    return explicit;
+  }
+
+  return path.join(os.homedir(), ".petdex");
+};
+
+export const getPetdexPetsDir = (): string => {
+  return path.join(getPetdexHomeDir(), "pets");
+};
+
+export const getPetdexRuntimeDir = (): string => {
+  return path.join(getPetdexHomeDir(), "runtime");
+};
+
 export const getPromptsDir = (): string => {
   return path.join(getAppRoot(), "prompts");
 };

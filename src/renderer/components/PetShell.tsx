@@ -22,6 +22,21 @@ import {
 } from "../pet-ui-state";
 import { usePetDrag } from "../use-pet-drag";
 
+type PetdexRuntimeState = {
+  expression: PetExpression;
+  durationMs: number | null;
+  updatedAt: number | null;
+  counter: number | null;
+  agentSource: string | null;
+};
+
+type PetdexRuntimeBubble = {
+  text: string;
+  agentSource: string | null;
+  updatedAt: number | null;
+  counter: number | null;
+};
+
 type PetShellProps = {
   windowMode: "mini" | "compact" | "expanded";
   historyOpen: boolean;
@@ -36,6 +51,8 @@ type PetShellProps = {
   isAsync: boolean;
   hasError: boolean;
   eventVersion: number;
+  petdexRuntimeState: PetdexRuntimeState | null;
+  petdexBubble: PetdexRuntimeBubble | null;
   onCloseBubble: () => void;
   onChaosTextChange: (value: string) => void;
   onSubmitChaosReset: () => void;
@@ -125,6 +142,8 @@ export function PetShell({
   isAsync,
   hasError,
   eventVersion,
+  petdexRuntimeState,
+  petdexBubble,
   onCloseBubble,
   onChaosTextChange,
   onSubmitChaosReset,
@@ -165,6 +184,9 @@ export function PetShell({
   const triggerIdRef = useRef(0);
   const prevEventVersionRef = useRef(eventVersion);
   const isMini = windowMode === "mini";
+  const petdexBubbleText = petdexBubble?.text ?? null;
+  const petdexBubbleSource = petdexBubble?.agentSource ?? null;
+  const visiblePetNote = petdexBubbleText ?? petNote;
   const [collapsedResumeCardId, setCollapsedResumeCardId] = useState<number | null>(null);
   const resumeCardId = rememberedThreadCard !== null ? rememberedThreadCard.id : null;
   const isResumeCollapsed = resumeCardId !== null && collapsedResumeCardId === resumeCardId;
@@ -246,9 +268,40 @@ export function PetShell({
     onHoverStart: () => triggerReaction("peek")
   });
 
-  const petUiState = getPetUiState({ activeCardTitle, isExpanded, petHourlyBudget, petShownThisHour });
-  const baseExpression = petExpressionByState[petUiState];
-  const petExpression = transientExpression ?? resolveExpression(baseExpression, triggers, Date.now());
+  const petUiState = getPetUiState({
+    activeCardTitle,
+    isExpanded,
+    isAsync,
+    hasPendingCard,
+    petHourlyBudget,
+    petShownThisHour,
+    dragging,
+    hovered
+  });
+  let baseExpression = petExpressionByState[petUiState];
+  if (dragging) {
+    baseExpression = "running";
+  } else if (reaction === "peek") {
+    baseExpression = "waving";
+  } else if (reaction === "nudge") {
+    baseExpression = "jumping";
+  } else if (hasPendingCard && !isMini) {
+    baseExpression = "waving";
+  } else if (isAsync) {
+    baseExpression = "waiting";
+  }
+  const now = Date.now();
+  const petdexExpression =
+    petdexRuntimeState !== null &&
+    petdexRuntimeState.expression !== "idle" &&
+    (
+      petdexRuntimeState.durationMs === null ||
+      petdexRuntimeState.updatedAt === null ||
+      now - petdexRuntimeState.updatedAt < petdexRuntimeState.durationMs
+    )
+      ? petdexRuntimeState.expression
+      : null;
+  const petExpression = petdexExpression ?? transientExpression ?? resolveExpression(baseExpression, triggers, now);
   const moodLabel = moodLabelByState[petUiState];
   const statusLabel = statusLabelByState[petUiState];
   const canShowRememberedThread = activeCardTitle === null && rememberedThread !== null;
@@ -258,9 +311,9 @@ export function PetShell({
   const memoryActive = canShowRememberedThread && !showResumeCard;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
   const presenceTitle = memoryActive && rememberedThread !== null
-    ? `上次帮你守的线：${clampPresenceTitle(rememberedThread.title)}`
+    ? `正在守着的线：${clampPresenceTitle(rememberedThread.title)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
-  const presenceLabel = memoryActive ? "线程记忆" : moodLabel;
+  const presenceLabel = memoryActive ? "工作记忆" : moodLabel;
   const miniRememberedTitle = rememberedThread === null
     ? null
     : `继续：${clampPresenceTitle(rememberedThread.title, 18)}`;
@@ -412,11 +465,13 @@ export function PetShell({
   }, [isAsync]);
 
   const handlePoke = () => {
+    triggerExpression("jumping", 900);
     triggerReaction("nudge");
     onPoke();
   };
 
   const openBench = () => {
+    triggerExpression("waving", 1200);
     triggerReaction("peek");
     onSetWindowSize("expanded");
   };
@@ -453,19 +508,25 @@ export function PetShell({
         </div>
       ) : null}
 
-      {isMini && clipboardOfferPreview === null && petNote !== null ? (
-        <div className="pet-click-bubble" role="status">
-          {petNote}
+      {isMini && clipboardOfferPreview === null && visiblePetNote !== null ? (
+        <div
+          className={`pet-click-bubble ${petdexBubbleText !== null ? "pet-click-bubble-petdex" : ""}`}
+          role="status"
+        >
+          {petdexBubbleText !== null && petdexBubbleSource !== null ? (
+            <span className="pet-click-bubble-source">{petdexBubbleSource}</span>
+          ) : null}
+          {visiblePetNote}
         </div>
       ) : null}
 
-      {isMini && clipboardOfferPreview === null && petNote === null && miniRememberedTitle !== null ? (
+      {isMini && clipboardOfferPreview === null && visiblePetNote === null && miniRememberedTitle !== null ? (
         <button
           className="pet-mini-resume-thread"
           onClick={onResurfaceRememberedThread}
           type="button"
         >
-          <span>上次那条线</span>
+          <span>正在守着的线</span>
           <strong>{miniRememberedTitle}</strong>
         </button>
       ) : null}
@@ -476,7 +537,7 @@ export function PetShell({
             <div className="bubble-anchor">
               <PetBubble
                 card={bubbleCard}
-                note={petNote}
+                note={visiblePetNote}
                 onClose={onCloseBubble}
                 windowMode={windowMode}
               />
@@ -499,15 +560,15 @@ export function PetShell({
           />
 
           {hasPendingCard && !isMini ? (
-            <div className={`pet-pending-badge ${isSleepy ? "pet-pending-badge-sleepy" : ""}`} aria-label="有新的小纸条">
+            <div className={`pet-pending-badge ${isSleepy ? "pet-pending-badge-sleepy" : ""}`} aria-label="有新的工作记忆缓存">
               <span>✦</span>
-              新纸条
+              新线
             </div>
           ) : null}
 
           {!isMini ? (
             <PetPresence
-              actionLabel="点击继续这条线"
+              actionLabel="点击接回这条线"
               label={presenceLabel}
               memoryActive={memoryActive}
               title={presenceTitle}

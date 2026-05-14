@@ -10,6 +10,21 @@ import bobaSpritesheet from "./assets/boba-spritesheet.webp";
 
 type WindowMode = "mini" | "compact" | "expanded";
 
+type PetdexRuntimeState = {
+  expression: "idle" | "running" | "waiting" | "waving" | "jumping" | "failed" | "review";
+  durationMs: number | null;
+  updatedAt: number | null;
+  counter: number | null;
+  agentSource: string | null;
+};
+
+type PetdexRuntimeBubble = {
+  text: string;
+  agentSource: string | null;
+  updatedAt: number | null;
+  counter: number | null;
+};
+
 type ClaudeDispatchFeedback = {
   cardId: number;
   tone: "success" | "error";
@@ -34,6 +49,8 @@ export default function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [petNote, setPetNote] = useState<string | null>(null);
   const [spritesheetUrl, setSpritesheetUrl] = useState<string>(bobaSpritesheet);
+  const [petdexRuntimeState, setPetdexRuntimeState] = useState<PetdexRuntimeState | null>(null);
+  const [petdexBubble, setPetdexBubble] = useState<PetdexRuntimeBubble | null>(null);
   const [isNestSubmitting, setIsNestSubmitting] = useState(false);
   const [isAsync, setIsAsync] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -105,6 +122,15 @@ export default function App() {
       setSpritesheetUrl(toSpritesheetUrl(assets.slug, assets.spritesheetPath));
     });
 
+    const unsubscribePetdexRuntime = window.driftpet.onPetdexRuntimeState((state) => {
+      setPetdexRuntimeState(state.expression === "idle" ? null : state);
+    });
+
+    const unsubscribePetdexBubble = window.driftpet.onPetdexBubble((bubble) => {
+      const trimmedText = bubble.text.trim();
+      setPetdexBubble(trimmedText.length === 0 ? null : { ...bubble, text: trimmedText });
+    });
+
     const unsubscribe = window.driftpet.onCardCreated((card) => {
       if (petNoteTimerRef.current !== null) {
         clearTimeout(petNoteTimerRef.current);
@@ -130,6 +156,8 @@ export default function App() {
     return () => {
       unsubscribe();
       unsubscribePet();
+      unsubscribePetdexRuntime();
+      unsubscribePetdexBubble();
       unsubscribeClipboard();
       if (petNoteTimerRef.current !== null) {
         clearTimeout(petNoteTimerRef.current);
@@ -137,7 +165,34 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      petdexRuntimeState === null ||
+      petdexRuntimeState.durationMs === null ||
+      petdexRuntimeState.updatedAt === null
+    ) {
+      return;
+    }
+
+    const remainingMs = petdexRuntimeState.durationMs - (Date.now() - petdexRuntimeState.updatedAt);
+    if (remainingMs <= 0) {
+      setPetdexRuntimeState(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPetdexRuntimeState((current) =>
+        current?.counter === petdexRuntimeState.counter ? null : current
+      );
+    }, remainingMs);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [petdexRuntimeState]);
+
   const showPetNote = useCallback((note: string, duration = 4200) => {
+    setPetdexBubble(null);
     setPetNote(note);
     if (petNoteTimerRef.current !== null) {
       clearTimeout(petNoteTimerRef.current);
@@ -570,6 +625,8 @@ export default function App() {
           isAsync={isAsync}
           hasError={hasError}
           eventVersion={eventVersion}
+          petdexRuntimeState={petdexRuntimeState}
+          petdexBubble={petdexBubble}
           onCloseBubble={() => setActiveCard(null)}
           onChangePetBudget={changePetBudget}
           onSetWindowSize={setWindowSize}

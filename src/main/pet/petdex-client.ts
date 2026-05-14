@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getDataDir } from "../paths";
+import { getCodexPetsDir, getDataDir, getPetdexPetsDir } from "../paths";
 
 const MANIFEST_URL = "https://petdex.crafter.run/api/manifest";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -23,13 +23,38 @@ type CachedManifest = {
 
 let manifestCache: CachedManifest | null = null;
 
+const PETDEX_INSTALL_COMMAND_RE = /\bpetdex\s+install\s+([a-z0-9_-]+)\b/i;
+const PETDEX_PET_URL_RE =
+  /^(?:https?:\/\/)?petdex\.crafter\.run(?:\/[^/?#]+)?\/pets\/([a-z0-9_-]+)(?:[/?#].*)?$/i;
+
+const writePetPackage = (
+  petsRootDir: string,
+  slug: string,
+  petJsonBuffer: Buffer,
+  spritesheetBuffer: Buffer,
+  spritesheetExt: string
+): string => {
+  const petDir = path.join(petsRootDir, slug);
+  fs.mkdirSync(petDir, { recursive: true });
+  fs.writeFileSync(path.join(petDir, "pet.json"), petJsonBuffer);
+  fs.writeFileSync(
+    path.join(petDir, `spritesheet${spritesheetExt}`),
+    spritesheetBuffer
+  );
+  return petDir;
+};
+
 export const parsePetdexSlug = (input: string): string | null => {
   const trimmed = input.trim();
 
-  // Full URL: https://petdex.crafter.run/zh/pets/boba
-  const urlMatch = trimmed.match(
-    /petdex\.crafter\.run\/[^/]*\/pets\/([a-z0-9_-]+)/i
-  );
+  // CLI install command: npx petdex install boba
+  const commandMatch = trimmed.match(PETDEX_INSTALL_COMMAND_RE);
+  if (commandMatch !== null) {
+    return commandMatch[1].toLowerCase();
+  }
+
+  // Full URL: https://petdex.crafter.run/pets/boba or /zh/pets/boba
+  const urlMatch = trimmed.match(PETDEX_PET_URL_RE);
   if (urlMatch !== null) {
     return urlMatch[1].toLowerCase();
   }
@@ -75,9 +100,6 @@ export const downloadPet = async (
     throw new Error(`pet not found in manifest: ${slug}`);
   }
 
-  const petDir = path.join(getDataDir(), "pets", slug);
-  fs.mkdirSync(petDir, { recursive: true });
-
   const [petJsonResponse, spritesheetResponse] = await Promise.all([
     fetch(entry.petJsonUrl),
     fetch(entry.spritesheetUrl),
@@ -95,17 +117,41 @@ export const downloadPet = async (
   }
 
   const petJsonBuffer = Buffer.from(await petJsonResponse.arrayBuffer());
-  fs.writeFileSync(path.join(petDir, "pet.json"), petJsonBuffer);
-
   const spritesheetUrl = entry.spritesheetUrl;
   const spritesheetExt = spritesheetUrl.endsWith(".png") ? ".png" : ".webp";
   const spritesheetBuffer = Buffer.from(
     await spritesheetResponse.arrayBuffer()
   );
-  fs.writeFileSync(
-    path.join(petDir, `spritesheet${spritesheetExt}`),
-    spritesheetBuffer
+
+  const primaryPetsDir = path.join(getDataDir(), "pets");
+  const petDir = writePetPackage(
+    primaryPetsDir,
+    slug,
+    petJsonBuffer,
+    spritesheetBuffer,
+    spritesheetExt
   );
+
+  const codexPetsDir = getCodexPetsDir();
+  const mirrorPetsDirs = [codexPetsDir, getPetdexPetsDir()].filter(
+    (petsDir, index, all) =>
+      path.resolve(petsDir) !== path.resolve(primaryPetsDir) &&
+      all.findIndex((candidate) => path.resolve(candidate) === path.resolve(petsDir)) === index
+  );
+
+  for (const mirrorPetsDir of mirrorPetsDirs) {
+    try {
+      writePetPackage(
+        mirrorPetsDir,
+        slug,
+        petJsonBuffer,
+        spritesheetBuffer,
+        spritesheetExt
+      );
+    } catch (error) {
+      console.warn("[driftpet] failed to mirror pet into external pet root:", error);
+    }
+  }
 
   return { slug, dir: petDir, spritesheetExt };
 };

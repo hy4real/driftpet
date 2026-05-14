@@ -121,15 +121,15 @@ export function PetWorkbench({
         ) : null}
 
         {rememberedThreadCard !== null ? (
-          <div className="pet-workbench-resume-strip" aria-label="上次那条线可继续">
-            <span className="pet-workbench-resume-strip-eyebrow">上次那条线</span>
+          <div className="pet-workbench-resume-strip" aria-label="正在守着的工作记忆可接回">
+            <span className="pet-workbench-resume-strip-eyebrow">正在守着的线</span>
             <span className="pet-workbench-resume-strip-title">{rememberedThreadCard.title}</span>
             <button
               type="button"
               className="pet-workbench-resume-strip-button"
               onClick={onResurfaceRememberedThread}
             >
-              继续
+              接回
             </button>
           </div>
         ) : null}
@@ -138,8 +138,8 @@ export function PetWorkbench({
           <section className="pet-workbench-thread-panel" aria-label="当前线头">
             <div className="pet-workbench-thread-header">
               <div>
-                <p className="bubble-eyebrow">线头模式</p>
-                <h3>这条线最近长了什么</h3>
+                <p className="bubble-eyebrow">守线模式</p>
+                <h3>这条工作记忆最近长了什么</h3>
               </div>
               <button
                 type="button"
@@ -157,7 +157,7 @@ export function PetWorkbench({
               </button>
             </div>
             <p className="pet-workbench-thread-copy">
-              先沿着这条线往下做，不用每次都从孤立卡片重新起步。
+              先沿着这条被守住的工作记忆往下做，不用每次都从孤立卡片重新起步。
             </p>
             {threadAnchorCard !== null && threadDispatch !== null && threadDispatchView !== null ? (
               <div className={`pet-workbench-thread-dispatch pet-workbench-thread-dispatch-${threadDispatchView.tone}`} role="status">
@@ -253,7 +253,7 @@ export function PetWorkbench({
         <header className="pet-workbench-header">
           <div>
             <p className="bubble-eyebrow">小窝</p>
-            <h2>先放进来，我帮你收好。</h2>
+            <h2>先交给我守着。</h2>
           </div>
           <div className="pet-workbench-toolbar" aria-label="小窝操作">
             <button
@@ -261,7 +261,7 @@ export function PetWorkbench({
               onClick={onToggleHistory}
               type="button"
             >
-              记忆
+              放下的线
             </button>
             <button
               className="pet-pill"
@@ -281,7 +281,7 @@ export function PetWorkbench({
         </header>
 
         <label className="manual-input-shell">
-          <span className="manual-input-label">粘贴链接、想法、上下文，乱一点也没关系</span>
+          <span className="manual-input-label">粘贴问题、临时判断、已排除路径，乱一点也没关系</span>
           <div className="template-row">
             {resetTemplates.map((template) => (
               <button
@@ -298,7 +298,7 @@ export function PetWorkbench({
             className="manual-input"
             disabled={isSubmitting}
             onChange={(event) => onChaosTextChange(event.target.value)}
-            placeholder="例如：刚看的链接、突然冒出的任务、下一步想做但还没想清楚的事。"
+            placeholder="例如：我怀疑不是 URL 抽取失败，而是 recall 去噪没压住；下一步先跑两条 MDN locale URL，别再改 prompt。"
             value={chaosText}
           />
         </label>
@@ -310,7 +310,7 @@ export function PetWorkbench({
             onClick={onSubmitChaosReset}
             type="button"
           >
-            {isSubmitting ? "正在保存..." : "保存到小窝"}
+            {isSubmitting ? "正在守住..." : "交给它守"}
           </button>
         </div>
 
@@ -321,7 +321,7 @@ export function PetWorkbench({
               className={`pet-workbench-history-toggle ${historyFoldOpen ? "pet-workbench-history-toggle-open" : ""}`}
               onClick={() => setHistoryFoldOpen((open) => !open)}
             >
-              {historyFoldOpen ? "收起更早的卡片" : `更早的卡片 (${recentCards.length})`}
+              {historyFoldOpen ? "收起放下的线" : `放下的线 (${recentCards.length})`}
             </button>
             {historyFoldOpen ? (
               <ul className="pet-workbench-history-list">

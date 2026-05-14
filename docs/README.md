@@ -5,6 +5,8 @@ Use this index to tell what is current source-of-truth versus what is historical
 
 ## Current sources of truth
 
+- `product-direction-2026-05-14.md`
+  Current product direction: driftpet is a desktop pet that guards working memory.
 - `../README.md`
   Current local setup, runtime configuration, and product surface summary.
 - `../CLAUDE.md`

@@ -1,6 +1,7 @@
 import { ensureEnvLoaded } from "../src/main/env";
 import { app, BrowserWindow, protocol } from "electron";
 import { bootstrapApp } from "../src/main/app/bootstrap";
+import { revealMainWindow } from "../src/main/app/windows";
 
 // Handle Squirrel.Mac events (required for electron-builder packaged apps).
 if (process.platform === "darwin") {
@@ -30,8 +31,7 @@ if (!hasSingleInstanceLock) {
       return;
     }
 
-    existingWindow.show();
-    existingWindow.focus();
+    revealMainWindow(existingWindow, { focus: true });
   });
 
   void bootstrapApp(app);

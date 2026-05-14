@@ -1,15 +1,35 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getDataDir, getAssetsDir } from "../paths";
+import { getDataDir, getAssetsDir, getCodexPetsDir, getPetdexPetsDir } from "../paths";
 import { getPref, setPref } from "../db/prefs";
 
 const ACTIVE_PET_PREF = "active_pet_slug";
 const BOBA_SLUG = "boba";
 
+export type PetSource = "builtin" | "driftpet" | "codex" | "petdex";
+
 export type PetInfo = {
   slug: string;
   displayName: string;
   isBuiltin: boolean;
+  source: PetSource;
+};
+
+type PetManifest = {
+  id?: string;
+  displayName?: string;
+  description?: string;
+  spritesheetPath?: string;
+};
+
+type PetRecord = {
+  slug: string;
+  displayName: string;
+  isBuiltin: boolean;
+  source: PetSource;
+  petDir: string | null;
+  spritesheetPath: string;
+  spritesheetAssetPath: string;
 };
 
 const getBuiltinSpritesheetPath = (): string => {
@@ -33,7 +53,7 @@ const getPetsDir = (): string => {
 
 const readPetJson = (
   petDir: string
-): { displayName: string } | null => {
+): PetManifest | null => {
   const jsonPath = path.join(petDir, "pet.json");
   if (!fs.existsSync(jsonPath)) {
     return null;
@@ -41,22 +61,123 @@ const readPetJson = (
 
   try {
     const raw = fs.readFileSync(jsonPath, "utf-8");
-    return JSON.parse(raw) as { displayName: string };
+    return JSON.parse(raw) as PetManifest;
   } catch {
     return null;
   }
 };
 
-export const listInstalledPets = (): PetInfo[] => {
-  const pets: PetInfo[] = [
-    { slug: BOBA_SLUG, displayName: "Boba", isBuiltin: true },
-  ];
-
-  const petsDir = getPetsDir();
-  if (!fs.existsSync(petsDir)) {
-    return pets;
+const normalizeAssetPath = (input: string): string | null => {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return null;
   }
 
+  const normalized = trimmed.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (normalized.length === 0 || normalized.includes("..")) {
+    return null;
+  }
+
+  return normalized;
+};
+
+const resolvePetFile = (
+  petDir: string,
+  assetPath: string
+): string | null => {
+  const resolved = path.resolve(petDir, assetPath);
+  const relative = path.relative(petDir, resolved);
+  if (
+    relative.startsWith("..") ||
+    path.isAbsolute(relative) ||
+    !fs.existsSync(resolved)
+  ) {
+    return null;
+  }
+
+  return resolved;
+};
+
+const resolvePetSpritesheet = (
+  petDir: string,
+  petJson: PetManifest
+): { spritesheetPath: string; spritesheetAssetPath: string } | null => {
+  const candidateAssetPaths = [
+    petJson.spritesheetPath,
+    "spritesheet.webp",
+    "spritesheet.png",
+  ];
+
+  for (const candidate of candidateAssetPaths) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+
+    const assetPath = normalizeAssetPath(candidate);
+    if (assetPath === null) {
+      continue;
+    }
+
+    const resolved = resolvePetFile(petDir, assetPath);
+    if (resolved !== null) {
+      return {
+        spritesheetPath: resolved,
+        spritesheetAssetPath: assetPath,
+      };
+    }
+  }
+
+  return null;
+};
+
+const getBuiltinPet = (): PetRecord => {
+  const spritesheetPath = getBuiltinSpritesheetPath();
+  return {
+    slug: BOBA_SLUG,
+    displayName: "Boba",
+    isBuiltin: true,
+    source: "builtin",
+    petDir: null,
+    spritesheetPath,
+    spritesheetAssetPath: path.basename(spritesheetPath),
+  };
+};
+
+const readPetRecord = (
+  petDir: string,
+  slug: string,
+  source: PetSource
+): PetRecord | null => {
+  const petJson = readPetJson(petDir);
+  if (petJson === null) {
+    return null;
+  }
+
+  const spritesheet = resolvePetSpritesheet(petDir, petJson);
+  if (spritesheet === null) {
+    return null;
+  }
+
+  return {
+    slug,
+    displayName: petJson.displayName ?? slug,
+    isBuiltin: false,
+    source,
+    petDir,
+    spritesheetPath: spritesheet.spritesheetPath,
+    spritesheetAssetPath: spritesheet.spritesheetAssetPath,
+  };
+};
+
+const collectPetsFromDir = (
+  petsDir: string,
+  source: PetSource
+): PetRecord[] => {
+  if (!fs.existsSync(petsDir)) {
+    return [];
+  }
+
+  const pets: PetRecord[] = [];
   const entries = fs.readdirSync(petsDir, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name === BOBA_SLUG) {
@@ -64,19 +185,73 @@ export const listInstalledPets = (): PetInfo[] => {
     }
 
     const petDir = path.join(petsDir, entry.name);
-    const petJson = readPetJson(petDir);
-    if (petJson === null) {
-      continue;
+    const pet = readPetRecord(petDir, entry.name, source);
+    if (pet !== null) {
+      pets.push(pet);
     }
-
-    pets.push({
-      slug: entry.name,
-      displayName: petJson.displayName ?? entry.name,
-      isBuiltin: false,
-    });
   }
 
   return pets;
+};
+
+const petSourcePriority = (source: PetSource): number => {
+  if (source === "builtin") {
+    return 0;
+  }
+  if (source === "driftpet") {
+    return 1;
+  }
+  if (source === "codex") {
+    return 2;
+  }
+  return 3;
+};
+
+const listPetRecords = (): PetRecord[] => {
+  const merged = new Map<string, PetRecord>();
+  const register = (pet: PetRecord) => {
+    const current = merged.get(pet.slug);
+    if (
+      current === undefined ||
+      petSourcePriority(pet.source) >= petSourcePriority(current.source)
+    ) {
+      merged.set(pet.slug, pet);
+    }
+  };
+
+  register(getBuiltinPet());
+  for (const pet of collectPetsFromDir(getPetsDir(), "driftpet")) {
+    register(pet);
+  }
+  for (const pet of collectPetsFromDir(getCodexPetsDir(), "codex")) {
+    register(pet);
+  }
+  for (const pet of collectPetsFromDir(getPetdexPetsDir(), "petdex")) {
+    register(pet);
+  }
+
+  return Array.from(merged.values()).sort((left, right) => {
+    if (left.isBuiltin !== right.isBuiltin) {
+      return left.isBuiltin ? -1 : 1;
+    }
+
+    return left.displayName.localeCompare(right.displayName, "en", {
+      sensitivity: "base",
+    });
+  });
+};
+
+const findPetRecord = (slug: string): PetRecord | null => {
+  return listPetRecords().find((pet) => pet.slug === slug) ?? null;
+};
+
+export const listInstalledPets = (): PetInfo[] => {
+  return listPetRecords().map((pet) => ({
+    slug: pet.slug,
+    displayName: pet.displayName,
+    isBuiltin: pet.isBuiltin,
+    source: pet.source,
+  }));
 };
 
 export const getActivePetSlug = (): string => {
@@ -91,37 +266,44 @@ export const getActivePetAssets = (): {
   slug: string;
   spritesheetPath: string;
   spritesheetExt: string;
+  spritesheetAssetPath: string;
 } => {
   const slug = getActivePetSlug();
-
-  if (slug === BOBA_SLUG) {
-    const builtinPath = getBuiltinSpritesheetPath();
-    const ext = builtinPath.endsWith(".png") ? ".png" : ".webp";
-    return { slug, spritesheetPath: builtinPath, spritesheetExt: ext };
+  const pet = findPetRecord(slug) ?? getBuiltinPet();
+  if (pet.slug !== slug) {
+    setActivePetSlug(pet.slug);
   }
 
-  const petDir = path.join(getPetsDir(), slug);
-  if (!fs.existsSync(petDir)) {
-    // Fallback to boba if the installed pet is missing.
-    const builtinPath = getBuiltinSpritesheetPath();
-    const ext = builtinPath.endsWith(".png") ? ".png" : ".webp";
-    setActivePetSlug(BOBA_SLUG);
-    return { slug: BOBA_SLUG, spritesheetPath: builtinPath, spritesheetExt: ext };
+  const ext = pet.spritesheetPath.endsWith(".png") ? ".png" : ".webp";
+  return {
+    slug: pet.slug,
+    spritesheetPath: pet.spritesheetPath,
+    spritesheetExt: ext,
+    spritesheetAssetPath: pet.spritesheetAssetPath,
+  };
+};
+
+export const resolvePetAssetPath = (
+  slug: string,
+  assetPath: string
+): string | null => {
+  const pet = findPetRecord(slug);
+  if (pet === null) {
+    return null;
   }
 
-  // Detect spritesheet extension.
-  const webpPath = path.join(petDir, "spritesheet.webp");
-  const pngPath = path.join(petDir, "spritesheet.png");
-  if (fs.existsSync(webpPath)) {
-    return { slug, spritesheetPath: webpPath, spritesheetExt: ".webp" };
-  }
-  if (fs.existsSync(pngPath)) {
-    return { slug, spritesheetPath: pngPath, spritesheetExt: ".png" };
+  const normalizedAssetPath = normalizeAssetPath(assetPath);
+  if (normalizedAssetPath === null) {
+    return null;
   }
 
-  // No spritesheet found — fallback to boba.
-  const builtinPath = getBuiltinSpritesheetPath();
-  const ext = builtinPath.endsWith(".png") ? ".png" : ".webp";
-  setActivePetSlug(BOBA_SLUG);
-  return { slug: BOBA_SLUG, spritesheetPath: builtinPath, spritesheetExt: ext };
+  if (normalizedAssetPath === pet.spritesheetAssetPath) {
+    return pet.spritesheetPath;
+  }
+
+  if (pet.petDir === null) {
+    return resolvePetFile(getAssetsDir(), normalizedAssetPath);
+  }
+
+  return resolvePetFile(pet.petDir, normalizedAssetPath);
 };

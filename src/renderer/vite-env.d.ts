@@ -9,6 +9,22 @@ type PetInfo = {
   slug: string;
   displayName: string;
   isBuiltin: boolean;
+  source: "builtin" | "driftpet" | "codex" | "petdex";
+};
+
+type PetdexRuntimeState = {
+  expression: "idle" | "running" | "waiting" | "waving" | "jumping" | "failed" | "review";
+  durationMs: number | null;
+  updatedAt: number | null;
+  counter: number | null;
+  agentSource: string | null;
+};
+
+type PetdexRuntimeBubble = {
+  text: string;
+  agentSource: string | null;
+  updatedAt: number | null;
+  counter: number | null;
 };
 
 type ClaudeDispatchSettings = {
@@ -42,6 +58,8 @@ declare global {
       onCardCreated: (listener: (card: CardRecord) => void) => () => void;
       onClipboardOffer: (listener: (offer: ClipboardOffer) => void) => () => void;
       onPetActiveChanged: (listener: (assets: { slug: string; spritesheetPath: string }) => void) => () => void;
+      onPetdexRuntimeState: (listener: (state: PetdexRuntimeState) => void) => () => void;
+      onPetdexBubble: (listener: (bubble: PetdexRuntimeBubble) => void) => () => void;
     };
   }
 }

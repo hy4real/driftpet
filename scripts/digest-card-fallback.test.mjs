@@ -60,8 +60,10 @@ test("manual chaos fallback uses a concrete first action instead of meta deliver
     );
 
     assert.match(result.digest.useFor, /^Set aside: /);
-    assert.match(result.digest.useFor, /Next: Close two unrelated tabs, write the first checklist line/);
+    assert.match(result.digest.useFor, /Next: Close two unrelated tabs, let driftpet guard/);
     assert.doesNotMatch(result.digest.useFor, /smallest deliverable/i);
+    assert.match(result.digest.knowledgeTag, /thread cache/i);
+    assert.match(result.digest.summaryForRetrieval, /Working-memory cache/);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {
@@ -94,6 +96,7 @@ test("telegram drift fallback turns tab spiral into a concrete reset action", as
     assert.equal(result.digest.title, "Tab drift reset");
     assert.notEqual(result.digest.knowledgeTag.toLowerCase(), "captured note");
     assert.match(result.digest.useFor, /Close two unrelated tabs/);
+    assert.match(result.digest.useFor, /let driftpet guard/);
     assert.match(result.digest.useFor, /work on it for five minutes now/);
     assert.doesNotMatch(result.digest.useFor, /Turn this into one next action/i);
   } finally {
@@ -128,8 +131,42 @@ test("manual chaos fallback names declared thread when recovering from tab drift
     assert.match(result.digest.title, /pick one branch and close the rest/i);
     assert.match(result.digest.useFor, /^Set aside: /);
     assert.match(result.digest.useFor, /Close two unrelated tabs/);
+    assert.match(result.digest.useFor, /let driftpet guard/);
     assert.match(result.digest.useFor, /pick one branch and close the rest/i);
     assert.doesNotMatch(result.digest.useFor, /Turn this into one next action/i);
+  } finally {
+    await cleanupBundle();
+    for (const [key, value] of previousEnv.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test("telegram text fallback frames high-signal notes as guarded working memory", async () => {
+  const { generateDigestDraft, cleanupBundle } = await buildDigestModule();
+  const previousEnv = new Map(LLM_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+  for (const key of LLM_ENV_KEYS) {
+    delete process.env[key];
+  }
+
+  try {
+    const result = await generateDigestDraft(
+      {
+        source: "tg_text",
+        rawText: "I suspect the issue is not URL extraction but recall dedupe around MDN locale variants. Next step is to run two locale URLs through the poller path.",
+      },
+      []
+    );
+
+    assert.match(result.digest.useFor, /Let driftpet guard/);
+    assert.match(result.digest.summaryForRetrieval, /Working-memory cache/);
+    assert.match(result.digest.summaryForRetrieval, /guarded thread/i);
+    assert.doesNotMatch(result.digest.knowledgeTag.toLowerCase(), /captured note/);
   } finally {
     await cleanupBundle();
     for (const [key, value] of previousEnv.entries()) {

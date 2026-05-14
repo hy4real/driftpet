@@ -19,24 +19,24 @@ type IdleCopy = {
 const idleCopies: IdleCopy[] = [
   {
     eyebrow: "driftpet 竖着耳朵",
-    title: "我在这里陪你。",
-    body: "有东西想记就丢给我；没事的时候，我就安静趴在桌面上。",
+    title: "我在这里守线。",
+    body: "有还没写下来的中间判断就丢给我；没事的时候，我就安静趴着。",
     metaLabel: "姿态",
-    metaValue: "陪伴中"
+    metaValue: "待命守线"
   },
   {
     eyebrow: "driftpet 来回踱步",
-    title: "要不要把脑子放松一下？",
-    body: "你可以先把乱七八糟的东西倒给我，我慢慢帮你收着。",
+    title: "脑子里的线可以先交给我。",
+    body: "不用整理成任务，先把问题、判断和别再走的岔路倒给我。",
     metaLabel: "姿态",
-    metaValue: "散步中"
+    metaValue: "找线中"
   },
   {
     eyebrow: "driftpet 盯着你",
     title: "你不用现在就把一切想清楚。",
-    body: "先陪你待一会儿。需要我帮忙时，再把内容丢过来就行。",
+    body: "先陪你待一会儿。怕一断就忘的那根线，再把它交给我。",
     metaLabel: "姿态",
-    metaValue: "发呆中"
+    metaValue: "等你交线"
   }
 ];
 
@@ -64,7 +64,7 @@ export function PetBubble({ card, note, onClose, windowMode }: PetBubbleProps) {
     <article className={`bubble-panel bubble-panel-${windowMode} ${card === null ? "bubble-panel-idle" : ""}`}>
       <header className="bubble-header">
         <div>
-          <p className="bubble-eyebrow">{card === null ? idleCopy.eyebrow : "driftpet 叼来一张小纸条"}</p>
+          <p className="bubble-eyebrow">{card === null ? idleCopy.eyebrow : "driftpet 叼住一根线"}</p>
           <h1>{card === null ? displayTitle : card.title}</h1>
         </div>
         {card !== null ? (
@@ -79,24 +79,24 @@ export function PetBubble({ card, note, onClose, windowMode }: PetBubbleProps) {
       </header>
 
       <section className="bubble-section">
-        <span className="bubble-label">{card === null ? "现在的我" : "我觉得可以先这样"}</span>
+        <span className="bubble-label">{card === null ? "现在的我" : "接线下一手"}</span>
         <p>{card === null ? displayBody : card.useFor}</p>
       </section>
 
       <section className="bubble-meta">
         <div>
-          <span className="bubble-label">{card === null ? idleCopy.metaLabel : "我帮你贴的标签"}</span>
+          <span className="bubble-label">{card === null ? idleCopy.metaLabel : "这条线的标签"}</span>
           <p>{card === null ? idleCopy.metaValue : card.knowledgeTag}</p>
         </div>
         <div>
           <span className="bubble-label">{card === null ? "提示" : "悄悄说"}</span>
-          <p>{card === null ? "戳我一下，我会回应你；需要整理时再打开小窝。" : card.petRemark}</p>
+          <p>{card === null ? "戳我一下，我会回应你；需要守线时再打开小窝。" : card.petRemark}</p>
         </div>
       </section>
 
       {card !== null && card.related.length > 0 ? (
         <section className="bubble-section">
-          <span className="bubble-label">我想起了这些</span>
+          <span className="bubble-label">能补线索的记忆</span>
           <ul className="related-list">
             {card.related.map((related) => (
               <li key={related.cardId}>

@@ -734,6 +734,10 @@ textarea:disabled {
   width: var(--mini-pet-width);
   height: var(--mini-pet-height);
   place-items: start;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 50% 76%, rgba(0, 0, 0, 0.24), transparent 38%),
+    radial-gradient(circle at 52% 50%, rgba(255, 255, 255, 0.08), transparent 60%);
 }
 
 .pet-avatar-button:active {
@@ -1295,6 +1299,19 @@ textarea:disabled {
   overflow-wrap: anywhere;
   animation: pet-click-bubble-in 150ms ease-out;
   pointer-events: none;
+}
+
+.pet-click-bubble-petdex {
+  max-width: 126px;
+  display: grid;
+  gap: 3px;
+}
+
+.pet-click-bubble-source {
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .pet-click-bubble::after {

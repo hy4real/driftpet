@@ -408,6 +408,8 @@ const setupDom = () => {
       };
     },
     onPetActiveChanged: () => () => {},
+    onPetdexRuntimeState: () => () => {},
+    onPetdexBubble: () => () => {},
   };
 
   return {
@@ -546,7 +548,7 @@ test("mini mode stays pure pet, click bubbles, right click opens the nest", asyn
   assert.equal(container.querySelector(".mini-card"), null, "mini mode should not show a mini card");
   assert.equal(container.querySelector(".mini-pet-toast"), null, "mini mode should not show a mini toast");
   assert.equal(container.querySelector(".bubble-panel"), null, "mini mode should not show the main bubble");
-  assert.equal(container.querySelector(".pet-mini-resume-thread")?.textContent.includes("上次那条线"), true, "mini mode may show the remembered-thread resume entry");
+  assert.equal(container.querySelector(".pet-mini-resume-thread")?.textContent.includes("正在守着的线"), true, "mini mode may show the remembered-thread resume entry");
 
   await clickAvatar(container);
 
@@ -702,7 +704,7 @@ test("mini resume thread opens the remembered card directly", async () => {
 
   const resumeThread = container.querySelector(".pet-mini-resume-thread");
   assert.ok(resumeThread, "expected mini mode to expose the remembered thread");
-  assert.match(resumeThread.textContent ?? "", /上次那条线/);
+  assert.match(resumeThread.textContent ?? "", /正在守着的线/);
   assert.match(resumeThread.textContent ?? "", /继续/);
 
   await act(async () => {
@@ -745,7 +747,7 @@ test("nest panel exposes history drawer", async () => {
   assert.equal(container.querySelector(".pet-avatar-button"), null, "expected expanded nest to omit the pet animation");
   assert.ok(container.querySelector(".pet-workbench-toolbar"), "expected toolbar integrated in workbench header");
 
-  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("放下的线"));
   assert.ok(logToggle, "expected show log button");
 
   await act(async () => {
@@ -803,7 +805,7 @@ test("history drawer can dispatch a card to Claude Code", async () => {
   await openNestWithContextMenu(container);
   assert.deepEqual(setWindowSizeCalls, ["expanded"]);
 
-  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("放下的线"));
   assert.ok(logToggle, "expected show log button");
 
   await act(async () => {
@@ -846,7 +848,7 @@ test("history drawer can mark a launched Claude dispatch done", async () => {
   await openNestWithContextMenu(container);
   assert.deepEqual(setWindowSizeCalls, ["expanded"]);
 
-  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("放下的线"));
   assert.ok(logToggle, "expected show log button");
 
   await act(async () => {
@@ -901,7 +903,7 @@ test("history drawer can capture a Claude dispatch result summary", async () => 
   await openNestWithContextMenu(container);
   assert.deepEqual(setWindowSizeCalls, ["expanded"]);
 
-  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("放下的线"));
   assert.ok(logToggle, "expected show log button");
 
   await act(async () => {
@@ -975,7 +977,7 @@ test("workbench shows the active thread bundle in continuous mode", async () => 
 
   const threadPanel = container.querySelector(".pet-workbench-thread-panel");
   assert.ok(threadPanel, "expected an active thread panel in the workbench");
-  assert.match(threadPanel.textContent ?? "", /线头模式/);
+  assert.match(threadPanel.textContent ?? "", /守线模式/);
   assert.match(threadPanel.textContent ?? "", /Ship product work instead of polishing infra/);
   assert.match(threadPanel.textContent ?? "", /Trim portability cleanup into one follow-up/);
 
@@ -1195,7 +1197,7 @@ test("history drawer can delete a remembered card", async () => {
   await openNestWithContextMenu(container);
   assert.deepEqual(setWindowSizeCalls, ["expanded"]);
 
-  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("记忆"));
+  const logToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("放下的线"));
   assert.ok(logToggle, "expected show log button");
 
   await act(async () => {
@@ -1347,7 +1349,7 @@ test("workbench can capture a note after opening from the avatar", async () => {
   assert.ok(textarea, "expected workbench textarea");
   assert.match(textarea.value, /我现在想做的事：/);
 
-  const submitButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("保存到小窝"));
+  const submitButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("交给它守"));
   assert.ok(submitButton, "expected submit button");
 
   await act(async () => {
@@ -1356,7 +1358,7 @@ test("workbench can capture a note after opening from the avatar", async () => {
   });
 
   assert.equal(container.querySelector(".bubble-panel"), null, "expected expanded workbench to stay a single function surface after saving");
-  assert.match(container.textContent ?? "", /保存到小窝|正在保存/);
+  assert.match(container.textContent ?? "", /交给它守|正在守住/);
 
   await act(async () => {
     root.unmount();
@@ -1696,12 +1698,12 @@ test("expanded workbench shows a resume strip when a remembered thread exists", 
 
   const resumeStrip = container.querySelector(".pet-workbench-resume-strip");
   assert.ok(resumeStrip, "expected the resume strip to render at the top of the expanded workbench");
-  assert.match(resumeStrip.textContent ?? "", /上次那条线/);
+  assert.match(resumeStrip.textContent ?? "", /正在守着的线/);
   assert.match(resumeStrip.textContent ?? "", /Ship product work instead of polishing infra/);
 
   const continueButton = resumeStrip.querySelector(".pet-workbench-resume-strip-button");
   assert.ok(continueButton, "expected a continue button in the resume strip");
-  assert.match(continueButton.textContent ?? "", /继续/);
+  assert.match(continueButton.textContent ?? "", /接回/);
 
   await act(async () => {
     continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1736,14 +1738,14 @@ test("expanded workbench earlier-cards fold toggles and selects a card", async (
 
   const toggle = container.querySelector(".pet-workbench-history-toggle");
   assert.ok(toggle, "expected the earlier-cards toggle button");
-  assert.match(toggle.textContent ?? "", /更早的卡片/);
+  assert.match(toggle.textContent ?? "", /放下的线/);
   assert.equal(container.querySelector(".pet-workbench-history-list"), null, "fold should be collapsed by default");
 
   await act(async () => {
     toggle.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
 
-  assert.match(toggle.textContent ?? "", /收起更早的卡片/);
+  assert.match(toggle.textContent ?? "", /收起放下的线/);
   const historyList = container.querySelector(".pet-workbench-history-list");
   assert.ok(historyList, "fold should expand to show the card list");
 

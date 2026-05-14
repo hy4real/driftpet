@@ -1,16 +1,24 @@
 # driftpet
 
-Mac 可爱桌面陪伴宠。它先陪你待在桌面上，顺手帮你收住链接、碎片想法和乱糟糟的小纸条。
+Mac 工作记忆守护型桌宠。它常驻桌面，帮你守住还没来得及写进任务、文档或笔记里的那根工作线。
 
 Current V1 shape:
 
 - Boba 风格的小桌宠常驻桌面，可拖拽、戳一下、睡一会儿。
 - 你可以把文字或 URL 从手机转发到 Telegram，也可以直接放进 driftpet 的“小窝”。
-- 它会把输入收成一张小纸条：一个可以先做的下一步、一点标签、几句宠物备注。
-- 它会把旧内容放进“记忆”，需要时再让你翻出来。
+- 它会把输入收成一张小纸条：正在追的问题、一个可以先做的下一步、一点标签、几句宠物备注。
+- 它会把旧内容放进“记忆”，但只在能帮你补回当前工作线时再翻出来。
 - 连续模式下，它会把“上次那条线”附近的相关卡片收成一个小线头，直接在 workbench 里继续。
 - 新内容默认低打扰：先轻轻提示，点开后再看详情。
 - 详细的 Telegram / LLM / embeddings / storage 状态还在，但默认藏在“详细状态”里。
+
+Current product direction:
+
+- driftpet 不是任务管理器；任务清单管承诺。
+- driftpet 不是普通笔记；文档和 Obsidian 管稳定结论。
+- driftpet 不是打开窗口索引；桌面 app 管工作现场。
+- driftpet 管的是还热着、还没稳定、但一中断就会丢的工作记忆。
+- 桌宠不是皮肤，而是这条工作记忆在桌面上的身体：它接住、守着、提醒、放下。
 
 ## Local setup
 
@@ -163,11 +171,11 @@ The template package defaults to `specs/<feature>/...`, but this repo's adopted 
 
 ## Current limitations
 
-- The product is now intentionally companion-first; some older internal names still say digest / chaos / capture.
+- The product is now intentionally a working-memory guardian pet; some older internal names still say digest / chaos / capture.
 - Real-world prompt tuning is still lightweight; the best next improvement is more real captures and calmer output, not more feature branches.
 - URL extraction still needs another live pass on a wider variety of real pages.
 - Real usage tuning is still in progress for when recall should stay empty instead of forcing a weak memory link.
-- The pet's sense of aliveness has improved with Boba, idle reactions, and lighter copy, but richer long-lived personality is still future work.
+- The pet's sense of aliveness has improved with Boba, idle reactions, and lighter copy, but pet behavior is not yet fully bound to guarded working-memory state.
 - The generated morning brief in `reports/` is useful for local review, but `reports/` is intentionally gitignored.
 
 ## Recommended split setup

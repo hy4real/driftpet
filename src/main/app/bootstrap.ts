@@ -8,11 +8,11 @@ import { closeDatabase, checkpointDatabase } from "../db/client";
 import { runMigrations } from "../db/migrate";
 import { decideAutoSurface, recordAutoCardShown, recordAutoCardSuppressed } from "../pet/runtime";
 import { startTelegramPoller } from "../telegram/poller";
-import { createMainWindow } from "./windows";
+import { createMainWindow, revealMainWindow } from "./windows";
 import { createTray } from "./tray";
 import type { CardRecord } from "../types/card";
-import { getActivePetAssets } from "../pet/registry";
-import { getDataDir, getAssetsDir } from "../paths";
+import { resolvePetAssetPath } from "../pet/registry";
+import { watchPetdexRuntime } from "../pet/petdex-runtime";
 
 export const bootstrapApp = async (electronApp: App): Promise<void> => {
   await electronApp.whenReady();
@@ -20,31 +20,21 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
   // Register custom protocol for serving pet spritesheet assets.
   protocol.handle("driftpet-pet", (request) => {
     const url = new URL(request.url);
-    // driftpet-pet://<slug>/spritesheet.webp
     const slug = url.hostname;
-    const filename = url.pathname.replace(/^\//, "");
-
-    if (slug === "boba") {
-      const builtinDir = getAssetsDir();
-      const builtinPath = path.join(builtinDir, filename);
-      if (fs.existsSync(builtinPath)) {
-        return net.fetch(`file://${builtinPath}`);
-      }
-      // Fallback to renderer assets.
-      const rendererAsset = path.resolve(__dirname, "../../src/renderer/assets", filename);
-      return net.fetch(`file://${rendererAsset}`);
-    }
-
-    const petDir = path.join(getDataDir(), "pets", slug);
-    const filePath = path.join(petDir, filename);
-    if (fs.existsSync(filePath)) {
+    const assetPath = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    const filePath = resolvePetAssetPath(slug, assetPath);
+    if (filePath !== null && fs.existsSync(filePath)) {
       return net.fetch(`file://${filePath}`);
     }
 
     return new Response("Not Found", { status: 404 });
   });
 
-  if (process.platform === "darwin" && app.dock !== undefined) {
+  if (
+    process.platform === "darwin" &&
+    app.dock !== undefined &&
+    process.env.DRIFTPET_HIDE_DOCK === "1"
+  ) {
     app.dock.hide();
   }
 
@@ -85,6 +75,22 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
   };
 
   registerIpcHandlers(emitCardCreated);
+  const stopPetdexRuntimeWatcher = watchPetdexRuntime(
+    (state) => {
+      if (mainWindow.isDestroyed()) {
+        return;
+      }
+
+      mainWindow.webContents.send("petdex:runtime-state", state);
+    },
+    (bubble) => {
+      if (mainWindow.isDestroyed()) {
+        return;
+      }
+
+      mainWindow.webContents.send("petdex:bubble", bubble);
+    }
+  );
   const stopTelegramPoller = startTelegramPoller({ onCardCreated: emitAutoCardCreated });
 
   const clipboardOfferEnabled = (process.env.DRIFTPET_CLIPBOARD_OFFER ?? "on").toLowerCase() !== "off";
@@ -110,10 +116,11 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
-        mainWindow.show();
+        revealMainWindow(mainWindow, { focus: true });
       }
     },
     onQuit: () => {
+      stopPetdexRuntimeWatcher();
       stopTelegramPoller();
       clipboardWatcher?.stop();
       globalShortcut.unregisterAll();
@@ -130,12 +137,12 @@ export const bootstrapApp = async (electronApp: App): Promise<void> => {
       return;
     }
 
-    mainWindow.show();
-    mainWindow.focus();
+    revealMainWindow(mainWindow, { focus: true });
   });
 
   electronApp.on("before-quit", () => {
     isQuitting = true;
+    stopPetdexRuntimeWatcher();
     stopTelegramPoller();
     clipboardWatcher?.stop();
     globalShortcut.unregisterAll();

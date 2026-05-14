@@ -13,9 +13,9 @@ export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCar
   const showNextStep = parsed.nextStep.length > 0;
 
   return (
-    <article className="pet-resume-card" aria-label="上次没收尾的那条线">
+    <article className="pet-resume-card" aria-label="driftpet 正在守着的工作记忆">
       <header className="pet-resume-card-header">
-        <span className="pet-resume-card-eyebrow">上次那条线</span>
+        <span className="pet-resume-card-eyebrow">正在守着的线</span>
         <h2 className="pet-resume-card-title">{card.title}</h2>
       </header>
 
@@ -23,7 +23,7 @@ export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCar
         <section className="pet-resume-card-row">
           <span className="pet-resume-card-row-label" aria-hidden="true">⏭</span>
           <div className="pet-resume-card-row-body">
-            <span className="pet-resume-card-row-eyebrow">下一步</span>
+            <span className="pet-resume-card-row-eyebrow">接线下一手</span>
             <p>{parsed.nextStep}</p>
           </div>
         </section>
@@ -33,7 +33,7 @@ export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCar
         <section className="pet-resume-card-row pet-resume-card-row-muted">
           <span className="pet-resume-card-row-label" aria-hidden="true">⏸</span>
           <div className="pet-resume-card-row-body">
-            <span className="pet-resume-card-row-eyebrow">先放下</span>
+            <span className="pet-resume-card-row-eyebrow">先别碰</span>
             <p>{parsed.setAside}</p>
           </div>
         </section>
@@ -45,7 +45,7 @@ export function ResumeThreadCard({ card, onResume, onCollapse }: ResumeThreadCar
           onClick={onResume}
           type="button"
         >
-          继续这条
+          接回这条
         </button>
         <button
           className="pet-resume-card-secondary"
