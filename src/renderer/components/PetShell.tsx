@@ -12,6 +12,15 @@ import { PetPresence } from "./PetPresence";
 import { PetWorkbench } from "./PetWorkbench";
 import { ResumeThreadCard } from "./ResumeThreadCard";
 import {
+  clampGuardedThreadLabel,
+  formatGuardedThreadActionLabel,
+  getGuardedThreadAgeState,
+  getGuardedThreadExpiresWhen,
+  getGuardedThreadNextMove,
+  getGuardedThreadTitle,
+  guardedThreadVerbByAge,
+} from "../guarded-thread";
+import {
   getPetUiState,
   moodLabelByState,
   petExpressionByState,
@@ -80,127 +89,6 @@ type PetShellProps = {
   onDismissClipboardOffer: () => void;
   onReleaseRememberedThread: (card: CardRecord) => void;
 };
-
-const clampPresenceTitle = (value: string, maxLength = 28): string => {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength - 1)}…`;
-};
-
-type GuardedThreadAgeState = "fresh" | "cooling" | "cold";
-
-const THREAD_COOLING_AFTER_MS = 2 * 60 * 60 * 1000;
-const THREAD_COLD_AFTER_MS = 24 * 60 * 60 * 1000;
-
-const getGuardedThreadAgeState = (createdAt: number | null, now: number): GuardedThreadAgeState => {
-  if (createdAt === null) {
-    return "fresh";
-  }
-
-  const ageMs = Math.max(0, now - createdAt);
-  if (ageMs >= THREAD_COLD_AFTER_MS) {
-    return "cold";
-  }
-  if (ageMs >= THREAD_COOLING_AFTER_MS) {
-    return "cooling";
-  }
-
-  return "fresh";
-};
-
-const guardedThreadVerbByAge: Record<GuardedThreadAgeState, string> = {
-  fresh: "正在追",
-  cooling: "线变冷",
-  cold: "可放下"
-};
-
-const guardedThreadActionPrefixByAge: Record<GuardedThreadAgeState, string> = {
-  fresh: "下一手",
-  cooling: "趁热接",
-  cold: "先判定"
-};
-
-const getGuardedThreadTitle = (card: CardRecord | null, thread: RememberedThread | null): string | null => {
-  if (card?.threadCache !== null && card?.threadCache !== undefined) {
-    return card.threadCache.chasing;
-  }
-
-  return thread?.title ?? null;
-};
-
-const getGuardedThreadNextMove = (card: CardRecord | null): string | null => {
-  return card?.threadCache?.nextMove ?? null;
-};
-
-const getGuardedThreadExpiresWhen = (card: CardRecord | null): string | null => {
-  return card?.threadCache?.expiresWhen ?? null;
-};
-
-const formatGuardedThreadActionLabel = (
-  ageState: GuardedThreadAgeState,
-  nextMove: string | null,
-  expiresWhen: string | null,
-  maxLength: number
-): string => {
-  if (ageState === "cold" && expiresWhen !== null) {
-    return `冷掉条件：${clampPresenceTitle(expiresWhen, maxLength)}`;
-  }
-
-  if (nextMove !== null) {
-    return `${guardedThreadActionPrefixByAge[ageState]}：${clampPresenceTitle(nextMove, maxLength)}`;
-  }
-
-  if (ageState === "cooling") {
-    return "这条线有点冷";
-  }
-  if (ageState === "cold") {
-    return "可以放下或接回";
-  }
-
-  return "点击接回这条线";
-};
-
-const resetTemplates = [
-  {
-    label: "东西太多",
-    value: [
-      "我现在想做的事：",
-      "",
-      "刚刚让我分心的东西：",
-      "- ",
-      "- ",
-      "- ",
-      "",
-      "我希望 driftpet 帮我收成："
-    ].join("\n")
-  },
-  {
-    label: "想法散了",
-    value: [
-      "一开始我想做：",
-      "",
-      "后来我跑去想了：",
-      "",
-      "我已经试过 / 改过：",
-      "",
-      "现在最想先放回小窝的是："
-    ].join("\n")
-  },
-  {
-    label: "上下文混乱",
-    value: [
-      "现在的情况：",
-      "",
-      "想让 driftpet 记住的文件 / 链接 / 笔记：",
-      "",
-      "卡在哪了：",
-      "",
-      "希望 driftpet 先提醒我的事："
-    ].join("\n")
-  }
-] as const;
 
 export function PetShell({
   windowMode,
@@ -391,7 +279,7 @@ export function PetShell({
   const guardedThreadAgeState = getGuardedThreadAgeState(rememberedThread?.createdAt ?? null, now);
   const guardedThreadVerb = guardedThreadVerbByAge[guardedThreadAgeState];
   const presenceTitle = memoryActive && guardedThreadTitle !== null
-    ? `${guardedThreadVerb}：${clampPresenceTitle(guardedThreadTitle)}`
+    ? `${guardedThreadVerb}：${clampGuardedThreadLabel(guardedThreadTitle)}`
     : activeCardTitle ?? (isSleepy ? "在桌面上打瞌睡" : "陪你待在桌面上");
   const presenceLabel = memoryActive ? "工作记忆" : moodLabel;
   const presenceActionLabel = memoryActive
@@ -399,7 +287,7 @@ export function PetShell({
     : "点击接回这条线";
   const miniRememberedTitle = guardedThreadTitle === null
     ? null
-    : `${guardedThreadVerb}：${clampPresenceTitle(guardedThreadTitle, 18)}`;
+    : `${guardedThreadVerb}：${clampGuardedThreadLabel(guardedThreadTitle, 18)}`;
   const miniRememberedNextMove = memoryActive
     ? formatGuardedThreadActionLabel(guardedThreadAgeState, guardedThreadNextMove, guardedThreadExpiresWhen, 18)
     : null;
@@ -687,7 +575,6 @@ export function PetShell({
               onReturnToPet={() => onSetWindowSize("mini")}
               isSubmitting={isNestSubmitting}
               onSubmitChaosReset={onSubmitChaosReset}
-              resetTemplates={resetTemplates}
               historyOpen={historyOpen}
               onToggleHistory={onToggleHistory}
               rememberedThread={rememberedThread}

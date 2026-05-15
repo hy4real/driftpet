@@ -5,18 +5,21 @@ import type { RememberedThread } from "../../main/types/status";
 import type { ThreadBundle } from "../../main/types/thread";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import { getClaudeDispatchStatusView } from "../claude-dispatch-view";
+import {
+  formatGuardedThreadActionLabel,
+  getGuardedThreadAgeState,
+  getGuardedThreadExpiresWhen,
+  getGuardedThreadNextMove,
+  getGuardedThreadProgress,
+  getGuardedThreadTitle,
+  guardedThreadVerbByAge,
+} from "../guarded-thread";
 import { PetSkinPanel } from "./PetSkinPanel";
-
-type ResetTemplate = {
-  label: string;
-  value: string;
-};
 
 type PetWorkbenchProps = {
   chaosText: string;
   clipboardOffer: ClipboardOffer | null;
   isSubmitting: boolean;
-  resetTemplates: readonly ResetTemplate[];
   historyOpen: boolean;
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
@@ -50,7 +53,6 @@ export function PetWorkbench({
   chaosText,
   clipboardOffer,
   isSubmitting,
-  resetTemplates,
   historyOpen,
   rememberedThread,
   rememberedThreadCard,
@@ -74,12 +76,33 @@ export function PetWorkbench({
   const [showSkinPanel, setShowSkinPanel] = useState(false);
   const [historyFoldOpen, setHistoryFoldOpen] = useState(false);
   const [threadResultEditorOpen, setThreadResultEditorOpen] = useState(false);
+  const now = Date.now();
   const threadAnchorCard = activeThreadBundle?.cards[0]?.card ?? null;
   const threadDispatchView = getClaudeDispatchStatusView(threadAnchorCard?.latestClaudeDispatch);
   const threadDispatch = threadAnchorCard?.latestClaudeDispatch ?? null;
   const threadStatusActionsDisabled = dispatchingCardId !== null
     || updatingDispatchCardId !== null
     || capturingDispatchResultCardId !== null;
+  const rememberedAgeState = getGuardedThreadAgeState(rememberedThread?.createdAt ?? null, now);
+  const rememberedVerb = guardedThreadVerbByAge[rememberedAgeState];
+  const rememberedAction = formatGuardedThreadActionLabel(
+    rememberedAgeState,
+    getGuardedThreadNextMove(rememberedThreadCard),
+    getGuardedThreadExpiresWhen(rememberedThreadCard),
+    30
+  );
+  const rememberedProgress = getGuardedThreadProgress(rememberedThread?.createdAt ?? null, now);
+  const rememberedTitle = getGuardedThreadTitle(rememberedThreadCard, rememberedThread) ?? rememberedThreadCard?.title ?? "";
+  const threadAgeState = getGuardedThreadAgeState(threadAnchorCard?.createdAt ?? null, now);
+  const threadVerb = guardedThreadVerbByAge[threadAgeState];
+  const threadAction = formatGuardedThreadActionLabel(
+    threadAgeState,
+    threadAnchorCard?.threadCache?.nextMove ?? null,
+    threadAnchorCard?.threadCache?.expiresWhen ?? null,
+    44
+  );
+  const threadProgress = getGuardedThreadProgress(threadAnchorCard?.createdAt ?? null, now);
+  const threadWaitNote = threadAnchorCard?.threadCache?.expiresWhen ?? null;
 
   if (showSkinPanel) {
     return (
@@ -122,8 +145,19 @@ export function PetWorkbench({
 
         {rememberedThreadCard !== null ? (
           <div className="pet-workbench-resume-strip" aria-label="正在守着的工作记忆可接回">
-            <span className="pet-workbench-resume-strip-eyebrow">正在守着的线</span>
-            <span className="pet-workbench-resume-strip-title">{rememberedThreadCard.title}</span>
+            <div className="pet-workbench-resume-strip-copy">
+              <span className="pet-workbench-resume-strip-eyebrow">正在守着的线</span>
+              <span className="pet-workbench-resume-strip-title">{rememberedTitle}</span>
+              <span className="pet-workbench-resume-strip-meta">
+                {rememberedVerb} · {rememberedAction}
+              </span>
+              <div
+                className={`pet-workbench-thread-progress pet-workbench-thread-progress-${rememberedAgeState}`}
+                aria-hidden="true"
+              >
+                <span style={{ width: `${Math.round(rememberedProgress * 100)}%` }} />
+              </div>
+            </div>
             <button
               type="button"
               className="pet-workbench-resume-strip-button"
@@ -137,9 +171,12 @@ export function PetWorkbench({
         {activeThreadBundle !== null ? (
           <section className="pet-workbench-thread-panel" aria-label="当前线头">
             <div className="pet-workbench-thread-header">
-              <div>
+              <div className="pet-workbench-thread-heading">
                 <p className="bubble-eyebrow">守线模式</p>
                 <h3>这条工作记忆最近长了什么</h3>
+                <p className="pet-workbench-thread-meta">
+                  {threadVerb} · {threadAction}
+                </p>
               </div>
               <button
                 type="button"
@@ -156,9 +193,20 @@ export function PetWorkbench({
                   : "派给 Claude Code（整条线）"}
               </button>
             </div>
+            <div
+              className={`pet-workbench-thread-progress pet-workbench-thread-progress-${threadAgeState}`}
+              aria-hidden="true"
+            >
+              <span style={{ width: `${Math.round(threadProgress * 100)}%` }} />
+            </div>
             <p className="pet-workbench-thread-copy">
               先沿着这条被守住的工作记忆往下做，不用每次都从孤立卡片重新起步。
             </p>
+            {threadWaitNote !== null && /等待|等|wait/i.test(threadWaitNote) ? (
+              <p className="pet-workbench-thread-wait-note">
+                这条线现在在等，不是让你干等：{threadWaitNote}
+              </p>
+            ) : null}
             {threadAnchorCard !== null && threadDispatch !== null && threadDispatchView !== null ? (
               <div className={`pet-workbench-thread-dispatch pet-workbench-thread-dispatch-${threadDispatchView.tone}`} role="status">
                 <span>{threadDispatchView.label}</span>
@@ -282,25 +330,16 @@ export function PetWorkbench({
 
         <label className="manual-input-shell">
           <span className="manual-input-label">粘贴问题、临时判断、已排除路径，乱一点也没关系</span>
-          <div className="template-row">
-            {resetTemplates.map((template) => (
-              <button
-                key={template.label}
-                className="template-chip"
-                onClick={() => onChaosTextChange(template.value)}
-                type="button"
-              >
-                {template.label}
-              </button>
-            ))}
-          </div>
           <textarea
             className="manual-input"
             disabled={isSubmitting}
             onChange={(event) => onChaosTextChange(event.target.value)}
-            placeholder="例如：我怀疑不是 URL 抽取失败，而是 recall 去噪没压住；下一步先跑两条 MDN locale URL，别再改 prompt。"
+            placeholder="例如：A 在等别人回复，这会儿先把 B 的验收补完；我怀疑不是 URL 抽取失败，而是 recall 去噪没压住；别再改 prompt。"
             value={chaosText}
           />
+          <span className="manual-input-hint">
+            不用挑模板。直接把主线、在等什么、这会儿先做什么、先别碰什么都塞进来。
+          </span>
         </label>
 
         <div className="workbench-actions">

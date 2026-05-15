@@ -1083,22 +1083,6 @@ textarea:disabled {
   gap: var(--space-2);
 }
 
-.template-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.template-chip {
-  min-height: var(--btn-h-sm);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-1);
-  font-size: var(--font-body);
-}
-
 .manual-input {
   width: 100%;
   min-height: 200px;
@@ -1111,6 +1095,12 @@ textarea:disabled {
   color: var(--text-0);
   font-size: var(--font-body);
   outline: none;
+}
+
+.manual-input-hint {
+  color: var(--text-2);
+  font-size: var(--font-caption);
+  line-height: 1.45;
 }
 
 .workbench-actions {
@@ -1511,6 +1501,13 @@ textarea:disabled {
   background: rgba(92, 195, 191, 0.06);
 }
 
+.pet-workbench-resume-strip-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 .pet-workbench-resume-strip-eyebrow {
   color: var(--teal);
   font-size: var(--font-caption);
@@ -1527,6 +1524,13 @@ textarea:disabled {
   white-space: nowrap;
   color: var(--text-0);
   font-size: var(--font-body);
+}
+
+.pet-workbench-resume-strip-meta,
+.pet-workbench-thread-meta {
+  color: var(--text-1);
+  font-size: var(--font-caption);
+  line-height: 1.4;
 }
 
 .pet-workbench-resume-strip-button {
@@ -1553,11 +1557,41 @@ textarea:disabled {
   background: rgba(243, 169, 75, 0.06);
 }
 
+.pet-workbench-thread-progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pet-workbench-thread-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(243, 169, 75, 0.95), rgba(92, 195, 191, 0.9));
+  transition: width 180ms ease-out;
+}
+
+.pet-workbench-thread-progress-cooling span {
+  background: linear-gradient(90deg, rgba(243, 169, 75, 0.9), rgba(255, 145, 104, 0.85));
+}
+
+.pet-workbench-thread-progress-cold span {
+  background: linear-gradient(90deg, rgba(255, 145, 104, 0.85), rgba(255, 205, 205, 0.82));
+}
+
 .pet-workbench-thread-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.pet-workbench-thread-heading {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .pet-workbench-thread-header h3,
@@ -1575,6 +1609,13 @@ textarea:disabled {
 .pet-workbench-thread-copy {
   color: var(--text-1);
   font-size: var(--font-body);
+  line-height: 1.45;
+}
+
+.pet-workbench-thread-wait-note {
+  margin: 0;
+  color: rgba(255, 227, 173, 0.96);
+  font-size: var(--font-caption);
   line-height: 1.45;
 }
 

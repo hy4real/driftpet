@@ -1413,16 +1413,10 @@ test("workbench can capture a note after opening from the avatar", async () => {
   assert.ok(container.querySelector(".pet-workbench"), "expected expanded mode to show the workbench");
   assert.equal(container.querySelector(".pet-avatar-button"), null, "expected workbench to stay a function panel without pet animation");
 
-  const templateButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("东西太多"));
-  assert.ok(templateButton, "expected quick template button");
-
-  await act(async () => {
-    templateButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  });
-
   const textarea = container.querySelector("textarea");
   assert.ok(textarea, "expected workbench textarea");
-  assert.match(textarea.value, /我现在想做的事：/);
+  await setFormControlValue(textarea, "A 在等别人回复，这会儿先把 B 的验收补完。别围着 A 干等。");
+  assert.match(textarea.value, /这会儿先把 B 的验收补完/);
 
   const submitButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("交给它守"));
   assert.ok(submitButton, "expected submit button");
@@ -1784,6 +1778,13 @@ test("expanded workbench shows a resume strip when a remembered thread exists", 
   assert.ok(resumeStrip, "expected the resume strip to render at the top of the expanded workbench");
   assert.match(resumeStrip.textContent ?? "", /正在守着的线/);
   assert.match(resumeStrip.textContent ?? "", /Ship product work instead of polishing infra/);
+  assert.ok(resumeStrip.querySelector(".pet-workbench-thread-progress"), "expected a progress bar in the resume strip");
+
+  const threadPanelProgress = container.querySelector(".pet-workbench-thread-panel .pet-workbench-thread-progress");
+  assert.ok(threadPanelProgress, "expected the current thread panel to show a progress bar");
+
+  assert.equal(container.querySelector(".template-row"), null, "expanded workbench should no longer render preset template chips");
+  assert.ok(container.querySelector(".manual-input-hint"), "expected a freeform input hint under the textarea");
 
   const continueButton = resumeStrip.querySelector(".pet-workbench-resume-strip-button");
   assert.ok(continueButton, "expected a continue button in the resume strip");
