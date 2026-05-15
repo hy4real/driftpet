@@ -126,7 +126,26 @@ const parseThreadCache = (value) => {
   }
 };
 
-const qualityFlagsFor = (row, related) => {
+const readSqliteJson = (sql) => {
+  const output = execFileSync("sqlite3", [
+    "-json",
+    dbPath,
+    sql,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+
+  return output.length === 0 ? [] : JSON.parse(output);
+};
+
+const getTableColumns = (tableName) => {
+  return readSqliteJson(`PRAGMA table_info(${tableName})`)
+    .map((row) => String(row.name ?? ""));
+};
+
+const qualityFlagsFor = (row, related, options) => {
   const flags = [];
   const title = row.title?.trim() ?? "";
   const useFor = row.use_for?.trim() ?? "";
@@ -135,6 +154,7 @@ const qualityFlagsFor = (row, related) => {
   const summary = row.summary_for_retrieval?.trim() ?? "";
   const rawText = row.raw_text?.trim() ?? "";
   const threadCache = parseThreadCache(row.thread_cache_json);
+  const hasThreadCacheColumn = options.hasThreadCacheColumn;
 
   if (title.length === 0 || title.length > 80) {
     flags.push("title");
@@ -166,10 +186,10 @@ const qualityFlagsFor = (row, related) => {
   if (row.source === "manual_chaos" && related.length > 2) {
     flags.push("noisy-recall");
   }
-  if (threadCache === null && !/ping|轻量 ping|link retry|链接待重试/i.test(tag)) {
+  if (hasThreadCacheColumn && threadCache === null && !/ping|轻量 ping|link retry|链接待重试/i.test(tag)) {
     flags.push("missing-thread-cache");
   }
-  if (threadCache !== null) {
+  if (hasThreadCacheColumn && threadCache !== null) {
     if (threadCache.chasing.length > 120 || threadCache.chasing === summary) {
       flags.push("thread-cache-chasing");
     }
@@ -221,6 +241,16 @@ if (!fs.existsSync(dbPath)) {
   throw new Error(`SQLite database not found: ${dbPath}`);
 }
 
+const cardColumns = getTableColumns("cards");
+const hasThreadCacheColumn = cardColumns.includes("thread_cache_json");
+const schemaWarnings = [];
+
+if (!hasThreadCacheColumn) {
+  schemaWarnings.push(
+    "cards.thread_cache_json is missing in the local SQLite DB; thread-cache checks are skipped until the latest migrations are applied."
+  );
+}
+
 const sql = `
   SELECT
     items.id AS item_id,
@@ -238,7 +268,7 @@ const sql = `
     cards.use_for,
     cards.knowledge_tag,
     cards.summary_for_retrieval,
-    cards.thread_cache_json,
+    ${hasThreadCacheColumn ? "cards.thread_cache_json" : "NULL AS thread_cache_json"},
     cards.related_card_ids,
     cards.pet_remark,
     cards.created_at
@@ -250,16 +280,7 @@ const sql = `
   LIMIT ${limit}
 `;
 
-const sqliteOutput = execFileSync("sqlite3", [
-  "-json",
-  dbPath,
-  sql,
-], {
-  cwd: root,
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "pipe"],
-}).trim();
-const rows = sqliteOutput.length === 0 ? [] : JSON.parse(sqliteOutput);
+const rows = readSqliteJson(sql);
 
 fs.mkdirSync(reportsDir, { recursive: true });
 
@@ -271,7 +292,7 @@ const jsonPath = path.join(reportsDir, `${basename}.json`);
 const cards = rows.map((row, index) => {
   const related = parseRelated(row.related_card_ids);
   const threadCache = parseThreadCache(row.thread_cache_json);
-  const flags = qualityFlagsFor(row, related);
+  const flags = qualityFlagsFor(row, related, { hasThreadCacheColumn });
 
   return {
     index: index + 1,
@@ -305,6 +326,7 @@ const summary = {
   requestedLimit: limit,
   since: sinceInput,
   sinceMs,
+  schemaWarnings,
   cards: cards.length,
   bySource: cards.reduce((acc, card) => {
     acc[card.source] = (acc[card.source] ?? 0) + 1;
@@ -318,6 +340,14 @@ fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, cards }, null, 2)}\n`);
 const markdown = [
   `# driftpet Real Usage Review - ${reportDate}`,
   "",
+  ...(schemaWarnings.length === 0
+    ? []
+    : [
+      "## Schema warnings",
+      "",
+      ...schemaWarnings.map((warning) => `- ${warning}`),
+      "",
+    ]),
   "Use this as an annotation sheet after a real usage batch. Fill the four review columns with `yes`, `no`, or a short note.",
   "",
   "## Summary",
@@ -400,4 +430,5 @@ console.log(JSON.stringify({
   cards: summary.cards,
   flaggedCards: summary.flaggedCards,
   since: summary.since,
+  schemaWarnings: summary.schemaWarnings,
 }, null, 2));
