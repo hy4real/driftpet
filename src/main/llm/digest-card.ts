@@ -145,6 +145,69 @@ const isThreadDriftText = (value: string): boolean => {
     || /标签页|开.*标签|丢线|跑偏|飘了|分心/u.test(normalized);
 };
 
+const hasWaitingSignal = (value: string): boolean => {
+  const normalized = normalizeText(value);
+  return /等待|等[^。！？\n，,]*(?:回复|结果|消息|确认|同步|跑完|通过|回音)|卡在.*等/u.test(normalized)
+    || /\bwait(?:ing)?\b|\bblocked on\b|\bpending\b|\buntil .*reply\b|\bwaiting for\b/i.test(normalized);
+};
+
+const findActiveMoveWhileWaiting = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  if (language === "zh") {
+    const direct = normalized.match(/(?:这会儿|现在|同时)\s*(先[^。！？\n，,]*)/u);
+    const directCandidate = nullableText(direct?.[1] ?? "");
+    if (directCandidate !== null && !/^(?:等|等待)/u.test(directCandidate)) {
+      return directCandidate;
+    }
+  }
+
+  const patterns = language === "zh"
+    ? [
+      /(?:这会儿|现在|同时|先去|先把|先)\s*([^。！？\n，,]+(?:补完|做完|写完|收掉|推进|处理|验收|整理|提交|修掉|跑完)[^。！？\n，,]*)/u,
+      /(?:先做|先把)\s*([^。！？\n，,]+)/u,
+    ]
+    : [
+      /\b(?:for now|meanwhile|while waiting)\b[^.!?\n]*?\b(?:finish|ship|write|check|verify|clean up|close|run|fix)\b([^.!?\n]*)/i,
+      /\b(?:first|for now)\s+(?:finish|ship|write|check|verify|clean up|close|run|fix)\b([^.!?\n]*)/i,
+    ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(normalized);
+    const segment = match === null
+      ? null
+      : language === "zh"
+        ? match[1]
+        : `${match[0].trim()}`;
+    const candidate = cleanNextMoveCandidate(segment ?? "", language);
+    if (candidate !== null && !/^(?:等|等待|wait)/i.test(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const buildWaitingSideThread = (value: string, language: OutputLanguage): string | null => {
+  const normalized = normalizeText(value);
+  if (!hasWaitingSignal(normalized)) {
+    return null;
+  }
+
+  if (language === "zh") {
+    const match = normalized.match(/(?:等待|等[^。！？\n，,]*(?:回复|结果|消息|确认|同步|跑完|通过|回音))/u);
+    const waiting = normalizeText(match?.[0] ?? "");
+    return waiting.length > 0
+      ? truncate(`${waiting}，回音没来前先别围着它空转。`, 120)
+      : "这条里有一段在等结果，别围着它空转。";
+  }
+
+  const match = normalized.match(/\b(?:wait(?:ing)? for|blocked on|pending)\b([^.!?\n]+)/i);
+  const waiting = normalizeText(match?.[0] ?? "");
+  return waiting.length > 0
+    ? truncate(`${waiting}; do not idle around it before the response lands.`, 160)
+    : "Part of this thread is waiting on outside input; do not idle around it.";
+};
+
 const hasTabDrift = (value: string): boolean => {
   const normalized = normalizeText(value);
   return /\btabs?\b/i.test(normalized) || /标签页|标签/u.test(normalized);
@@ -230,8 +293,8 @@ const extractRuledOut = (value: string, language: OutputLanguage): string | null
   const normalized = normalizeText(value);
   const patterns = language === "zh"
     ? [
-      /(?:不是|并不是|别再|不要再|先别|不用)([^。！？\n]+)/u,
-      /(?:排除|放下|别碰)([^。！？\n]+)/u,
+      /(?:不是|并不是|别再|不要再|先别|不用|别急着)([^。！？\n]+)/u,
+      /(?:^|[。！？\n；;，,])\s*(?:排除|先放下|放下|别碰)\s*([^。！？\n]+)/u,
     ]
     : [
       /\b(?:not|isn't|wasn't|do not|don't|stop|avoid|set aside|ruled out)\b([^.!?\n]+)/i,
@@ -259,6 +322,7 @@ const cleanNextMoveCandidate = (value: string, language: OutputLanguage): string
   const cleaned = language === "zh"
     ? normalized
       .replace(/^[，,;；:：\s]+/u, "")
+      .replace(/[，,]\s*(?:别|不要|不用|先别|别再|下一步|接下来|然后).*/u, "")
       .replace(/^(?:把|先把|先|继续|立刻|马上)\s*/u, "")
       .replace(/[，,;；:：\s]+$/u, "")
       .trim()
@@ -286,7 +350,7 @@ const extractNextMoveCandidateFromText = (value: string, language: OutputLanguag
   const markerPatterns = language === "zh"
     ? [
       /(?:下一步|下一手|接下来)\s*(?:是|：|:)?\s*([^。！？\n]+)/u,
-      /(?:先|立刻|马上)(?!\s*(?:别|不要|不用|别再))\s*([^。！？\n]+)/u,
+      /(?:^|[。！？\n；;，,])\s*(?:先|立刻|马上)(?!\s*(?:别|不要|不用|别再))\s*([^。！？\n]+)/u,
     ]
     : [
       /\b(?:next step|next move|next useful move)\s*(?:is|:)?\s*([^.!?\n]+)/i,
@@ -321,6 +385,13 @@ const extractNextMoveCandidateFromText = (value: string, language: OutputLanguag
 };
 
 const extractNextMoveFromText = (value: string, fallback: string, language: OutputLanguage): string => {
+  if (hasWaitingSignal(value)) {
+    const activeWhileWaiting = findActiveMoveWhileWaiting(value, language);
+    if (activeWhileWaiting !== null) {
+      return truncate(activeWhileWaiting, language === "zh" ? 120 : 180);
+    }
+  }
+
   const candidate = extractNextMoveCandidateFromText(value, language);
   return truncate(candidate ?? fallback, language === "zh" ? 120 : 180);
 };
@@ -622,11 +693,14 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
     : extractTelegramThreadLabel(contentBasis, language);
   const knowledgeTag = buildTelegramTextKnowledgeTag(title, language);
   const thread = summarizeChaosThreadForStep(title, language === "zh" ? 28 : 40);
+  const waitingSideThread = buildWaitingSideThread(contentBasis, language);
 
   if (language === "zh") {
     const useFor = isThreadDriftText(contentBasis)
       ? buildThreadDriftUseFor(contentBasis, language, thread)
-      : `让 driftpet 先守住“${thread}”，只做一个当前动作，别把这条信息扩成新分支。`;
+      : hasWaitingSignal(contentBasis)
+        ? `让 driftpet 先守住“${thread}”，别围着等待项空转，先做现在能推进的那一步。`
+        : `让 driftpet 先守住“${thread}”，只做一个当前动作，别把这条信息扩成新分支。`;
     return {
       title,
       useFor,
@@ -636,7 +710,7 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
         sourceText: contentBasis,
         title,
         nextMove: extractNextMoveFromText(contentBasis, useFor, language),
-        sideThread: "别把这条信息扩成新分支。",
+        sideThread: waitingSideThread ?? "别把这条信息扩成新分支。",
         language
       }),
       petRemark: "这根线我先叼着，你只做下一小步。"
@@ -650,15 +724,15 @@ const createTelegramTextFallback = (input: DigestInput): DigestDraft => {
     title,
     useFor,
     knowledgeTag,
-    summaryForRetrieval: truncate(`Working-memory cache: ${title}. The guarded thread is "${thread}", and the next move should stay on this line instead of becoming a broader branch.`, 500),
-    threadCache: buildThreadCache({
-      sourceText: contentBasis,
-      title,
-      nextMove: extractNextMoveFromText(contentBasis, useFor, language),
-      sideThread: "Do not turn this into a broader redesign.",
-      language
-    }),
-    petRemark: "I will hold this thread; you take the next small move."
+      summaryForRetrieval: truncate(`Working-memory cache: ${title}. The guarded thread is "${thread}", and the next move should stay on this line instead of becoming a broader branch.`, 500),
+      threadCache: buildThreadCache({
+        sourceText: contentBasis,
+        title,
+        nextMove: extractNextMoveFromText(contentBasis, useFor, language),
+        sideThread: waitingSideThread ?? "Do not turn this into a broader redesign.",
+        language
+      }),
+      petRemark: "I will hold this thread; you take the next small move."
   };
 };
 
@@ -735,13 +809,16 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
       ? truncate(fallbackMainLine, 72)
       : mainLine;
     const stepThread = summarizeChaosThreadForStep(resolvedMainLine, 28);
-    const sideQuests = /https?:\/\//i.test(contentBasis)
-      ? "先放下那些不能直接推进这条工作记忆的链接和标签页。"
-      : "先放下所有不能直接推进当前工作记忆的岔线。";
+    const sideQuests = buildWaitingSideThread(contentBasis, language)
+      ?? (/https?:\/\//i.test(contentBasis)
+        ? "先放下那些不能直接推进这条工作记忆的链接和标签页。"
+        : "先放下所有不能直接推进当前工作记忆的岔线。");
     const fallbackNextStep = isThreadDriftText(contentBasis)
       ? buildThreadDriftUseFor(contentBasis, language, stepThread)
-      : `关掉两个无关标签页，让 driftpet 先守住“${stepThread}”，写下第一条检查项，然后立刻做五分钟。`;
-    const nextStep = hasExplicitNextMove(contentBasis, language)
+      : hasWaitingSignal(contentBasis)
+        ? `先做现在能推进的那一步，让 driftpet 先守住“${stepThread}”，别围着等待项空转。`
+        : `关掉两个无关标签页，让 driftpet 先守住“${stepThread}”，写下第一条检查项，然后立刻做五分钟。`;
+    const nextStep = hasExplicitNextMove(contentBasis, language) || hasWaitingSignal(contentBasis)
       ? extractNextMoveFromText(contentBasis, fallbackNextStep, language)
       : fallbackNextStep;
 
@@ -761,14 +838,17 @@ const createChaosResetFallback = (input: DigestInput): DigestDraft => {
     };
   }
 
-  const sideQuests = /https?:\/\//i.test(contentBasis)
-    ? "Set aside the extra links and tabs that do not unblock this working-memory thread."
-    : "Set aside anything that does not move the current working-memory thread forward.";
+  const sideQuests = buildWaitingSideThread(contentBasis, language)
+    ?? (/https?:\/\//i.test(contentBasis)
+      ? "Set aside the extra links and tabs that do not unblock this working-memory thread."
+      : "Set aside anything that does not move the current working-memory thread forward.");
   const stepThread = summarizeChaosThreadForStep(mainLine, 40);
   const fallbackNextStep = isThreadDriftText(contentBasis)
     ? buildThreadDriftUseFor(contentBasis, language, stepThread)
-    : `Close two unrelated tabs, let driftpet guard "${stepThread}", write the first checklist line, and work on it for five minutes now.`;
-  const nextStep = hasExplicitNextMove(contentBasis, language)
+    : hasWaitingSignal(contentBasis)
+      ? `Do not idle around the waiting item. Let driftpet guard "${stepThread}" and do the move you can advance right now.`
+      : `Close two unrelated tabs, let driftpet guard "${stepThread}", write the first checklist line, and work on it for five minutes now.`;
+  const nextStep = hasExplicitNextMove(contentBasis, language) || hasWaitingSignal(contentBasis)
     ? extractNextMoveFromText(contentBasis, fallbackNextStep, language)
     : fallbackNextStep;
 

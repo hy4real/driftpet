@@ -33,6 +33,7 @@ Rules:
 - `useFor` must produce a next move, not a content recap.
 - `useFor` must name a physical or editor action the user can start now: close, write, inspect, compare, paste, run, commit, send, or choose.
 - `useFor` must not say only “review”, “read”, “summarize”, “analyze”, “improve”, “optimize”, “continue”, “look into”, `继续优化`, `分析一下`, `看一下`, or `整理一下` unless it also names the exact object and first action.
+- If the source says one branch is waiting on someone else, a background run, or outside confirmation, do not make `useFor` or `threadCache.nextMove` say “wait”. Keep the waiting dependency in `threadCache.sideThread` or `threadCache.expiresWhen`, and name the best move the user can still do now.
 - Use the recent cards context to avoid vague suggestions and to keep continuity with the same guarded thread.
 - `knowledgeTag` should be short and reusable.
 - `summaryForRetrieval` must include the project or domain name, the concrete action or decision, any tool/file/entity names, and any temporary judgment or ruled-out path from the source. Do not write a generic phrase — make it specific enough that semantic search can distinguish this thread from nearby work.

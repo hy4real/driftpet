@@ -257,3 +257,69 @@ test("telegram text fallback keeps first-action clause over reference caveat", a
     }
   }
 });
+
+test("manual chaos fallback preserves what to do first and what to set aside", async () => {
+  const { generateDigestDraft, cleanupBundle } = await buildDigestModule();
+  const previousEnv = new Map(LLM_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+  for (const key of LLM_ENV_KEYS) {
+    delete process.env[key];
+  }
+
+  try {
+    const result = await generateDigestDraft(
+      {
+        source: "manual_chaos",
+        rawText: "我已经看到一条真实消息能帮我判断该先做什么、先放下什么。先把这条命中的判断固化成回归样本，别急着再扩展新入口或新提醒方式。",
+      },
+      []
+    );
+
+    assert.match(result.digest.threadCache.chasing, /判断该先做什么、先放下什么/);
+    assert.match(result.digest.threadCache.nextMove, /固化成回归样本/);
+    assert.match(result.digest.threadCache.ruledOut ?? "", /别急着再扩展新入口或新提醒方式/);
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /扩展新入口|新提醒方式/);
+  } finally {
+    await cleanupBundle();
+    for (const [key, value] of previousEnv.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test("manual chaos fallback keeps an active move when another branch is waiting", async () => {
+  const { generateDigestDraft, cleanupBundle } = await buildDigestModule();
+  const previousEnv = new Map(LLM_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+  for (const key of LLM_ENV_KEYS) {
+    delete process.env[key];
+  }
+
+  try {
+    const result = await generateDigestDraft(
+      {
+        source: "manual_chaos",
+        rawText: "A 还在等别人回复，这会儿先把 B 的验收补完。别围着 A 干等，也别再开新分支。",
+      },
+      []
+    );
+
+    assert.match(result.digest.threadCache.nextMove, /把 B 的验收补完/);
+    assert.doesNotMatch(result.digest.threadCache.nextMove, /^等|等待/);
+    assert.match(result.digest.threadCache.sideThread ?? "", /等别人回复|干等/);
+    assert.match(result.digest.threadCache.ruledOut ?? "", /别再开新分支/);
+  } finally {
+    await cleanupBundle();
+    for (const [key, value] of previousEnv.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
