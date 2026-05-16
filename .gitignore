@@ -2,7 +2,6 @@ node_modules
 dist
 dist-electron
 .env
-.omx
 .workflow
 reports
 data/app.db
@@ -11,7 +10,6 @@ data/claude-dispatches/
 data/pets/
 *.log
 .DS_Store
-.omx/
 .workflow/
 release/
 DriftPet.app/
@@ -19,3 +17,4 @@ DriftPet.app/
 *.db-journal
 *.db-wal
 *.db-shm
+HeartBeat/
