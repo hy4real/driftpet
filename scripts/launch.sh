@@ -6,22 +6,12 @@ set -euo pipefail
 
 REPO="/Users/mac/driftpet"
 LOG="/tmp/driftpet-launch.log"
+PACKAGED_APP="$REPO/release/mac-arm64/driftpet.app"
 
-# If already running, just show the window.
-if pgrep -f "Electron.*driftpet" >/dev/null 2>&1; then
-  osascript -e '
-  tell application "System Events"
-    set procs to every process whose name contains "Electron"
-    repeat with p in procs
-      set wins to every window of p
-      if (count of wins) > 0 then
-        set frontmost of p to true
-        repeat with w in wins
-          perform action "AXRaise" of w
-        end repeat
-      end if
-    end repeat
-  end tell' >/dev/null 2>&1
+# Prefer the packaged app once it exists. macOS handles single-instance
+# activation through Electron without Accessibility-only window automation.
+if [ -d "$PACKAGED_APP" ]; then
+  open -n "$PACKAGED_APP"
   exit 0
 fi
 

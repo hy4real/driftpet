@@ -2,8 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+const getElectronResourcesPath = (): string | undefined => {
+  return (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+};
+
 const resolvePackagedAppRoot = (): string | null => {
-  const resourcesPath = process.resourcesPath;
+  const resourcesPath = getElectronResourcesPath();
   if (typeof resourcesPath !== "string" || resourcesPath.length === 0) {
     return null;
   }
@@ -21,7 +25,7 @@ const resolveRepoRoot = (): string => {
   // Packaged app detection must come before CWD heuristic — when a user
   // launches the .app from Finder while their terminal CWD is the repo,
   // the CWD check would incorrectly win and point at the source tree.
-  const resourcesPath = process.resourcesPath;
+  const resourcesPath = getElectronResourcesPath();
   if (
     typeof resourcesPath === "string" &&
     resourcesPath.length > 0 &&
@@ -120,6 +124,11 @@ export const getPromptsDir = (): string => {
 export const getMigrationsDir = (): string => {
   const appRoot = getAppRoot();
   if (isPackagedAppRoot(appRoot)) {
+    const packagedSourceDir = path.join(appRoot, "src/main/db/migrations");
+    if (fs.existsSync(packagedSourceDir)) {
+      return packagedSourceDir;
+    }
+
     return path.join(appRoot, "dist-electron/migrations");
   }
   return path.join(appRoot, "src/main/db/migrations");
