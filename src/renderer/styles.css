@@ -1991,6 +1991,17 @@ textarea:disabled {
   background: rgba(92, 195, 191, 0.06);
 }
 
+.pet-workbench-resume-strip-empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 13px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .pet-workbench-fresh-resolve-strip {
   display: flex;
   align-items: center;

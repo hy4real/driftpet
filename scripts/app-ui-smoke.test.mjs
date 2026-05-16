@@ -516,6 +516,9 @@ const setupDom = () => {
     setRecoverableChaosDraft: (draft) => {
       recoverableChaosDraft = draft;
     },
+    clearRememberedThread: () => {
+      localStatus.pet.rememberedThread = null;
+    },
     emitClipboardOffer: (offer) => {
       if (clipboardOfferEmitter !== null) {
         clipboardOfferEmitter(offer);
@@ -3632,4 +3635,41 @@ test("G4: remembered thread status structure is valid", () => {
   assert.equal(typeof thread.title, "string", "rememberedThread.title must be a string");
   assert.ok(thread.title.length > 0, "rememberedThread.title must be non-empty");
   assert.equal(typeof thread.createdAt, "number", "rememberedThread.createdAt must be a number");
+});
+
+test("workbench shows the empty-state line when no work line is being guarded", async () => {
+  const { App, cleanupBundle } = await buildAppModule();
+  const { cleanup, clearRememberedThread } = setupDom();
+  clearRememberedThread();
+
+  const container = document.getElementById("root");
+  assert.ok(container);
+
+  const root = ReactDOMClient.createRoot(container);
+
+  await act(async () => {
+    root.render(React.createElement(App));
+  });
+  await openNestWithContextMenu(container);
+
+  const emptyLine = container.querySelector(".pet-workbench-resume-strip-empty");
+  assert.ok(emptyLine, "expected empty-state line when no thread is being guarded");
+  assert.match(
+    emptyLine.textContent ?? "",
+    /现在没有需要我替你守着的线。/,
+    "empty-state line must use the v0.2 calming copy verbatim"
+  );
+
+  assert.equal(
+    container.querySelector(".pet-workbench-resume-strip"),
+    null,
+    "resume strip must be hidden when no remembered thread exists"
+  );
+
+  await act(async () => {
+    root.unmount();
+  });
+
+  cleanup();
+  await cleanupBundle();
 });

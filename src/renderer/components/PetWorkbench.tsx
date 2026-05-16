@@ -366,7 +366,11 @@ export function PetWorkbench({
               ))}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <p className="pet-workbench-resume-strip-empty" role="status">
+            现在没有需要我替你守着的线。
+          </p>
+        )}
 
         {activeThreadBundle !== null ? (
           <section className="pet-workbench-thread-panel" aria-label="当前线头">
