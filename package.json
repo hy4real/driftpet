@@ -36,6 +36,7 @@
     "test:ingest-dedup": "npm run build:electron && node --test scripts/ingest-chaos-dedup.test.mjs",
     "test:remembered-release": "npm run build:electron && node --test scripts/remembered-thread-release.test.mjs",
     "test:workline-lifecycle": "npm run build:electron && node --test scripts/workline-lifecycle.test.mjs",
+    "test:three-day-feed": "npm run build:electron && node --test scripts/three-day-feed-fixture.test.mjs",
     "test:v02-copy": "node --test scripts/v02-product-copy.test.mjs",
     "test:ui-smoke": "node --test scripts/app-ui-smoke.test.mjs",
     "test:window-state": "node --test --experimental-strip-types src/main/app/window-state.test.mjs",
