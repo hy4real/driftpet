@@ -247,6 +247,52 @@ export const buildTerminalLaunch = (command: string, terminalApp: string): { pro
   };
 };
 
+export const describeTerminalLaunchFailure = (
+  terminalApp: string,
+  program: string,
+  detail: string
+): string => {
+  const normalizedDetail = detail.trim();
+  const lowerDetail = normalizedDetail.toLowerCase();
+  const appName = terminalApp.trim() || "Terminal";
+
+  if (
+    lowerDetail.includes("-1743") ||
+    lowerDetail.includes("not authorized to send apple events") ||
+    lowerDetail.includes("not authorised to send apple events") ||
+    lowerDetail.includes("not allowed to send apple events") ||
+    lowerDetail.includes("automation")
+  ) {
+    return `macOS 自动化权限没通。请在 系统设置 > 隐私与安全性 > 自动化 里允许 driftpet 控制 ${appName}。`;
+  }
+
+  if (
+    lowerDetail.includes("assistive access") ||
+    lowerDetail.includes("accessibility") ||
+    lowerDetail.includes("axraise") ||
+    lowerDetail.includes("system events")
+  ) {
+    return "macOS 辅助功能权限没通。请在 系统设置 > 隐私与安全性 > 辅助功能 里允许 driftpet。";
+  }
+
+  if (
+    lowerDetail.includes("unable to find application") ||
+    lowerDetail.includes("application isn't running") ||
+    lowerDetail.includes("doesn’t understand") ||
+    lowerDetail.includes("doesn't understand")
+  ) {
+    return `找不到或无法控制 ${appName}。请在设置里换一个已安装的终端应用。`;
+  }
+
+  if (program === "open" && lowerDetail.includes("does not exist")) {
+    return `${appName} 没装好或 app 名称不匹配。请在设置里换成 Terminal，或确认 ${appName}.app 可以正常打开。`;
+  }
+
+  return normalizedDetail.length > 0
+    ? `终端启动失败：${normalizedDetail}`
+    : "终端启动失败。请检查 Claude / 终端配置。";
+};
+
 export const launchClaudeCodeTask = async (payload: ClaudeDispatchPayload): Promise<ClaudeDispatchResult> => {
   const dispatchDir = path.join(getDataDir(), "claude-dispatches");
   fs.mkdirSync(dispatchDir, { recursive: true });
@@ -265,7 +311,12 @@ export const launchClaudeCodeTask = async (payload: ClaudeDispatchPayload): Prom
   }
 
   const terminalLaunch = buildTerminalLaunch(launch.command, settings.terminalApp);
-  await runTerminalLaunch(terminalLaunch.program, terminalLaunch.args);
+  try {
+    await runTerminalLaunch(terminalLaunch.program, terminalLaunch.args);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(describeTerminalLaunchFailure(settings.terminalApp, terminalLaunch.program, detail));
+  }
 
   return {
     command: launch.command,

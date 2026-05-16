@@ -31,6 +31,7 @@ const buildDispatchModule = async () => {
     buildClaudeCodePrompt: moduleExports.buildClaudeCodePrompt,
     buildClaudeLaunchCommand: moduleExports.buildClaudeLaunchCommand,
     buildTerminalLaunch: moduleExports.buildTerminalLaunch,
+    describeTerminalLaunchFailure: moduleExports.describeTerminalLaunchFailure,
     parseClaudeDispatchMeta: moduleExports.parseClaudeDispatchMeta,
     cleanupBundle: async () => {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -73,6 +74,29 @@ test("buildTerminalLaunch uses open --args for Ghostty on macOS", async () => {
       "-lc",
       "echo hi",
     ]);
+  } finally {
+    await cleanupBundle();
+  }
+});
+
+test("describeTerminalLaunchFailure explains macOS automation and accessibility failures", async () => {
+  const { describeTerminalLaunchFailure, cleanupBundle } = await buildDispatchModule();
+
+  try {
+    assert.match(
+      describeTerminalLaunchFailure("Terminal", "osascript", "Not authorized to send Apple events to Terminal. (-1743)"),
+      /自动化权限没通.*允许 driftpet 控制 Terminal/
+    );
+
+    assert.match(
+      describeTerminalLaunchFailure("Ghostty", "osascript", "System Events got an error: Assistive access is not allowed."),
+      /辅助功能权限没通.*允许 driftpet/
+    );
+
+    assert.match(
+      describeTerminalLaunchFailure("Ghostty", "open", "The application Ghostty.app does not exist."),
+      /Ghostty 没装好|app 名称不匹配/
+    );
   } finally {
     await cleanupBundle();
   }
