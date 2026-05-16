@@ -1,0 +1,104 @@
+[
+  {
+    "name": "telegram generic captured-note output",
+    "input": {
+      "source": "tg_text",
+      "rawText": "今晚先把 onboarding 里的权限弹窗文案收掉，别再改布局。"
+    },
+    "responses": [
+      {
+        "title": "捕获笔记",
+        "useFor": "继续优化这个方向。",
+        "knowledgeTag": "捕获笔记",
+        "summaryForRetrieval": "捕获笔记。",
+        "threadCache": {
+          "chasing": "捕获笔记",
+          "workingJudgment": null,
+          "ruledOut": null,
+          "nextMove": "继续优化",
+          "sideThread": "继续优化这个方向。",
+          "expiresWhen": "以后"
+        }
+      },
+      "守住这个动作。"
+    ],
+    "expect": {
+      "titleMatches": "权限弹窗文案",
+      "titleNotMatches": "捕获笔记",
+      "knowledgeTagMatches": "权限弹窗文案|onboarding",
+      "knowledgeTagNotMatches": "捕获笔记",
+      "useForMatches": "只做一个当前动作|driftpet",
+      "nextMoveMatches": "权限弹窗文案收掉",
+      "nextMoveNotMatches": "继续优化|新分支",
+      "ruledOutMatches": "别再改布局",
+      "digestError": null
+    }
+  },
+  {
+    "name": "manual chaos generic next step output",
+    "input": {
+      "source": "manual_chaos",
+      "rawText": "我怀疑不是 URL 抽取失败，是 recall 去噪没压住；别再改 prompt，下一步看 scoring。"
+    },
+    "responses": [
+      {
+        "mainLine": "整理当前问题",
+        "sideQuests": "先放下无关内容。",
+        "nextStep": "继续优化。",
+        "knowledgeTag": "工作记忆守线",
+        "summaryForRetrieval": "工作记忆缓存。",
+        "threadCache": {
+          "chasing": "整理当前问题",
+          "workingJudgment": "我怀疑不是 URL 抽取失败",
+          "ruledOut": "别再改 prompt",
+          "nextMove": "继续优化",
+          "sideThread": "先放下无关内容。",
+          "expiresWhen": "以后"
+        }
+      },
+      "别开岔路。"
+    ],
+    "expect": {
+      "useForMatches": "看 scoring",
+      "nextMoveMatches": "看 scoring",
+      "nextMoveNotMatches": "继续优化|整理当前问题",
+      "ruledOutMatches": "别再改 prompt|不是 URL 抽取失败"
+    }
+  },
+  {
+    "name": "readable URL whole-article homework output",
+    "input": {
+      "source": "tg_url",
+      "rawText": "这个可以当参考",
+      "rawUrl": "https://example.com/docs/permissions",
+      "extractedTitle": "macOS 辅助功能权限说明",
+      "extractedText": "这篇文章解释 macOS Accessibility 权限为什么会反复弹窗，以及如何检查应用签名、bundle id 和 TCC 记录是否一致。",
+      "extractionStage": "readable"
+    },
+    "responses": [
+      {
+        "title": "macOS Accessibility guide",
+        "useFor": "通读并总结整篇文章。",
+        "knowledgeTag": "捕获文章",
+        "summaryForRetrieval": "这是一篇关于 macOS Accessibility 权限的文章。",
+        "threadCache": {
+          "chasing": "macOS Accessibility guide",
+          "workingJudgment": null,
+          "ruledOut": null,
+          "nextMove": "通读并总结整篇文章",
+          "sideThread": "阅读全文",
+          "expiresWhen": "以后"
+        }
+      },
+      "只拿需要的一小段。"
+    ],
+    "expect": {
+      "titleMatches": "macOS 辅助功能权限说明",
+      "useForMatches": "按需参考",
+      "useForNotMatches": "通读|总结整篇|阅读全文",
+      "nextMoveMatches": "按需参考|不要现在整篇消化",
+      "nextMoveNotMatches": "通读|总结整篇|阅读全文",
+      "sideThreadMatches": "不要把整篇文章变成新任务|阅读全文"
+    }
+  }
+]

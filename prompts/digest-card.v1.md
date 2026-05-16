@@ -17,6 +17,8 @@ Required schema:
     "workingJudgment": "the user's tentative suspicion, hypothesis, or current judgment, or null",
     "ruledOut": "what the user should not retry or should ignore without new evidence, or null",
     "nextMove": "the smallest concrete action to resume this thread",
+    "meanwhile": "if part of the thread is waiting, the concrete move to do while waiting, otherwise null",
+    "waitingOn": "if part of the thread is blocked on a reply, run, review, or outside input, name that waiting dependency, otherwise null",
     "sideThread": "useful but deferred side branch, or null",
     "expiresWhen": "when this cache should be dropped or stop asking for attention, or null"
   }
@@ -28,6 +30,8 @@ Rules:
 - Preserve unfinished working memory: the current question, tentative judgment, ruled-out path, next move, and deferred side branch whenever the source provides them.
 - `threadCache` is required for high-signal work inputs. Use null only inside optional fields when the source does not contain that part.
 - `threadCache.nextMove` must match the concrete resume action implied by `useFor`.
+- If the source contains a waiting dependency, fill both `threadCache.waitingOn` and `threadCache.meanwhile`.
+- When `threadCache.meanwhile` is present, it should usually match `threadCache.nextMove`.
 - Match the requested output language.
 - Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `useFor` must produce a next move, not a content recap.

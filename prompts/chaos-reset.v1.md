@@ -18,6 +18,8 @@ Required schema:
     "workingJudgment": "the user's tentative suspicion, hypothesis, or current judgment, or null",
     "ruledOut": "what the user should not retry or should ignore without new evidence, or null",
     "nextMove": "the smallest concrete action to resume this thread",
+    "meanwhile": "if part of the thread is waiting, the concrete move to do while waiting, otherwise null",
+    "waitingOn": "if part of the thread is blocked on a reply, review, run, or outside input, name that waiting dependency, otherwise null",
     "sideThread": "useful but deferred side branch, or null",
     "expiresWhen": "when this cache should be dropped or stop asking for attention, or null"
   }
@@ -29,6 +31,8 @@ Rules:
 - Preserve tentative thinking when present: suspicions, rejected explanations, abandoned branches, and the next experiment.
 - `threadCache` is required. Use null only inside optional fields when the source does not contain that part.
 - `threadCache.nextMove` must match `nextStep`.
+- If the source contains a waiting dependency, fill both `threadCache.waitingOn` and `threadCache.meanwhile`.
+- When `threadCache.meanwhile` is present, it should usually match `threadCache.nextMove`.
 - Match the requested output language.
 - Do not mix Chinese and English inside the same field unless the source text itself requires a literal term.
 - `mainLine` must name the real deliverable or thread being guarded, not a mood.
