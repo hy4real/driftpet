@@ -137,6 +137,7 @@ export function HistoryDrawer({
                     onClick={() => onDeleteCard(card)}
                     type="button"
                   >
+                    {/* v02-copy:allow-banned -- destructive delete kept for private/erroneous ingest cleanup; not a lifecycle verb */}
                     {deletingCardId === card.id ? "删除中..." : "删除"}
                   </button>
                 </div>

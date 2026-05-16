@@ -679,6 +679,7 @@ export default function App() {
       setStatus(nextStatus);
     } catch (error) {
       console.error("[driftpet] card delete failed:", error);
+      // v02-copy:allow-banned -- HistoryDrawer's destructive delete path keeps "删除" deliberately; see HistoryDrawer.tsx
       showPetNote("删除失败了。再试一次。", 4200);
     } finally {
       setDeletingCardId(null);
