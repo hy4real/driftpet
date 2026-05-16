@@ -1,16 +1,24 @@
 import { BrowserWindow, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import { deleteCardById, getRecentCards } from "../src/main/db/cards";
 import { getPref, setPref } from "../src/main/db/prefs";
-import { ingestChaosReset } from "../src/main/ingest/ingest";
+import { getRecoverableChaosDraft, ingestChaosReset, type RecoverableChaosDraft } from "../src/main/ingest/ingest";
 import { launchClaudeCodeTask, getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../src/main/claude/dispatch";
+import { clearResolvedWaiting } from "../src/main/claude/waiting-resolution";
 import { getClaudeDispatchSettings, setClaudeDispatchSettings } from "../src/main/claude/settings";
 import type { CardRecord } from "../src/main/types/card";
 import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/types/claude";
 import { setPetHourlyBudget } from "../src/main/pet/runtime";
+import {
+  skipDailyCloseLine,
+  takeDailyCloseLineCandidates,
+  updateCardLifecycle,
+  type WorklineLifecycleAction
+} from "../src/main/workline/lifecycle";
 import type { AppStatus } from "../src/main/types/status";
 import { getAppStatus, releaseRememberedThread } from "../src/main/status/app-status";
 import { buildThreadBundle } from "../src/shared/thread-bundle";
 import { moveMainWindowBy, resizeMainWindow } from "../src/main/app/windows";
+import { getDatabase } from "../src/main/db/client";
 import {
   COMPACT_WINDOW_HEIGHT,
   COMPACT_WINDOW_WIDTH,
@@ -32,6 +40,23 @@ import {
 export const registerIpcHandlers = (
   emitCardCreated: (card: CardRecord) => void
 ): void => {
+  const persistThreadCache = (cardId: number, card: CardRecord, resolvedAt = Date.now()): void => {
+    if (card.threadCache === null) {
+      return;
+    }
+
+    const nextThreadCache = clearResolvedWaiting(card.threadCache, resolvedAt);
+    if (nextThreadCache === null || nextThreadCache === card.threadCache) {
+      return;
+    }
+
+    getDatabase().prepare(`
+      UPDATE cards
+      SET thread_cache_json = ?
+      WHERE id = ?
+    `).run(JSON.stringify(nextThreadCache), cardId);
+  };
+
   const getTargetWindow = (
     event: IpcMainEvent | IpcMainInvokeEvent
   ): BrowserWindow | null => {
@@ -78,6 +103,18 @@ export const registerIpcHandlers = (
 
   ipcMain.handle("cards:delete", async (_event, cardId: number): Promise<boolean> => {
     return deleteCardById(cardId);
+  });
+
+  ipcMain.handle("workline:update-lifecycle", async (_event, cardId: number, action: WorklineLifecycleAction): Promise<CardRecord> => {
+    return updateCardLifecycle(cardId, action);
+  });
+
+  ipcMain.handle("workline:list-close-line-candidates", async (): Promise<CardRecord[]> => {
+    return takeDailyCloseLineCandidates();
+  });
+
+  ipcMain.handle("workline:skip-daily-close-line", async (_event, cardIds: number[]): Promise<number> => {
+    return skipDailyCloseLine(cardIds);
   });
 
   ipcMain.handle("pet:release-remembered-thread", async (_event, cardId: number): Promise<void> => {
@@ -211,6 +248,7 @@ export const registerIpcHandlers = (
         resultSummary: summary,
         resultCapturedAt: Date.now(),
       };
+      persistThreadCache(cardId, card, updated.resultCapturedAt);
       setPref(prefKey, JSON.stringify(updated));
       return updated;
     }
@@ -238,6 +276,10 @@ export const registerIpcHandlers = (
     const card = await ingestChaosReset(rawText);
     emitCardCreated(card);
     return card;
+  });
+
+  ipcMain.handle("ingest:get-recoverable-chaos-draft", async (): Promise<RecoverableChaosDraft | null> => {
+    return getRecoverableChaosDraft();
   });
 
   ipcMain.handle("pet:set-hourly-budget", async (_event, value: number): Promise<number> => {

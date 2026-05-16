@@ -1,6 +1,6 @@
 import { getDatabase } from "../db/client";
 import { parseRelated, parseThreadCache } from "../db/cards";
-import { getPref, setPref } from "../db/prefs";
+import { getPref } from "../db/prefs";
 import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
 import { getClaudeDispatchSettings } from "../claude/settings";
 import { getEmbeddingRuntimeConfig, getLlmRuntimeConfig } from "../llm/config";
@@ -16,6 +16,11 @@ import type { AppStatus, LatestItemStatus, RememberedThread, StatusLevel } from 
 import type { ClaudeDispatchMeta } from "../types/claude";
 import type { ItemOrigin, UrlExtractionStage } from "../types/item";
 import { normalizeText, truncate } from "../utils/text";
+import {
+  markDueTomorrowWorklinesCooling,
+  markTomorrowWorklineFloated,
+  updateCardLifecycle
+} from "../workline/lifecycle";
 
 type CountsRow = {
   item_count: number;
@@ -228,49 +233,62 @@ type RememberedThreadRow = {
   card_id: number;
   card_title: string;
   card_created_at: number;
+  lifecycle_status: "hot" | "waiting";
+  tomorrow_float_at: number | null;
+  tomorrow_floated_at: number | null;
 };
 
 const REMEMBERED_THREAD_EXCLUDED_TAGS = ["Telegram ping", "链接待重试", "link retry"];
-const RELEASED_REMEMBERED_THREAD_PREF = "released_remembered_thread_card_id";
-const RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF = "released_remembered_thread_created_at";
-
 export const releaseRememberedThread = (cardId: number): void => {
-  const db = getDatabase();
-  const row = db.prepare(`
-    SELECT created_at AS createdAt
-    FROM cards
-    WHERE id = ?
-    LIMIT 1
-  `).get(cardId) as { createdAt: number } | undefined;
-
-  setPref(RELEASED_REMEMBERED_THREAD_PREF, String(cardId));
-  setPref(RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF, String(row?.createdAt ?? Date.now()));
+  updateCardLifecycle(cardId, "drop");
 };
 
 const getRememberedThread = (): RememberedThread | null => {
   const db = getDatabase();
   const placeholders = REMEMBERED_THREAD_EXCLUDED_TAGS.map(() => "?").join(", ");
-  const releasedCreatedAt = Number(getPref(RELEASED_REMEMBERED_THREAD_CREATED_AT_PREF) ?? "0");
-  const hasReleaseWatermark = Number.isFinite(releasedCreatedAt) && releasedCreatedAt > 0;
+  const now = Date.now();
+  markDueTomorrowWorklinesCooling(now);
   const row = db.prepare(`
     SELECT
       cards.id AS card_id,
       cards.title AS card_title,
-      cards.created_at AS card_created_at
+      cards.created_at AS card_created_at,
+      cards.lifecycle_status AS lifecycle_status,
+      cards.tomorrow_float_at AS tomorrow_float_at,
+      cards.tomorrow_floated_at AS tomorrow_floated_at
     FROM items
     INNER JOIN cards ON cards.item_id = items.id
     WHERE items.origin = 'real'
       AND cards.knowledge_tag NOT IN (${placeholders})
-      ${hasReleaseWatermark ? "AND cards.created_at > ?" : ""}
-    ORDER BY cards.created_at DESC
+      AND cards.lifecycle_status IN ('hot', 'waiting')
+      AND (cards.ttl_at IS NULL OR cards.ttl_at >= ?)
+      AND (
+        cards.lifecycle_status != 'waiting'
+        OR cards.tomorrow_float_at IS NULL
+        OR cards.tomorrow_float_at <= ?
+      )
+    ORDER BY
+      CASE cards.lifecycle_status WHEN 'hot' THEN 0 ELSE 1 END ASC,
+      COALESCE(cards.last_touched_at, cards.created_at) DESC,
+      cards.created_at DESC
     LIMIT 1
   `).get(
     ...REMEMBERED_THREAD_EXCLUDED_TAGS,
-    ...(hasReleaseWatermark ? [releasedCreatedAt] : [])
+    now,
+    now
   ) as RememberedThreadRow | undefined;
 
   if (row === undefined) {
     return null;
+  }
+
+  if (
+    row.lifecycle_status === "waiting"
+    && row.tomorrow_float_at !== null
+    && row.tomorrow_float_at <= now
+    && row.tomorrow_floated_at === null
+  ) {
+    markTomorrowWorklineFloated(row.card_id, now);
   }
 
   return {

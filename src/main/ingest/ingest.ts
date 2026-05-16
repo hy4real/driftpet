@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
 import type { CardRecord, ThreadCache } from "../types/card";
 import { getDatabase } from "../db/client";
-import { getRecentCards, mapCardRow } from "../db/cards";
+import { CARD_SELECT_COLUMNS, getRecentCards, mapCardRow } from "../db/cards";
 import type { CardRow } from "../db/cards";
 import { upsertCardEmbedding } from "../db/embeddings";
 import { generateDigestDraft } from "../llm/digest-card";
 import { findRelatedCards } from "../recall/related";
 import type { ItemOrigin, ItemSource, ItemStatus, UrlExtractionStage } from "../types/item";
 import { normalizeText } from "../utils/text";
+import { buildInitialCardLifecycle } from "../workline/lifecycle";
 
 type ExistingItemRow = {
   id: number;
@@ -30,16 +31,7 @@ const findCardByItemId = (itemId: number): CardRecord | null => {
   const db = getDatabase();
   const row = db.prepare(`
     SELECT
-      id,
-      item_id,
-      title,
-      use_for,
-      knowledge_tag,
-      summary_for_retrieval,
-      thread_cache_json,
-      related_card_ids,
-      pet_remark,
-      created_at
+      ${CARD_SELECT_COLUMNS}
     FROM cards
     WHERE item_id = ?
     ORDER BY id DESC
@@ -104,6 +96,14 @@ export type IngestResult = {
   created: boolean;
 };
 
+export type RecoverableChaosDraft = {
+  itemId: number;
+  rawText: string;
+  status: "pending" | "failed";
+  receivedAt: number;
+  lastError: string | null;
+};
+
 // A real chaos reset is meant to be a fresh moment, so manual_chaos opts out
 // of permanent content-hash dedup. But a stream of identical pastes within a
 // few seconds is paste-spam, not five distinct moments — collapse those onto
@@ -133,6 +133,70 @@ const findRecentChaosItem = (
   `).get(origin, normalized, now - CHAOS_PASTE_DEDUP_WINDOW_MS) as ExistingItemRow | undefined;
 };
 
+const findUnfinishedChaosItem = (
+  payload: IngestInput,
+  normalized: string
+): ExistingItemRow | undefined => {
+  if (payload.source !== "manual_chaos") {
+    return undefined;
+  }
+
+  const origin = payload.origin ?? "real";
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT items.id
+    FROM items
+    LEFT JOIN cards ON cards.item_id = items.id
+    WHERE items.source = 'manual_chaos'
+      AND items.origin = ?
+      AND items.raw_text = ?
+      AND items.status = 'pending'
+      AND cards.id IS NULL
+    ORDER BY items.received_at DESC
+    LIMIT 1
+  `).get(origin, normalized) as ExistingItemRow | undefined;
+};
+
+export const getRecoverableChaosDraft = (): RecoverableChaosDraft | null => {
+  const db = getDatabase();
+  const row = db.prepare(`
+    SELECT
+      items.id AS itemId,
+      items.raw_text AS rawText,
+      items.status AS status,
+      items.received_at AS receivedAt,
+      items.last_error AS lastError
+    FROM items
+    LEFT JOIN cards ON cards.item_id = items.id
+    WHERE items.source = 'manual_chaos'
+      AND items.origin = 'real'
+      AND items.status IN ('pending', 'failed')
+      AND items.raw_text IS NOT NULL
+      AND length(trim(items.raw_text)) > 0
+      AND cards.id IS NULL
+    ORDER BY items.received_at DESC
+    LIMIT 1
+  `).get() as {
+    itemId: number;
+    rawText: string;
+    status: string;
+    receivedAt: number;
+    lastError: string | null;
+  } | undefined;
+
+  if (row === undefined) {
+    return null;
+  }
+
+  return {
+    itemId: row.itemId,
+    rawText: row.rawText,
+    status: row.status === "failed" ? "failed" : "pending",
+    receivedAt: row.receivedAt,
+    lastError: row.lastError,
+  };
+};
+
 const ensurePendingItem = (payload: IngestInput, normalized: string): PendingItemResult => {
   const db = getDatabase();
   const contentHash = payload.source === "manual_chaos"
@@ -140,7 +204,7 @@ const ensurePendingItem = (payload: IngestInput, normalized: string): PendingIte
     : buildContentHash(buildItemIdentity(payload, normalized));
 
   const existing = contentHash === null
-    ? findRecentChaosItem(payload, normalized, Date.now())
+    ? findUnfinishedChaosItem(payload, normalized) ?? findRecentChaosItem(payload, normalized, Date.now())
     : db.prepare(`
       SELECT id
       FROM items
@@ -208,6 +272,7 @@ const finalizeCard = (
 
   const createCard = db.transaction(() => {
     const createdAt = Date.now();
+    const lifecycle = buildInitialCardLifecycle(createdAt);
     const cardResult = db.prepare(`
       INSERT INTO cards (
         item_id,
@@ -218,8 +283,15 @@ const finalizeCard = (
         thread_cache_json,
         related_card_ids,
         pet_remark,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_at,
+        lifecycle_status,
+        ttl_at,
+        recover_until,
+        thread_id,
+        last_touched_at,
+        tomorrow_float_at,
+        tomorrow_floated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       itemId,
       digest.title,
@@ -231,7 +303,14 @@ const finalizeCard = (
         : JSON.stringify(digest.threadCache),
       JSON.stringify(related),
       digest.petRemark,
-      createdAt
+      createdAt,
+      lifecycle.lifecycleStatus,
+      lifecycle.ttlAt,
+      lifecycle.recoverUntil,
+      null,
+      lifecycle.lastTouchedAt,
+      lifecycle.tomorrowFloatAt,
+      lifecycle.tomorrowFloatedAt
     );
 
     db.prepare(`
@@ -268,6 +347,13 @@ const finalizeCard = (
       itemId,
       related,
       createdAt,
+      lifecycleStatus: lifecycle.lifecycleStatus,
+      ttlAt: lifecycle.ttlAt,
+      recoverUntil: lifecycle.recoverUntil,
+      threadId: null,
+      lastTouchedAt: lifecycle.lastTouchedAt,
+      tomorrowFloatAt: lifecycle.tomorrowFloatAt,
+      tomorrowFloatedAt: lifecycle.tomorrowFloatedAt,
       id: Number(cardResult.lastInsertRowid)
     };
   });

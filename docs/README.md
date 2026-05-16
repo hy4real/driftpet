@@ -7,6 +7,8 @@ Use this index to tell what is current source-of-truth versus what is historical
 
 - `product-direction-2026-05-14.md`
   Current product direction: driftpet is a desktop pet that guards working memory.
+- `driftpet-v0.2-workline-lifecycle-mvp.md`
+  Current v0.2 lifecycle handoff: guarded workline states, shipped implementation, verification, and next agent entry point.
 - `../README.md`
   Current local setup, runtime configuration, and product surface summary.
 - `../CLAUDE.md`

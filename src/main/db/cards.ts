@@ -1,4 +1,5 @@
 import type { CardRecord, RelatedCardRef, ThreadCache } from "../types/card";
+import { isCardLifecycleStatus } from "../types/card";
 import { getClaudeDispatchPrefKey, parseClaudeDispatchMeta } from "../claude/dispatch";
 import { getDatabase } from "./client";
 import { getPref } from "./prefs";
@@ -14,9 +15,36 @@ type CardRow = {
   related_card_ids: string | null;
   pet_remark: string;
   created_at: number;
+  lifecycle_status: string | null;
+  ttl_at: number | null;
+  recover_until: number | null;
+  thread_id: string | null;
+  last_touched_at: number | null;
+  tomorrow_float_at: number | null;
+  tomorrow_floated_at: number | null;
 };
 
 export type { CardRow };
+
+export const CARD_SELECT_COLUMNS = `
+  id,
+  item_id,
+  title,
+  use_for,
+  knowledge_tag,
+  summary_for_retrieval,
+  thread_cache_json,
+  related_card_ids,
+  pet_remark,
+  created_at,
+  lifecycle_status,
+  ttl_at,
+  recover_until,
+  thread_id,
+  last_touched_at,
+  tomorrow_float_at,
+  tomorrow_floated_at
+`;
 
 export const parseRelated = (value: string | null): RelatedCardRef[] => {
   if (value === null || value.length === 0) {
@@ -52,6 +80,11 @@ export const parseThreadCache = (value: string | null): ThreadCache | null => {
       workingJudgment: coerceText(parsed.workingJudgment),
       ruledOut: coerceText(parsed.ruledOut),
       nextMove,
+      meanwhile: coerceText(parsed.meanwhile),
+      waitingOn: coerceText(parsed.waitingOn),
+      waitingResolvedAt: typeof parsed.waitingResolvedAt === "number" && Number.isFinite(parsed.waitingResolvedAt)
+        ? parsed.waitingResolvedAt
+        : null,
       sideThread: coerceText(parsed.sideThread),
       expiresWhen: coerceText(parsed.expiresWhen)
     };
@@ -76,6 +109,13 @@ export const mapCardRow = (row: CardRow): CardRecord => {
     related: parseRelated(row.related_card_ids),
     petRemark: row.pet_remark,
     createdAt: row.created_at,
+    lifecycleStatus: isCardLifecycleStatus(row.lifecycle_status) ? row.lifecycle_status : "cooling",
+    ttlAt: row.ttl_at,
+    recoverUntil: row.recover_until,
+    threadId: row.thread_id,
+    lastTouchedAt: row.last_touched_at,
+    tomorrowFloatAt: row.tomorrow_float_at,
+    tomorrowFloatedAt: row.tomorrow_floated_at,
     latestClaudeDispatch: getLatestClaudeDispatch(row.id)
   };
 };
@@ -84,16 +124,7 @@ export const getRecentCards = (): CardRecord[] => {
   const db = getDatabase();
   const rows = db.prepare(`
     SELECT
-      id,
-      item_id,
-      title,
-      use_for,
-      knowledge_tag,
-      summary_for_retrieval,
-      thread_cache_json,
-      related_card_ids,
-      pet_remark,
-      created_at
+      ${CARD_SELECT_COLUMNS}
     FROM cards
     ORDER BY created_at DESC
     LIMIT 20

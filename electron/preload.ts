@@ -3,6 +3,7 @@ import type { CardRecord } from "../src/main/types/card";
 import type { ClipboardOffer } from "../src/main/clipboard/watcher";
 import type { AppStatus } from "../src/main/types/status";
 import type { ClaudeDispatchMeta, ClaudeDispatchUserStatus } from "../src/main/types/claude";
+import type { WorklineLifecycleAction } from "../src/main/workline/lifecycle";
 
 type CardCreatedListener = (card: CardRecord) => void;
 type ClipboardOfferListener = (offer: ClipboardOffer) => void;
@@ -38,15 +39,27 @@ type ClaudeDispatchSettings = {
   continuityMode: "continuous" | "isolated";
 };
 
+type RecoverableChaosDraft = {
+  itemId: number;
+  rawText: string;
+  status: "pending" | "failed";
+  receivedAt: number;
+  lastError: string | null;
+};
+
 const api = {
   showDemo: (): Promise<CardRecord> => ipcRenderer.invoke("pet:show-demo"),
   listRecentCards: (): Promise<CardRecord[]> => ipcRenderer.invoke("cards:list-recent"),
   deleteCard: (cardId: number): Promise<boolean> => ipcRenderer.invoke("cards:delete", cardId),
+  updateWorklineLifecycle: (cardId: number, action: WorklineLifecycleAction): Promise<CardRecord> => ipcRenderer.invoke("workline:update-lifecycle", cardId, action),
+  listCloseLineCandidates: (): Promise<CardRecord[]> => ipcRenderer.invoke("workline:list-close-line-candidates"),
+  skipDailyCloseLine: (cardIds: number[]): Promise<number> => ipcRenderer.invoke("workline:skip-daily-close-line", cardIds),
   releaseRememberedThread: (cardId: number): Promise<void> => ipcRenderer.invoke("pet:release-remembered-thread", cardId),
   getStatus: (): Promise<AppStatus> => ipcRenderer.invoke("app:get-status"),
   getClaudeDispatchSettings: (): Promise<ClaudeDispatchSettings> => ipcRenderer.invoke("claude:get-dispatch-settings"),
   setClaudeDispatchSettings: (settings: ClaudeDispatchSettings): Promise<ClaudeDispatchSettings> => ipcRenderer.invoke("claude:set-dispatch-settings", settings),
   ingestChaosReset: (rawText: string): Promise<CardRecord> => ipcRenderer.invoke("ingest:chaos-reset", rawText),
+  getRecoverableChaosDraft: (): Promise<RecoverableChaosDraft | null> => ipcRenderer.invoke("ingest:get-recoverable-chaos-draft"),
   dispatchClaudeCode: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-code", cardId),
   dispatchClaudeThread: (cardId: number): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:dispatch-claude-thread", cardId),
   updateClaudeDispatchStatus: (cardId: number, status: ClaudeDispatchUserStatus): Promise<ClaudeDispatchMeta> => ipcRenderer.invoke("card:update-claude-dispatch-status", cardId, status),
