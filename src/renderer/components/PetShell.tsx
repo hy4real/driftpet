@@ -5,8 +5,10 @@ import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
 import type { RememberedThread } from "../../main/types/status";
 import type { ThreadBundle } from "../../main/types/thread";
+import type { WorklineLifecycleAction } from "../../main/workline/lifecycle";
+import type { PetShellSurface, WindowMode } from "../ui-surface";
 import { PetAvatar } from "./PetAvatar";
-import { PetBubble } from "./PetBubble";
+import { CompactThreadCard } from "./CompactThreadCard";
 import { PetControls } from "./PetControls";
 import { PetPresence } from "./PetPresence";
 import { PetWorkbench } from "./PetWorkbench";
@@ -20,6 +22,7 @@ import {
   getGuardedThreadTitle,
   guardedThreadVerbByAge,
 } from "../guarded-thread";
+import { getThreadWaitingReminder } from "../thread-cache-waiting";
 import {
   getPetUiState,
   moodLabelByState,
@@ -46,34 +49,39 @@ type PetdexRuntimeBubble = {
   counter: number | null;
 };
 
+type HotCapChoice = {
+  card: CardRecord;
+  hotCards: CardRecord[];
+};
+
 type PetShellProps = {
-  windowMode: "mini" | "compact" | "expanded";
+  surface: PetShellSurface;
   historyOpen: boolean;
+  recentlyReleasedCardId: number | null;
+  freshResolveCardId: number | null;
   chaosText: string;
   petHourlyBudget: number;
   petShownThisHour: number;
   isNestSubmitting: boolean;
   petNote: string | null;
-  bubbleCard: CardRecord | null;
-  showBubble: boolean;
   spritesheetUrl: string;
   isAsync: boolean;
   hasError: boolean;
   eventVersion: number;
   petdexRuntimeState: PetdexRuntimeState | null;
   petdexBubble: PetdexRuntimeBubble | null;
-  onCloseBubble: () => void;
   onChaosTextChange: (value: string) => void;
   onSubmitChaosReset: () => void;
-  onChangePetBudget: (delta: number) => void;
   onToggleHistory: () => void;
   onCompanionNote: (note: string, duration?: number) => void;
   onPoke: () => void;
-  onSetWindowSize: (windowSize: "mini" | "compact" | "expanded") => void;
+  onSetWindowSize: (windowSize: WindowMode) => void;
   activeCardTitle: string | null;
   hasPendingCard: boolean;
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
+  dailyCloseLineCards: CardRecord[];
+  hotCapChoice: HotCapChoice | null;
   activeThreadBundle: ThreadBundle | null;
   dispatchingCardId: number | null;
   updatingDispatchCardId: number | null;
@@ -88,28 +96,33 @@ type PetShellProps = {
   onAcceptClipboardOffer: () => void;
   onDismissClipboardOffer: () => void;
   onReleaseRememberedThread: (card: CardRecord) => void;
+  onUpdateWorklineLifecycle: (card: CardRecord, action: WorklineLifecycleAction) => void;
+  onSkipDailyCloseLine: () => void;
+  onHotCapLater: () => void;
+  onHotCapDrop: () => void;
+  onHotCapReplace: (card: CardRecord) => void;
+  compactCardCloseLabel: string;
+  onCloseCompactCard: () => void;
 };
 
 export function PetShell({
-  windowMode,
+  surface,
   historyOpen,
+  recentlyReleasedCardId,
+  freshResolveCardId,
   chaosText,
   petHourlyBudget,
   petShownThisHour,
   isNestSubmitting,
   petNote,
-  bubbleCard,
-  showBubble,
   spritesheetUrl,
   isAsync,
   hasError,
   eventVersion,
   petdexRuntimeState,
   petdexBubble,
-  onCloseBubble,
   onChaosTextChange,
   onSubmitChaosReset,
-  onChangePetBudget,
   onToggleHistory,
   onCompanionNote,
   onPoke,
@@ -118,6 +131,8 @@ export function PetShell({
   hasPendingCard,
   rememberedThread,
   rememberedThreadCard,
+  dailyCloseLineCards,
+  hotCapChoice,
   activeThreadBundle,
   dispatchingCardId,
   updatingDispatchCardId,
@@ -131,7 +146,14 @@ export function PetShell({
   clipboardOffer,
   onAcceptClipboardOffer,
   onDismissClipboardOffer,
-  onReleaseRememberedThread
+  onReleaseRememberedThread,
+  onUpdateWorklineLifecycle,
+  onSkipDailyCloseLine,
+  onHotCapLater,
+  onHotCapDrop,
+  onHotCapReplace,
+  compactCardCloseLabel,
+  onCloseCompactCard
 }: PetShellProps) {
   const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,14 +168,19 @@ export function PetShell({
   const triggerCleanupRefs = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const triggerIdRef = useRef(0);
   const prevEventVersionRef = useRef(eventVersion);
+  const windowMode = surface.windowMode;
   const isMini = windowMode === "mini";
+  const isCompact = windowMode === "compact";
+  const isExpanded = surface.kind === "expanded_workbench";
+  const showMiniNote = surface.kind === "mini_note";
+  const showMiniRememberedThread = surface.kind === "mini_remembered";
+  const showCompactThreadCard = surface.kind === "compact_card";
+  const showCompactRememberedThread = surface.kind === "compact_remembered";
+  const compactCard = showCompactThreadCard ? surface.card : null;
+  const compactRememberedCard = showCompactRememberedThread ? surface.card : null;
   const petdexBubbleText = petdexBubble?.text ?? null;
   const petdexBubbleSource = petdexBubble?.agentSource ?? null;
   const visiblePetNote = petdexBubbleText ?? petNote;
-  const [collapsedResumeCardId, setCollapsedResumeCardId] = useState<number | null>(null);
-  const resumeCardId = rememberedThreadCard !== null ? rememberedThreadCard.id : null;
-  const isResumeCollapsed = resumeCardId !== null && collapsedResumeCardId === resumeCardId;
-
   const triggerExpression = (expression: PetExpression, durationMs: number) => {
     const id = ++triggerIdRef.current;
     const trigger: ExpressionTrigger = { expression, startedAt: Date.now(), durationMs };
@@ -166,8 +193,6 @@ export function PetShell({
     }, durationMs);
     triggerCleanupRefs.current.set(id, timer);
   };
-  const isExpanded = windowMode === "expanded";
-
   useEffect(() => {
     if (clipboardOffer !== null) {
       setClipboardOfferPreview(clipboardOffer);
@@ -268,14 +293,14 @@ export function PetShell({
   const moodLabel = moodLabelByState[petUiState];
   const statusLabel = statusLabelByState[petUiState];
   const canShowRememberedThread = activeCardTitle === null && rememberedThread !== null;
-  const showResumeCard = !isMini && !isExpanded && !showBubble && rememberedThreadCard !== null && !isResumeCollapsed;
   // When the full resume card is on screen, suppress the presence-line memory hint
   // so the same thread does not echo in two places at once.
-  const memoryActive = canShowRememberedThread && !showResumeCard;
+  const memoryActive = canShowRememberedThread && !showCompactRememberedThread && !showCompactThreadCard;
   const isSleepy = transientExpression === "review" || petUiState === "sleepy";
   const guardedThreadTitle = getGuardedThreadTitle(rememberedThreadCard, rememberedThread);
   const guardedThreadNextMove = getGuardedThreadNextMove(rememberedThreadCard);
   const guardedThreadExpiresWhen = getGuardedThreadExpiresWhen(rememberedThreadCard);
+  const guardedThreadWaitingReminder = getThreadWaitingReminder(rememberedThreadCard);
   const guardedThreadAgeState = getGuardedThreadAgeState(rememberedThread?.createdAt ?? null, now);
   const guardedThreadVerb = guardedThreadVerbByAge[guardedThreadAgeState];
   const presenceTitle = memoryActive && guardedThreadTitle !== null
@@ -289,7 +314,13 @@ export function PetShell({
     ? null
     : `${guardedThreadVerb}：${clampGuardedThreadLabel(guardedThreadTitle, 18)}`;
   const miniRememberedNextMove = memoryActive
-    ? formatGuardedThreadActionLabel(guardedThreadAgeState, guardedThreadNextMove, guardedThreadExpiresWhen, 18)
+    ? guardedThreadWaitingReminder.state === "active"
+      ? `${guardedThreadWaitingReminder.age === "cooling"
+        ? "等了一阵："
+        : guardedThreadWaitingReminder.age === "cold"
+          ? "可放下："
+          : "正在等："}${clampGuardedThreadLabel(guardedThreadWaitingReminder.waitingOn ?? "", 18)}`
+      : formatGuardedThreadActionLabel(guardedThreadAgeState, guardedThreadNextMove, guardedThreadExpiresWhen, 18)
     : null;
   const liveStatusLabel = dragging
     ? runDirection === "left"
@@ -475,14 +506,14 @@ export function PetShell({
   };
 
   return (
-    <section className={`pet-shell pet-shell-${windowMode}`}>
-      {!isMini && !isExpanded ? (
+    <section className={`pet-shell pet-shell-${windowMode} ${showCompactRememberedThread ? "pet-shell-compact-remembered" : ""}`}>
+      {!isMini && !isExpanded && !showCompactThreadCard ? (
         <div className="pet-titlebar">
           <span>driftpet</span>
         </div>
       ) : null}
 
-      {isMini && clipboardOfferPreview === null && visiblePetNote !== null ? (
+      {showMiniNote && clipboardOfferPreview === null && visiblePetNote !== null ? (
         <div
           className={`pet-click-bubble ${petdexBubbleText !== null ? "pet-click-bubble-petdex" : ""}`}
           role="status"
@@ -494,7 +525,7 @@ export function PetShell({
         </div>
       ) : null}
 
-      {isMini && clipboardOfferPreview === null && visiblePetNote === null && miniRememberedTitle !== null ? (
+      {showMiniRememberedThread && clipboardOfferPreview === null && miniRememberedTitle !== null ? (
         <button
           className="pet-mini-resume-thread"
           onClick={onResurfaceRememberedThread}
@@ -505,19 +536,8 @@ export function PetShell({
         </button>
       ) : null}
 
-      {!isExpanded ? (
+      {!isExpanded && !showCompactThreadCard ? (
         <div className={`pet-avatar-shell pet-avatar-shell-${windowMode}`}>
-          {showBubble ? (
-            <div className="bubble-anchor">
-              <PetBubble
-                card={bubbleCard}
-                note={visiblePetNote}
-                onClose={onCloseBubble}
-                windowMode={windowMode}
-              />
-            </div>
-          ) : null}
-
           <PetAvatar
             buttonRef={buttonRef}
             dragging={dragging}
@@ -540,7 +560,7 @@ export function PetShell({
             </div>
           ) : null}
 
-          {!isMini ? (
+          {!isMini && !showCompactThreadCard && !showCompactRememberedThread ? (
             <PetPresence
               actionLabel={presenceActionLabel}
               label={presenceLabel}
@@ -552,22 +572,29 @@ export function PetShell({
         </div>
       ) : null}
 
-      {showResumeCard && rememberedThreadCard !== null ? (
-        <ResumeThreadCard
-          card={rememberedThreadCard}
-          onResume={onResurfaceRememberedThread}
-          onRelease={() => {
-            setCollapsedResumeCardId(rememberedThreadCard.id);
-            onReleaseRememberedThread(rememberedThreadCard);
-          }}
+      {showCompactThreadCard && compactCard !== null ? (
+        <CompactThreadCard
+          card={compactCard}
+          closeLabel={compactCardCloseLabel}
+          rememberedThread={rememberedThread}
+          onClose={onCloseCompactCard}
         />
       ) : null}
 
-      {!isMini ? (
+      {showCompactRememberedThread && compactRememberedCard !== null ? (
+        <ResumeThreadCard
+          card={compactRememberedCard}
+          onResume={onResurfaceRememberedThread}
+          onRelease={() => onReleaseRememberedThread(compactRememberedCard)}
+        />
+      ) : null}
+
+      {!isMini && !showCompactThreadCard ? (
         <div className={`pet-actions pet-actions-${windowMode}`}>
           {isExpanded ? (
             <PetWorkbench
               chaosText={chaosText}
+              companionNote={visiblePetNote}
               clipboardOffer={clipboardOfferPreview}
               onChaosTextChange={onChaosTextChange}
               onAcceptClipboardOffer={acceptClipboardOffer}
@@ -576,14 +603,23 @@ export function PetShell({
               isSubmitting={isNestSubmitting}
               onSubmitChaosReset={onSubmitChaosReset}
               historyOpen={historyOpen}
+              recentlyReleasedCardId={recentlyReleasedCardId}
+              freshResolveCardId={freshResolveCardId}
               onToggleHistory={onToggleHistory}
               rememberedThread={rememberedThread}
               rememberedThreadCard={rememberedThreadCard}
+              dailyCloseLineCards={dailyCloseLineCards}
+              hotCapChoice={hotCapChoice}
               activeThreadBundle={activeThreadBundle}
               dispatchingCardId={dispatchingCardId}
               updatingDispatchCardId={updatingDispatchCardId}
               capturingDispatchResultCardId={capturingDispatchResultCardId}
               onResurfaceRememberedThread={onResurfaceRememberedThread}
+              onUpdateWorklineLifecycle={onUpdateWorklineLifecycle}
+              onSkipDailyCloseLine={onSkipDailyCloseLine}
+              onHotCapLater={onHotCapLater}
+              onHotCapDrop={onHotCapDrop}
+              onHotCapReplace={onHotCapReplace}
               recentCards={recentCards}
               onSelectRecentCard={onSelectRecentCard}
               onDispatchClaudeThread={onDispatchClaudeThread}

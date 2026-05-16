@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  COMPACT_WINDOW_HEIGHT,
+  COMPACT_WINDOW_WIDTH,
   EDGE_GAP,
   EXPANDED_WINDOW_HEIGHT,
   EXPANDED_WINDOW_WIDTH,
@@ -47,6 +49,19 @@ test("expanded workbench defaults to the preferred compact desktop size", () => 
     {
       width: 582,
       height: 438,
+    }
+  );
+});
+
+test("compact thread view defaults to the wider reading layout", () => {
+  assert.deepEqual(
+    {
+      width: COMPACT_WINDOW_WIDTH,
+      height: COMPACT_WINDOW_HEIGHT,
+    },
+    {
+      width: 640,
+      height: 612,
     }
   );
 });

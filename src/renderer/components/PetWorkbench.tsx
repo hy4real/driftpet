@@ -4,6 +4,7 @@ import type { ClaudeDispatchUserStatus } from "../../main/types/claude";
 import type { RememberedThread } from "../../main/types/status";
 import type { ThreadBundle } from "../../main/types/thread";
 import type { ClipboardOffer } from "../../main/clipboard/watcher";
+import type { WorklineLifecycleAction } from "../../main/workline/lifecycle";
 import { getClaudeDispatchStatusView } from "../claude-dispatch-view";
 import {
   formatGuardedThreadActionLabel,
@@ -14,15 +15,24 @@ import {
   getGuardedThreadTitle,
   guardedThreadVerbByAge,
 } from "../guarded-thread";
+import { getThreadWaitingReminder } from "../thread-cache-waiting";
 import { PetSkinPanel } from "./PetSkinPanel";
 
 type PetWorkbenchProps = {
   chaosText: string;
+  companionNote: string | null;
   clipboardOffer: ClipboardOffer | null;
   isSubmitting: boolean;
   historyOpen: boolean;
+  recentlyReleasedCardId: number | null;
+  freshResolveCardId: number | null;
   rememberedThread: RememberedThread | null;
   rememberedThreadCard: CardRecord | null;
+  dailyCloseLineCards: CardRecord[];
+  hotCapChoice: {
+    card: CardRecord;
+    hotCards: CardRecord[];
+  } | null;
   activeThreadBundle: ThreadBundle | null;
   recentCards: CardRecord[];
   dispatchingCardId: number | null;
@@ -35,6 +45,11 @@ type PetWorkbenchProps = {
   onReturnToPet: () => void;
   onToggleHistory: () => void;
   onResurfaceRememberedThread: () => void;
+  onUpdateWorklineLifecycle: (card: CardRecord, action: WorklineLifecycleAction) => void;
+  onSkipDailyCloseLine: () => void;
+  onHotCapLater: () => void;
+  onHotCapDrop: () => void;
+  onHotCapReplace: (card: CardRecord) => void;
   onSelectRecentCard: (card: CardRecord) => void;
   onDispatchClaudeThread: (card: CardRecord) => void;
   onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
@@ -49,13 +64,41 @@ const previewClipboardText = (raw: string, maxLength = 72): string => {
   return `${collapsed.slice(0, maxLength - 1)}…`;
 };
 
+const summarizeWorkbenchHistoryCard = (card: CardRecord): string =>
+  card.threadCache?.nextMove
+  ?? card.threadCache?.chasing
+  ?? card.petRemark
+  ?? card.knowledgeTag;
+
+const summarizeThreadEntryCard = (card: CardRecord): string =>
+  card.threadCache?.nextMove
+  ?? card.threadCache?.chasing
+  ?? card.petRemark
+  ?? card.useFor;
+
+const worklineActions: Array<{
+  action: WorklineLifecycleAction;
+  label: string;
+  primary?: boolean;
+}> = [
+  { action: "continue_guarding", label: "继续守着", primary: true },
+  { action: "tomorrow", label: "明天接" },
+  { action: "archive", label: "沉淀" },
+  { action: "drop", label: "放下" },
+];
+
 export function PetWorkbench({
   chaosText,
+  companionNote,
   clipboardOffer,
   isSubmitting,
   historyOpen,
+  recentlyReleasedCardId,
+  freshResolveCardId,
   rememberedThread,
   rememberedThreadCard,
+  dailyCloseLineCards,
+  hotCapChoice,
   activeThreadBundle,
   recentCards,
   dispatchingCardId,
@@ -68,6 +111,11 @@ export function PetWorkbench({
   onReturnToPet,
   onToggleHistory,
   onResurfaceRememberedThread,
+  onUpdateWorklineLifecycle,
+  onSkipDailyCloseLine,
+  onHotCapLater,
+  onHotCapDrop,
+  onHotCapReplace,
   onSelectRecentCard,
   onDispatchClaudeThread,
   onUpdateClaudeDispatchStatus,
@@ -93,6 +141,13 @@ export function PetWorkbench({
   );
   const rememberedProgress = getGuardedThreadProgress(rememberedThread?.createdAt ?? null, now);
   const rememberedTitle = getGuardedThreadTitle(rememberedThreadCard, rememberedThread) ?? rememberedThreadCard?.title ?? "";
+  const rememberedWaitingReminder = getThreadWaitingReminder(rememberedThreadCard);
+  const rememberedWaitingLabel = rememberedWaitingReminder.age === "cold"
+    ? "可放下"
+    : "正在等";
+  const rememberedWaitingActionLabel = rememberedWaitingReminder.age === "cold"
+    ? "先做别的"
+    : "先推进";
   const threadAgeState = getGuardedThreadAgeState(threadAnchorCard?.createdAt ?? null, now);
   const threadVerb = guardedThreadVerbByAge[threadAgeState];
   const threadAction = formatGuardedThreadActionLabel(
@@ -102,7 +157,14 @@ export function PetWorkbench({
     44
   );
   const threadProgress = getGuardedThreadProgress(threadAnchorCard?.createdAt ?? null, now);
-  const threadWaitNote = threadAnchorCard?.threadCache?.expiresWhen ?? null;
+  const threadWaitingReminder = getThreadWaitingReminder(threadAnchorCard);
+  const threadWaitingOn = threadWaitingReminder.waitingOn;
+  const threadMeanwhile = threadWaitingReminder.meanwhile;
+  const threadWaitingLabel = threadWaitingReminder.age === "cooling"
+    ? "这条线已经等了一阵："
+    : threadWaitingReminder.age === "cold"
+      ? "这条线别再干等了："
+      : "这条线现在在等：";
 
   if (showSkinPanel) {
     return (
@@ -143,6 +205,111 @@ export function PetWorkbench({
           </section>
         ) : null}
 
+        {dailyCloseLineCards.length > 0 ? (
+          <section className="pet-workbench-close-line" aria-label="每日收线">
+            <div className="pet-workbench-close-line-header">
+              <div>
+                <p className="bubble-eyebrow">收线</p>
+                <h3>这些我今天还要继续替你守吗？</h3>
+              </div>
+              <button
+                type="button"
+                className="pet-workbench-resume-strip-secondary"
+                onClick={onSkipDailyCloseLine}
+              >
+                今天先不问
+              </button>
+            </div>
+            <ul className="pet-workbench-close-line-list">
+              {dailyCloseLineCards.map((card) => (
+                <li key={card.id} className="pet-workbench-close-line-item">
+                  <div className="pet-workbench-close-line-copy">
+                    <strong>{card.title}</strong>
+                    <span>{summarizeWorkbenchHistoryCard(card)}</span>
+                  </div>
+                  <div className="pet-workbench-close-line-actions">
+                    {worklineActions.map(({ action, label, primary }) => (
+                      <button
+                        key={action}
+                        type="button"
+                        className={primary ? "pet-workbench-resume-strip-button" : "pet-workbench-resume-strip-secondary"}
+                        onClick={() => onUpdateWorklineLifecycle(card, action)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {hotCapChoice !== null ? (
+          <section className="pet-workbench-hot-cap" aria-label="守线选择">
+            <div className="pet-workbench-close-line-header">
+              <div>
+                <p className="bubble-eyebrow">守线</p>
+                <h3>我已经在帮你守 3 条线了。</h3>
+                <p className="pet-workbench-thread-meta">
+                  这张要替换哪一条，还是先放到今天稍后再看？
+                </p>
+              </div>
+            </div>
+            {hotCapChoice.hotCards.length > 0 ? (
+              <div className="pet-workbench-hot-cap-replacements">
+                {hotCapChoice.hotCards.map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    className="pet-workbench-hot-cap-replace"
+                    onClick={() => onHotCapReplace(card)}
+                  >
+                    替换：{card.title}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="pet-workbench-close-line-actions">
+              <button
+                type="button"
+                className="pet-workbench-resume-strip-secondary"
+                onClick={onHotCapLater}
+              >
+                今天稍后再看
+              </button>
+              <button
+                type="button"
+                className="pet-workbench-resume-strip-secondary"
+                onClick={onHotCapDrop}
+              >
+                直接放下
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {rememberedThreadCard !== null && freshResolveCardId === rememberedThreadCard.id ? (
+          <div className="pet-workbench-fresh-resolve-strip" aria-label="刚等回来，值得优先接回">
+            <div className="pet-workbench-fresh-resolve-copy">
+              <span className="pet-workbench-fresh-resolve-eyebrow">优先接回</span>
+              <strong>{rememberedTitle}</strong>
+              <span className="pet-workbench-fresh-resolve-meta">
+                {rememberedThreadCard.latestClaudeDispatch?.resultSummary?.trim().length
+                  ? "Claude 结果刚记回这条线。"
+                  : "这条线刚等回来，可以直接往下接。"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="pet-workbench-fresh-resolve-button"
+              onClick={onResurfaceRememberedThread}
+            >
+              现在接回
+            </button>
+          </div>
+        ) : null}
+
         {rememberedThreadCard !== null ? (
           <div className="pet-workbench-resume-strip" aria-label="正在守着的工作记忆可接回">
             <div className="pet-workbench-resume-strip-copy">
@@ -151,6 +318,23 @@ export function PetWorkbench({
               <span className="pet-workbench-resume-strip-meta">
                 {rememberedVerb} · {rememberedAction}
               </span>
+              {rememberedWaitingReminder.state === "active" ? (
+                <div className="pet-workbench-resume-strip-waiting">
+                  <span className="pet-workbench-resume-strip-waiting-line">
+                    {rememberedWaitingLabel}：{rememberedWaitingReminder.waitingOn}
+                  </span>
+                  {rememberedWaitingReminder.meanwhile !== null ? (
+                    <span className="pet-workbench-resume-strip-waiting-line">
+                      {rememberedWaitingActionLabel}：{rememberedWaitingReminder.meanwhile}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {rememberedWaitingReminder.state === "resolved" && rememberedWaitingReminder.age === "resolved_fresh" ? (
+                <span className="pet-workbench-resume-strip-meta">
+                  等回来了 · 可以直接顺着这条线继续做
+                </span>
+              ) : null}
               <div
                 className={`pet-workbench-thread-progress pet-workbench-thread-progress-${rememberedAgeState}`}
                 aria-hidden="true"
@@ -158,13 +342,29 @@ export function PetWorkbench({
                 <span style={{ width: `${Math.round(rememberedProgress * 100)}%` }} />
               </div>
             </div>
-            <button
-              type="button"
-              className="pet-workbench-resume-strip-button"
-              onClick={onResurfaceRememberedThread}
-            >
-              接回
-            </button>
+            <div className="pet-workbench-resume-strip-actions">
+              <button
+                type="button"
+                className="pet-workbench-resume-strip-button"
+                onClick={onResurfaceRememberedThread}
+              >
+                接回
+              </button>
+              {worklineActions.map(({ action, label, primary }) => (
+                <button
+                  key={action}
+                  type="button"
+                  className={primary ? "pet-workbench-resume-strip-button" : "pet-workbench-resume-strip-secondary"}
+                  onClick={() => {
+                    if (rememberedThreadCard !== null) {
+                      onUpdateWorklineLifecycle(rememberedThreadCard, action);
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -202,9 +402,19 @@ export function PetWorkbench({
             <p className="pet-workbench-thread-copy">
               先沿着这条被守住的工作记忆往下做，不用每次都从孤立卡片重新起步。
             </p>
-            {threadWaitNote !== null && /等待|等|wait/i.test(threadWaitNote) ? (
+            {threadWaitingOn !== null ? (
               <p className="pet-workbench-thread-wait-note">
-                这条线现在在等，不是让你干等：{threadWaitNote}
+                {threadWaitingLabel}{threadWaitingOn}
+              </p>
+            ) : null}
+            {threadWaitingOn !== null && threadMeanwhile !== null ? (
+              <p className="pet-workbench-thread-copy">
+                {threadWaitingReminder.age === "cold" ? "先做别的，别围着它空转：" : "不用干等，先推进："}{threadMeanwhile}
+              </p>
+            ) : null}
+            {threadWaitingReminder.state === "resolved" && threadWaitingReminder.age === "resolved_fresh" ? (
+              <p className="pet-workbench-thread-copy">
+                这条线等回来了，直接顺着当前下一步往下接。
               </p>
             ) : null}
             {threadAnchorCard !== null && threadDispatch !== null && threadDispatchView !== null ? (
@@ -289,8 +499,7 @@ export function PetWorkbench({
                     onClick={() => onSelectRecentCard(entry.card)}
                   >
                     <strong>{entry.card.title}</strong>
-                    <span>{entry.card.knowledgeTag}</span>
-                    <p>{entry.card.threadCache?.nextMove ?? entry.card.useFor}</p>
+                    <p>{summarizeThreadEntryCard(entry.card)}</p>
                   </button>
                 </li>
               ))}
@@ -299,9 +508,14 @@ export function PetWorkbench({
         ) : null}
 
         <header className="pet-workbench-header">
-          <div>
+          <div className="pet-workbench-header-copy">
             <p className="bubble-eyebrow">小窝</p>
             <h2>先交给我守着。</h2>
+            {companionNote !== null ? (
+              <p className="pet-workbench-inline-note" role="status">
+                {companionNote}
+              </p>
+            ) : null}
           </div>
           <div className="pet-workbench-toolbar" aria-label="小窝操作">
             <button
@@ -323,7 +537,7 @@ export function PetWorkbench({
               onClick={onReturnToPet}
               type="button"
             >
-              收起
+              回到桌边
             </button>
           </div>
         </header>
@@ -334,6 +548,7 @@ export function PetWorkbench({
             className="manual-input"
             disabled={isSubmitting}
             onChange={(event) => onChaosTextChange(event.target.value)}
+            onInput={(event) => onChaosTextChange(event.currentTarget.value)}
             placeholder="例如：A 在等别人回复，这会儿先把 B 的验收补完；我怀疑不是 URL 抽取失败，而是 recall 去噪没压住；别再改 prompt。"
             value={chaosText}
           />
@@ -371,8 +586,11 @@ export function PetWorkbench({
                       className="pet-workbench-history-item"
                       onClick={() => onSelectRecentCard(card)}
                     >
+                      {recentlyReleasedCardId === card.id ? (
+                        <span className="pet-workbench-history-badge">刚放下</span>
+                      ) : null}
                       <strong>{card.title}</strong>
-                      <span>{card.threadCache?.chasing ?? card.knowledgeTag}</span>
+                      <span>{summarizeWorkbenchHistoryCard(card)}</span>
                     </button>
                   </li>
                 ))}

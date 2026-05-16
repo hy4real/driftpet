@@ -12,6 +12,7 @@ type ClaudeDispatchFeedback = {
 type HistoryDrawerProps = {
   cards: CardRecord[];
   isOpen: boolean;
+  recentlyReleasedCardId: number | null;
   dispatchingCardId: number | null;
   deletingCardId: number | null;
   updatingDispatchCardId: number | null;
@@ -19,11 +20,18 @@ type HistoryDrawerProps = {
   claudeDispatchFeedback: ClaudeDispatchFeedback | null;
   onClose: () => void;
   onDeleteCard: (card: CardRecord) => void;
+  onRecoverWorkline: (card: CardRecord) => void;
   onDispatchClaudeCode: (card: CardRecord) => void;
   onUpdateClaudeDispatchStatus: (card: CardRecord, status: ClaudeDispatchUserStatus) => void;
   onCaptureClaudeDispatchResult: (card: CardRecord, resultSummary: string) => void;
   onSelectCard: (card: CardRecord) => void;
 };
+
+const summarizeHistoryCard = (card: CardRecord): string =>
+  card.threadCache?.nextMove
+  ?? card.threadCache?.chasing
+  ?? card.petRemark
+  ?? card.useFor;
 
 const memoryAgeLabel = (index: number): string => {
   if (index === 0) {
@@ -36,9 +44,17 @@ const memoryAgeLabel = (index: number): string => {
   return "更早的小记忆";
 };
 
+const historyMemoryLabel = (card: CardRecord, index: number, recentlyReleasedCardId: number | null): string => {
+  if (recentlyReleasedCardId === card.id) {
+    return "刚放下";
+  }
+  return memoryAgeLabel(index);
+};
+
 export function HistoryDrawer({
   cards,
   isOpen,
+  recentlyReleasedCardId,
   dispatchingCardId,
   deletingCardId,
   updatingDispatchCardId,
@@ -46,6 +62,7 @@ export function HistoryDrawer({
   claudeDispatchFeedback,
   onClose,
   onDeleteCard,
+  onRecoverWorkline,
   onDispatchClaudeCode,
   onUpdateClaudeDispatchStatus,
   onCaptureClaudeDispatchResult,
@@ -76,7 +93,12 @@ export function HistoryDrawer({
         </div>
       ) : (
         <ul className="history-list">
-          {cards.map((card, index) => (
+          {cards.map((card, index) => {
+            const canRecover = card.lifecycleStatus === "dropped"
+              && card.recoverUntil !== null
+              && card.recoverUntil >= Date.now();
+
+            return (
             <li key={card.id}>
               <div className="history-card-shell">
                 <button
@@ -84,10 +106,11 @@ export function HistoryDrawer({
                   onClick={() => onSelectCard(card)}
                   type="button"
                 >
-                  <span className="history-memory-age">{memoryAgeLabel(index)}</span>
+                  <span className="history-memory-age">
+                    {historyMemoryLabel(card, index, recentlyReleasedCardId)}
+                  </span>
                   <strong>{card.title}</strong>
-                  <span>{card.knowledgeTag}</span>
-                  <p>{card.petRemark}</p>
+                  <p>{summarizeHistoryCard(card)}</p>
                 </button>
                 <div className="history-card-actions">
                   <button
@@ -98,6 +121,16 @@ export function HistoryDrawer({
                   >
                     {dispatchingCardId === card.id ? "正在派发..." : "派给 Claude Code"}
                   </button>
+                  {canRecover ? (
+                    <button
+                      className="ghost-button history-card-action"
+                      disabled={dispatchingCardId !== null || deletingCardId !== null}
+                      onClick={() => onRecoverWorkline(card)}
+                      type="button"
+                    >
+                      需要时找回
+                    </button>
+                  ) : null}
                   <button
                     className="ghost-button history-card-action history-card-action-danger"
                     disabled={dispatchingCardId !== null || deletingCardId !== null}
@@ -211,7 +244,8 @@ export function HistoryDrawer({
                 ) : null}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </aside>

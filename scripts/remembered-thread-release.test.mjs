@@ -17,15 +17,18 @@ process.env.DRIFTPET_EMBED_PROVIDER = "disabled";
 const { runMigrations } = require(path.join(${JSON.stringify(repoRoot)}, "dist-electron/src/main/db/migrate.js"));
 const { ingestChaosReset } = require(path.join(${JSON.stringify(repoRoot)}, "dist-electron/src/main/ingest/ingest.js"));
 const { getAppStatus, releaseRememberedThread } = require(path.join(${JSON.stringify(repoRoot)}, "dist-electron/src/main/status/app-status.js"));
+const { updateCardLifecycle } = require(path.join(${JSON.stringify(repoRoot)}, "dist-electron/src/main/workline/lifecycle.js"));
 
 (async () => {
   runMigrations();
 
   const first = await ingestChaosReset("主线是第一条真实守线，下一步是写第一条检查项。", "real");
+  updateCardLifecycle(first.id, "continue_guarding");
   const beforeRelease = await getAppStatus();
   releaseRememberedThread(first.id);
   const afterRelease = await getAppStatus();
   const second = await ingestChaosReset("主线是放下之后的新守线，下一步是确认它会重新出现。", "real");
+  updateCardLifecycle(second.id, "continue_guarding");
   const afterNewCard = await getAppStatus();
 
   console.log(JSON.stringify({
@@ -59,7 +62,7 @@ const runProbe = (electronScript) => new Promise((resolve, reject) => {
   });
 });
 
-test("released remembered thread stays in history but stops being guarded until a newer card lands", async () => {
+test("dropped remembered thread stays in history but stops being guarded until another card is kept", async () => {
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "driftpet-release-thread-"));
   const dataDir = path.join(tmpRoot, "data");
   try {
